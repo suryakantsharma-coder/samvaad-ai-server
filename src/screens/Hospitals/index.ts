@@ -1,0 +1,1 @@
+export { Hospitals } from "./Hospitals";
