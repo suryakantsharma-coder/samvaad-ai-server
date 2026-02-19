@@ -8,18 +8,18 @@
  * Outbound to Exotel: { event: "media", streamSid, media: { payload: "<base64>" } }.
  */
 
-const express = require("express");
-const expressWs = require("express-ws");
-const WebSocket = require("ws");
-const chatgpt = require("openai");
-const mongoose = require("mongoose");
-require("dotenv").config();
-const env = require("../config/env");
-const AppointmentModel = require("../models/appointment.model");
-const HospitalModel = require("../models/hospital.model");
-const DoctorModel = require("../models/doctor.model");
-const PatientModel = require("../models/patient.model");
-const { extractAppointmentFromTranscript } = require("./chatgpt");
+const express = require('express');
+const expressWs = require('express-ws');
+const WebSocket = require('ws');
+const chatgpt = require('openai');
+const mongoose = require('mongoose');
+require('dotenv').config();
+const env = require('../config/env');
+const AppointmentModel = require('../models/appointment.model');
+const HospitalModel = require('../models/hospital.model');
+const DoctorModel = require('../models/doctor.model');
+const PatientModel = require('../models/patient.model');
+const { extractAppointmentFromTranscript } = require('./chatgpt');
 
 // import express from "express";
 // import expressWs from "express-ws";
@@ -48,8 +48,9 @@ const SARVAM_API_KEY = process.env.SARVAM_API_KEY;
 const EXOTEL_SAMPLE_RATE = 8000;
 const EXOTEL_SAMPLE_WIDTH = 2;
 const EXOTEL_CHUNK_MS = 20;
-const EXOTEL_CHUNK_BYTES =
-  ((EXOTEL_SAMPLE_RATE * EXOTEL_CHUNK_MS) / 1000) * EXOTEL_SAMPLE_WIDTH; // 320
+const EXOTEL_CHUNK_BYTES = ((EXOTEL_SAMPLE_RATE * EXOTEL_CHUNK_MS) / 1000) * EXOTEL_SAMPLE_WIDTH; // 320
+const BOT_OUTBOUND_BUFFER_MS = 200;
+const BOT_OUTBOUND_BUFFER_CHUNKS = Math.max(1, Math.ceil(BOT_OUTBOUND_BUFFER_MS / EXOTEL_CHUNK_MS));
 
 // OpenAI Realtime API: 24kHz PCM 16-bit
 const OPENAI_SAMPLE_RATE = 24000;
@@ -103,10 +104,66 @@ function resample24kTo8k(pcm24k) {
 }
 
 // =========================
+// Option A: transcript-only input (user audio -> Whisper -> text -> model)
+// =========================
+const USE_TRANSCRIPT_ONLY = true;
+const TRANSCRIPT_ONLY_SILENCE_MS = 900;
+const TRANSCRIPT_ONLY_SPEECH_THRESHOLD = 300; // RMS for 16-bit PCM
+const TRANSCRIPT_ONLY_MIN_DURATION_MS = 400; // min speech to send (avoid noise)
+
+/** Build WAV buffer from 24kHz 16-bit mono PCM (for Whisper API). */
+function pcm24kToWavBuffer(pcm24k) {
+  const numSamples = pcm24k.length / 2;
+  const dataSize = numSamples * 2;
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + dataSize, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20); // PCM
+  header.writeUInt16LE(1, 22); // mono
+  header.writeUInt32LE(24000, 24);
+  header.writeUInt32LE(48000, 28); // byte rate
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(dataSize, 40);
+  return Buffer.concat([header, pcm24k]);
+}
+
+/** RMS of 16-bit LE PCM. */
+function computeRms(pcmBuffer) {
+  let sum = 0;
+  const n = pcmBuffer.length / 2;
+  for (let i = 0; i < n; i++) {
+    const s = pcmBuffer.readInt16LE(i * 2);
+    sum += s * s;
+  }
+  return n > 0 ? Math.sqrt(sum / n) : 0;
+}
+
+/** Transcribe audio (WAV buffer) via OpenAI Whisper API. */
+async function transcribeWithWhisper(wavBuffer) {
+  const { Readable } = require('stream');
+  const stream = Readable.from(wavBuffer);
+  stream.path = 'audio.wav';
+  const openai = new chatgpt({ apiKey: OPENAI_API_KEY });
+  const transcription = await openai.audio.transcriptions.create({
+    file: stream,
+    model: 'whisper-1',
+    language: 'hi',
+    prompt:
+      'Indian names, first name and last name. Hospital appointment, patient. Medical: piles, bavasir, बवासीर, pain, dard, pet dard, fever, bukhar, doctor, date, time.',
+  });
+  return transcription.text ? transcription.text.trim() : '';
+}
+
+// =========================
 // Parse appointment details from call transcript (for JSON log)
 // =========================
 function parseAppointmentFromTranscript(callTranscript, callerPhone) {
-  const fullText = callTranscript.map((t) => t.text).join(" ");
+  const fullText = callTranscript.map((t) => t.text).join(' ');
   if (!fullText) return null;
 
   // Prefer last mention of Hospital A/B (usually in confirmation)
@@ -126,14 +183,10 @@ function parseAppointmentFromTranscript(callTranscript, callerPhone) {
         /(?:patient|मरीज|રોગી)[\s:]+([A-Za-z\u0900-\u0DFF\s]+?)(?:\s*[,.]|\s+age|\s+उम्र|$)/i,
       )?.[1]
       ?.trim() ||
-    fullText
-      .match(/(?:patient|Patient):\s*([A-Za-z\s]+?)(?:\s*[,.]|\s+age|$)/i)?.[1]
-      ?.trim() ||
-    fullText.match(
-      /(?:confirmed for|with)\s+([A-Za-z]+)\s*(?:,|\.|age)/i,
-    )?.[1] ||
+    fullText.match(/(?:patient|Patient):\s*([A-Za-z\s]+?)(?:\s*[,.]|\s+age|$)/i)?.[1]?.trim() ||
+    fullText.match(/(?:confirmed for|with)\s+([A-Za-z]+)\s*(?:,|\.|age)/i)?.[1] ||
     null;
-  if (patientName) patientName = patientName.replace(/\s+/g, " ").trim();
+  if (patientName) patientName = patientName.replace(/\s+/g, ' ').trim();
 
   // Age: "age 55", "age: 55", "Age: 55", "उम्र 25", "55 years"
   const ageMatch =
@@ -150,9 +203,7 @@ function parseAppointmentFromTranscript(callTranscript, callerPhone) {
     fullText.match(
       /\d{1,2}(?:st|nd|rd|th)?\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)/i,
     ) ||
-    fullText.match(
-      /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2}/i,
-    );
+    fullText.match(/(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2}/i);
   const preferredDate = dateMatch ? dateMatch[0].trim() : null;
 
   // Time: "12 PM", "12:00 PM", "at 12 PM", "10 AM"
@@ -161,14 +212,7 @@ function parseAppointmentFromTranscript(callTranscript, callerPhone) {
     fullText.match(/(?:at|time)\s+(\d{1,2})\s*(?:AM|PM)/i);
   const preferredTime = timeMatch ? timeMatch[1].trim() : null;
 
-  if (
-    !hospital &&
-    !doctorName &&
-    !patientName &&
-    !patientAge &&
-    !preferredDate &&
-    !preferredTime
-  )
+  if (!hospital && !doctorName && !patientName && !patientAge && !preferredDate && !preferredTime)
     return null;
 
   return {
@@ -176,7 +220,7 @@ function parseAppointmentFromTranscript(callTranscript, callerPhone) {
     doctorName,
     patientName: patientName || null,
     patientAge,
-    phone: callerPhone !== "unknown" ? callerPhone : null,
+    phone: callerPhone !== 'unknown' ? callerPhone : null,
     preferredDate,
     preferredTime,
     callEndedAt: new Date().toISOString(),
@@ -211,8 +255,7 @@ CALL FLOW:
 // const HOSPITAL_PROMPT = `
 // તમે ABC Hospital ના Calling Assistant છો. શરૂઆત હંમેશા ABC Hospital તરફથી warm greeting થી કરો. તમારી ભાષા ગરમજોશીભરી, નેચરલ અને માણસ જેવી હોવી જોઈએ (robotic નહીં). તમારું કામ કોલર ના symptoms સમજવું, આપેલી doctor list માંથી યોગ્ય department/doctor suggest કરવું, અને appointment book કરવામાં મદદ કરવી છે. ભાષા ONLY પહેલી caller message પરથી detect કરો (English/Hindi/Gujarati) અને આખા call દરમિયાન એ જ ભાષા LOCK રાખો (વચ્ચે language switch નહીં કરવું). Caller બોલીને પૂરો કરે એટલે તરત જવાબ આપો: પહેલા એ જ ભાષામાં નાનું acknowledgment આપો, પછી naturally આખો જવાબ આપો. કોઈપણ બીમારીનું diagnosis ન કરો અને કોઈ medicine prescribe ન કરો. જો symptoms life-threatening લાગે (severe chest pain, unconsciousness, heavy bleeding), તો તરત nearest emergency માં જવા માટે redirect કરો. Booking વખતે માત્ર ONE question at a time પૂછો, આ જ order માં: patient name, patient age, phone number, preferred date, preferred time. માત્ર આ doctors જ use કરો: General Medicine: Dr. Amit Sharma (Mon–Sat 10:00AM–2:00PM), Dr. Neha Verma (Mon–Fri 4:00PM–8:00PM). Cardiology: Dr. Rajesh Mehta (Mon–Sat 11:00AM–3:00PM). Orthopedics: Dr. Suresh Iyer (Mon–Fri 10:00AM–1:00PM). Dermatology: Dr. Pooja Malhotra (Tue–Sun 12:00PM–5:00PM). ENT: Dr. Vikram Singh (Mon–Sat 9:00AM–12:00PM). Pediatrics: Dr. Anjali Rao (Mon–Sat 10:00AM–4:00PM). Symptom mapping: Fever/cold/headache/weakness→General Medicine; Chest pain/BP/heart issues→Cardiology; Joint/back pain/fracture→Orthopedics; Skin allergy/rashes/acne→Dermatology; Ear/throat/sinus→ENT; Child-related issues→Pediatrics. IMPORTANT: હંમેશા ONLY valid JSON output કરો જેમાં exactly 3 keys હોવી જોઈએ: intent, action, response। કોઈ extra text નહીં.
 // `;
-const DEFAULT_INSTRUCTIONS =
-  process.env.VOICE_AGENT_INSTRUCTIONS || HOSPITAL_PROMPT;
+const DEFAULT_INSTRUCTIONS = process.env.VOICE_AGENT_INSTRUCTIONS || HOSPITAL_PROMPT;
 // `You are a friendly and helpful voice assistant. Speak clearly and concisely. Keep responses brief and natural for a phone call.`;
 
 // =========================
@@ -224,138 +267,201 @@ const getHospitalInstructions = async (hospital) => {
   try {
     // Fetch all doctors for this hospital
     const doctors = await DoctorModel.find({ hospital: hospital._id })
-      .select("fullName designation availability status")
+      .select('fullName designation availability status')
       .lean();
 
     // Group doctors by designation/department
     const doctorsByDept = {};
     doctors.forEach((doctor) => {
-      const dept = doctor.designation || "General";
+      const dept = doctor.designation || 'General';
       if (!doctorsByDept[dept]) {
         doctorsByDept[dept] = [];
       }
       doctorsByDept[dept].push({
         name: doctor.fullName,
         designation: doctor.designation,
-        availability: doctor.availability || "9 AM - 5 PM",
-        status: doctor.status || "On Duty",
+        availability: doctor.availability || '9 AM - 5 PM',
+        status: doctor.status || 'On Duty',
       });
     });
 
     // Build doctor list string for prompt
-    let doctorListText = "";
+    let doctorListText = '';
     Object.keys(doctorsByDept).forEach((dept) => {
       doctorListText += `\n${dept}: `;
       const deptDoctors = doctorsByDept[dept];
       doctorListText += deptDoctors
         .map(
           (doc) =>
-            `Dr. ${doc.name} (${doc.availability})${doc.status !== "On Duty" ? ` - Status: ${doc.status}` : ""}`,
+            `Dr. ${doc.name} (${doc.availability})${doc.status !== 'On Duty' ? ` - Status: ${doc.status}` : ''}`,
         )
-        .join(", ");
+        .join(', ');
     });
 
     // Build dynamic prompt with hospital name and doctors
     const dynamicPrompt = `
-    You are ${hospital.name}'s Calling Assistant. Follow this flow strictly.
+   You are ${hospital.name}'s Calling Assistant (Female voice). Follow this flow strictly.
 
 HOSPITAL INFORMATION:
 - Hospital Name: ${hospital.name}
 - Hospital Address: ${hospital.address}, ${hospital.city} - ${hospital.pincode}
-- Hospital Phone: ${hospital.phoneCountryCode || "+91"} ${hospital.phoneNumber}
+- Hospital Phone: ${hospital.phoneCountryCode || '+91'} ${hospital.phoneNumber}
 
 AVAILABLE DOCTORS AT ${hospital.name.toUpperCase()}:
-${doctorListText || "\nNo doctors currently available. Please contact the hospital directly."}
+${doctorListText || '\nNo doctors currently available. Please contact the hospital directly.'}
 
-LANGUAGE RULES:
-1) GREETING: Always and ONLY in Hindi. Start every call with a warm Hindi greeting mentioning the hospital name.
-   Example: "नमस्ते, ${hospital.name} की तरफ से आपका स्वागत है।"
+user ka exact transcribed text use karo, audio interpretation pe mat jao
 
-2) After greeting, detect the caller's language from their FIRST reply (ONLY Hindi or Gujarati).
-   - If Hindi: Continue the rest of the call ONLY in Hindi.
-   - If Gujarati: Continue the rest of the call ONLY in Gujarati.
-   - Do NOT switch to English or any other language at any time after greeting.
+VOICE + SPEED + NATURAL FLOW RULES:
+1) You MUST sound like a polite, calm FEMALE receptionist voice.
+2) Speak like a real person — short, warm, one thing at a time. You may rephrase in your own words; keep the same meaning and flow. Do not sound like reading a script.
+3) Speak slowly and naturally. After every question, pause briefly (1-2 seconds) before continuing.
+4) Never ask multiple questions in one line.
 
-IMPORTANT REASON RULE (ENGLISH ONLY):
+TURN-TAKING (STRICT - NEVER TALK OVER):
+5) When the CALLER is speaking: Do NOT speak. Stay silent. Wait until they finish. Never overlap or interrupt the caller.
+6) When YOU are speaking and the caller starts speaking: STOP immediately, go silent, listen fully to what they say, then respond politely. Do not continue your sentence; let the caller have the floor.
+
+LANGUAGE RULES (AUTO - USER'S LANGUAGE):
+
+1) GREETING: Always and ONLY in Hindi.
+   First line MUST be:
+   "नमस्ते, ${hospital.name} की तरफ से आपका स्वागत है।"
+
+2) AUTO-DETECT LANGUAGE (do NOT ask "Hindi or Gujarati?"):
+   Right after the greeting, ask for their problem/illness in one short sentence in Hindi (e.g. "कृपया अपनी समस्या बताइए।"). From the caller's FIRST reply, detect the language they are speaking: if mainly Gujarati (e.g. ગુજરાતી words) → callerLanguage = "GU"; otherwise (Hindi, Hinglish, or unclear) → callerLanguage = "HI". Lock callerLanguage for the entire call.
+
+3) LANGUAGE LOCK (DO NOT SWITCH):
+   - If callerLanguage = "HI": Speak ONLY Hindi for the rest of the call.
+   - If callerLanguage = "GU": Speak ONLY Gujarati for the rest of the call. Never switch to Hindi after lock.
+   - Never mix languages in one response.
+
+4) BEFORE EVERY REPLY: If callerLanguage = "GU", your entire response MUST be in Gujarati only. If callerLanguage = "HI", entire response in Hindi only.
+
+IMPORTANT REASON RULE (ENGLISH ONLY FOR STORAGE):
 - The caller will speak the illness/reason in Hindi or Gujarati.
-- You MUST convert the reason into English before saving/creating the appointment.
+- You MUST convert the reason into English immediately.
+- You MUST use only the English reason when creating the appointment.
 - Never store/save the reason in Hindi or Gujarati.
-- Example conversions:
-  - "सीने में दर्द" -> "Chest pain"
-  - "બુખાર" -> "Fever"
-  - "ચામડી પર દાણા" -> "Skin rash"
+
+Examples:
+Hindi:
+- "बवासीर" / "मुझे बवासीर है" -> "Piles" (NOT Stomach pain)
+- "सीने में दर्द" -> "Chest pain"
+- "बुखार" -> "Fever"
+- "पेट दर्द" -> "Stomach pain"
+Gujarati:
+- "બવાસીર" -> "Piles" (NOT Stomach pain)
+- "સીનામાં દુખાવો" -> "Chest pain"
+- "બુખાર" -> "Fever"
+- "ચામડી પર દાણા" -> "Skin rash"
 
 CALL FLOW:
+
+REMINDER: If callerLanguage = "GU", every step below (reason confirm, patient status, name, date, time, final confirm) MUST be asked in Gujarati only. Do not use Hindi once the call is locked to Gujarati.
 
 0) CONTEXT:
 - The hospital is already selected (this call is for ${hospital.name}).
 - Do NOT ask the caller to choose any hospital.
 
-1) GREETING (FIRST LINE MUST BE IN HINDI):
-Say:
-"नमस्ते, ${hospital.name} की तरफ से आपका स्वागत है। कृपया अपनी समस्या / बीमारी बताएं।"
+1) GREETING + ASK PROBLEM (language auto from reply):
+   First say: "नमस्ते, ${hospital.name} की तरफ से आपका स्वागत है।"
+   Then ask for problem in Hindi: "कृपया अपनी समस्या बताइए।" From the caller's reply, detect callerLanguage (Gujarati vs Hindi) and lock it. Then continue in that language.
 
-2) ILLNESS/REASON:
-- Listen and capture the illness/reason the caller states in their language.
-- Convert that reason into English immediately.
-- This English reason must be used later while creating the appointment.
+2) ILLNESS/REASON (in callerLanguage):
+   You have already asked for problem. Capture the illness/reason from the caller's words. Convert to English for storage (reasonEnglish). See REASON MAPPING below — use exact mapping; do not confuse similar-sounding terms.
+
+REASON MAPPING (CRITICAL - DO NOT MIX):
+- बवासीर / બવાસીર / bavasir → English: "Piles". Do NOT use "Stomach pain" or "पेट दर्द" for बवासीर.
+- पेट दर्द / પેટ દર્દ / pet dard / stomach → English: "Stomach pain". Do NOT use "Piles" for पेट दर्द.
+- सीने में दर्द / seena dard → "Chest pain". बुखार / bukhar → "Fever". Other reasons: convert to correct English and store.
+
+CAPTURE + CONFIRM:
+- Listen and capture the illness/reason in the caller's exact words.
+- Convert to correct English using the mapping above. Store as reasonEnglish.
+
+IMPORTANT REASON CONFIRMATION RULE:
+- When confirming, use the EXACT reason the caller said — do not substitute a different condition. E.g. if caller said "मुझे बवासीर है" / "बवासीर", confirm "आपको बवासीर है, सही?" (HI) or "તમને બવાસીર છે, સાચું?" (GU). Do NOT confirm "पेट दर्द" or "stomach pain" when they said बवासीर.
+- If the caller says NO, ask again for the correct reason and repeat confirmation.
+- Only after caller confirms YES, proceed to Step 3.
 
 3) PATIENT STATUS:
-Ask:
-"क्या आपने पहले भी इस अस्पताल में इलाज कराया है, या आप यहाँ नए हैं?"
+Ask in callerLanguage whether they have visited this hospital before or are new (e.g. HI: "पहले यहाँ आ चुके हैं या नए हैं?" / GU: "અગાઉ આવ્યા છો કે નવા છો?" — or your own words).
 
 4) EXISTING PATIENT FLOW:
-- If the caller says they have taken treatment before / they are an existing patient:
-  a) Ask for Patient ID (format like P-YYYY-000001).
-  b) Call fetch_patient_by_patientId using the patientId.
-  c) You will get the patient record including _id.
-  d) Confirm patient details: name/age/gender/phone.
-  e) For appointment creation later, use patient._id (NOT patientId).
+If caller says they are an existing patient:
+
+If callerLanguage = "HI", ask:
+"कृपया अपना Patient ID बताइए।"
+
+If callerLanguage = "GU", ask:
+"કૃપા કરીને તમારું Patient ID જણાવશો."
+
+- Call fetch_patient_by_patientId using the patientId.
+- Confirm patient details one by one:
+  - Name
+  - Age
+  - Gender
+  - Phone
+
+- If any detail is wrong, ask correction in callerLanguage.
+- For appointment creation later, use patient._id (NOT patientId).
 
 5) NEW PATIENT FLOW:
-- If the caller says they are new / first time:
-  Ask ONE question at a time:
-  a) Full name
-  b) Age
-  c) Gender (Male/Female/Other)
-  d) Phone number (optional; system can use caller number automatically)
+If caller says they are new:
+Ask ONE question at a time in callerLanguage (name, age, gender, phone) in short natural phrases. Examples: HI — "पूरा नाम?", "उम्र क्या है?", "जेंडर? (Male/Female/Other)", "फोन नंबर?"; GU — "પૂરું નામ?", "ઉંમર?", "જેન્ડર?", "ફોન નંબર?" — or your own words.
 
-- Call create_patient.
+PATIENT NAME RULE (ENGLISH, FAST):
+- Ask for FULL name in one go (first + last) in callerLanguage (e.g. "पूरा नाम बताइए?" / "પૂરું નામ જણાવશો?"). Whatever the caller gives (Hindi, Gujarati, any script), convert to ENGLISH only (Roman/Latin) for create_patient. Example: "राजेश कुमार" → "Rajesh Kumar"; "સીતા પટેલ" → "Sita Patel". Store as fullName.
+- Confirm the name in ONE short sentence in callerLanguage (e.g. "नाम [NAME in English] है, सही?" / "નામ [NAME in English] છે, સાચું?"). If they say NO, ask again and re-confirm.
+- Spelling is OPTIONAL: do NOT insist on letter-by-letter spelling. If the caller offers to spell (letter-by-letter or word-by-word), accept it and use that for exact English spelling. If they don't spell, use your best conversion and proceed after short confirmation.
+- Only after name confirmation (and optional spelling if given), call create_patient with fullName in English only.
 - You will get back patientId and patient record including _id.
-- Confirm the patientId to the caller.
+- Confirm patientId to caller in callerLanguage.
 - For appointment creation later, use patient._id (NOT patientId).
 
 6) DOCTOR SELECTION (MANDATORY):
 - Always call list_doctors to get the FULL list of all doctors for this hospital.
-- Pick the doctor whose designation matches the patient's illness/reason.
-  Examples:
-  - Chest pain / heart issue -> Cardiologist
-  - Skin rash -> Dermatologist
-  - Fever / cough / cold -> General Physician
+- Pick the doctor whose designation matches the reasonEnglish.
 
-- Use ONLY that doctor's _id when creating the appointment.
+Examples:
+- Chest pain / heart issue -> Cardiologist
+- Skin rash -> Dermatologist
+- Fever / cough / cold -> General Physician
+- Child illness -> Pediatrician
+- Joint pain -> Orthopedic
+
+- Use ONLY that doctor's _id.
 - Never invent doctor names or ids.
 
 7) APPOINTMENT DATE & TIME:
-Ask one at a time:
-a) Preferred date
-b) Preferred time
-Confirm back the selected date and time.
+Ask for preferred date then time, one at a time, in callerLanguage (e.g. HI: "किस तारीख को?" then "किस समय?" / GU: "કઈ તારીખે?" then "ક્યા સમયે?" — or your own words). Confirm selected date and time in the same language.
 
 8) CONFIRMATION (ONE SENTENCE):
-Confirm in one sentence:
-"${hospital.name}, Dr. [Name], patient [name], patientId [P-...], phone [number], reason [ENGLISH reason], date [date], time [time]."
+Confirm in ONE sentence in callerLanguage.
+IMPORTANT: reason must remain English inside.
+
+If callerLanguage = "HI", say:
+"${hospital.name}, Dr. [Name], patient [name], patientId [P-...], phone [number], reason [reasonEnglish], date [date], time [time]."
+
+If callerLanguage = "GU", say:
+"${hospital.name}, Dr. [Name], patient [name], patientId [P-...], phone [number], reason [reasonEnglish], date [date], time [time]."
 
 9) CREATE APPOINTMENT:
 Call create_appointment with:
 - patientObjectId = patient._id
 - doctorObjectId = doctor._id
-- reason = the English converted reason from Step 2 (NOT from patient record)
+- reason = reasonEnglish
 - appointmentDateTimeISO
 
 10) FINAL:
-If appointment is created successfully, tell the caller:
+If appointment is created successfully:
+
+If callerLanguage = "HI", say:
 "आपकी अपॉइंटमेंट ID है: A-YYYY-000001"
+
+If callerLanguage = "GU", say:
+"તમારી અપોઇન્ટમેન્ટ ID છે: A-YYYY-000001"
 
 RULES:
 - Do NOT diagnose or prescribe medicines.
@@ -363,6 +469,9 @@ RULES:
 - Never mention tool names or JSON.
 - Always call list_doctors before booking.
 - Always save reason in English only.
+- Never speak too fast.
+- Always pause naturally between steps.
+
 
   `;
 
@@ -630,10 +739,7 @@ RULES:
 
     return dynamicPrompt;
   } catch (err) {
-    console.error(
-      `[Agent] Error fetching doctors for hospital ${hospital.name}:`,
-      err.message,
-    );
+    console.error(`[Agent] Error fetching doctors for hospital ${hospital.name}:`, err.message);
     // Fallback to default instructions if doctor fetch fails
     return `You are ${hospital.name}'s Calling Assistant. ${DEFAULT_INSTRUCTIONS}`;
   }
@@ -643,13 +749,13 @@ RULES:
 // WebSocket: Exotel <-> OpenAI Realtime bridge (hospital-specific)
 // Route: /media/:hospitalId
 // =========================
-app.ws("/media/:hospitalId", async (ws, req) => {
+app.ws('/media/:hospitalId', async (ws, req) => {
   const { hospitalId } = req.params;
 
   // Validate hospitalId format
   if (!mongoose.isValidObjectId(hospitalId)) {
     console.error(`[Exotel] Invalid hospitalId format: ${hospitalId}`);
-    ws.close(1008, "Invalid hospital ID");
+    ws.close(1008, 'Invalid hospital ID');
     return;
   }
 
@@ -659,15 +765,13 @@ app.ws("/media/:hospitalId", async (ws, req) => {
     hospital = await HospitalModel.findById(hospitalId).lean();
     if (!hospital) {
       console.error(`[Exotel] Hospital not found: ${hospitalId}`);
-      ws.close(1008, "Hospital not found");
+      ws.close(1008, 'Hospital not found');
       return;
     }
-    console.log(
-      `[Exotel] WebSocket connected for hospital: ${hospital.name} (${hospitalId})`,
-    );
+    console.log(`[Exotel] WebSocket connected for hospital: ${hospital.name} (${hospitalId})`);
   } catch (err) {
     console.error(`[Exotel] Error fetching hospital: ${err.message}`);
-    ws.close(1011, "Server error");
+    ws.close(1011, 'Server error');
     return;
   }
 
@@ -675,13 +779,9 @@ app.ws("/media/:hospitalId", async (ws, req) => {
   let hospitalInstructions;
   try {
     hospitalInstructions = await getHospitalInstructions(hospital);
-    console.log(
-      `[Agent] Loaded instructions for ${hospital.name} with doctors from database`,
-    );
+    console.log(`[Agent] Loaded instructions for ${hospital.name} with doctors from database`);
   } catch (err) {
-    console.error(
-      `[Agent] Error generating hospital instructions: ${err.message}`,
-    );
+    console.error(`[Agent] Error generating hospital instructions: ${err.message}`);
     hospitalInstructions = DEFAULT_INSTRUCTIONS;
   }
 
@@ -690,105 +790,99 @@ app.ws("/media/:hospitalId", async (ws, req) => {
   // =========================
   const tools = [
     {
-      type: "function",
-      name: "fetch_patient_by_patientId",
+      type: 'function',
+      name: 'fetch_patient_by_patientId',
       description:
-        "Find the patient using patientId (e.g. P-2026-000001) for the current hospital. Lookup is by patientId only. Returns the patient record including _id; use that _id as patientObjectId when calling create_appointment.",
+        'Find the patient using patientId (e.g. P-2026-000001) for the current hospital. Lookup is by patientId only. Returns the patient record including _id; use that _id as patientObjectId when calling create_appointment.',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
           patientId: {
-            type: "string",
-            description: "Patient ID like P-2026-000001",
+            type: 'string',
+            description: 'Patient ID like P-2026-000001',
           },
         },
-        required: ["patientId"],
+        required: ['patientId'],
         additionalProperties: false,
       },
     },
     {
-      type: "function",
-      name: "create_patient",
+      type: 'function',
+      name: 'create_patient',
       description:
         "Create a new patient for the current hospital and return patientId + details including _id. The caller's phone number from the call is automatically used for phoneNumber when not provided. Use the returned _id when linking to an appointment via create_appointment.",
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          fullName: { type: "string" },
-          age: { type: "number" },
-          gender: { type: "string", enum: ["Male", "Female", "Other"] },
+          fullName: { type: 'string' },
+          age: { type: 'number' },
+          gender: { type: 'string', enum: ['Male', 'Female', 'Other'] },
           phoneNumber: {
-            type: "string",
+            type: 'string',
             description:
               "Optional. If omitted or 'not provided', the system uses the phone number Exotel received the call from.",
           },
-          reason: { type: "string" },
+          reason: { type: 'string' },
         },
-        required: ["fullName", "age", "gender", "reason"],
+        required: ['fullName', 'age', 'gender', 'reason'],
         additionalProperties: false,
       },
     },
     {
-      type: "function",
-      name: "list_doctors",
+      type: 'function',
+      name: 'list_doctors',
       description:
         "List ALL doctors for the current hospital. Returns every doctor with _id, fullName, designation (e.g. Cardiologist, Dermatologist), availability, status. Use this list to pick the doctor whose designation matches the patient's illness, then use that doctor's _id as doctorObjectId when calling create_appointment.",
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {},
         additionalProperties: false,
       },
     },
     {
-      type: "function",
-      name: "search_doctors",
+      type: 'function',
+      name: 'search_doctors',
       description:
         "Search doctors by name or designation within the current hospital (optional filter). Returns matching doctors with _id. To get the full list first, use list_doctors instead. Use the selected doctor's _id as doctorObjectId when calling create_appointment.",
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          query: { type: "string" },
-          limit: { type: "number", default: 10 },
+          query: { type: 'string' },
+          limit: { type: 'number', default: 10 },
         },
-        required: ["query"],
+        required: ['query'],
         additionalProperties: false,
       },
     },
     {
-      type: "function",
-      name: "create_appointment",
+      type: 'function',
+      name: 'create_appointment',
       description:
-        "Create an appointment linking patient and doctor by their database _id. reason must be the illness/reason the caller stated during this call (step 2)—do not use a pre-set or stored value; take it from what the caller said.",
+        'Create an appointment linking patient and doctor by their database _id. reason must be the illness/reason the caller stated during this call (step 2)—do not use a pre-set or stored value; take it from what the caller said.',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
           doctorObjectId: {
-            type: "string",
-            description:
-              "The doctor's _id from list_doctors result (MongoDB ObjectId)",
+            type: 'string',
+            description: "The doctor's _id from list_doctors result (MongoDB ObjectId)",
           },
           patientObjectId: {
-            type: "string",
+            type: 'string',
             description:
               "The patient's _id from fetch_patient_by_patientId or create_patient result (MongoDB ObjectId)",
           },
           reason: {
-            type: "string",
+            type: 'string',
             description:
-              "The illness/reason the caller stated during the call (what they said when asked about their problem). Do not use patient record reason—use only what was said in this call.",
+              'The illness/reason the caller stated during the call (what they said when asked about their problem). Do not use patient record reason—use only what was said in this call.',
           },
           appointmentDateTimeISO: {
-            type: "string",
-            description: "UTC ISO string, e.g. 2026-02-12T12:00:00.000Z",
+            type: 'string',
+            description: 'UTC ISO string, e.g. 2026-02-12T12:00:00.000Z',
           },
-          type: { type: "string", default: "call" },
+          type: { type: 'string', default: 'call' },
         },
-        required: [
-          "doctorObjectId",
-          "patientObjectId",
-          "reason",
-          "appointmentDateTimeISO",
-        ],
+        required: ['doctorObjectId', 'patientObjectId', 'reason', 'appointmentDateTimeISO'],
         additionalProperties: false,
       },
     },
@@ -803,14 +897,28 @@ app.ws("/media/:hospitalId", async (ws, req) => {
   const audioQueue = []; // Queue Exotel audio until session.updated
   const callTranscript = []; // { role: "user"|"assistant", text: string }
   let appointmentDetails = null;
+  const outboundBotBuffer = []; // { sid, payload }[] — hold ~200ms so we can drop when user speaks
+  let userIsSpeaking = false;
   let callSummaryWritten = false;
+
+  // Option A: transcript-only — buffer user audio, VAD, Whisper, then send text to model
+  const transcriptOnlyState = {
+    userChunks: [],
+    lastSpeechAt: 0,
+    silenceStartedAt: null,
+    hadSpeechInTurn: false,
+    cancelResponse: () => {},
+    processing: false,
+  };
+  const MIN_SPEECH_BYTES_24K =
+    (TRANSCRIPT_ONLY_MIN_DURATION_MS / 1000) * OPENAI_SAMPLE_RATE * OPENAI_SAMPLE_WIDTH;
 
   const cleanupOpenAI = () => {
     if (openaiWs && openaiWs.readyState === WebSocket.OPEN) {
       try {
         openaiWs.close();
       } catch (e) {
-        console.error("[OpenAI] Error closing:", e);
+        console.error('[OpenAI] Error closing:', e);
       }
       openaiWs = null;
     }
@@ -818,39 +926,44 @@ app.ws("/media/:hospitalId", async (ws, req) => {
 
   const connectOpenAIRealtime = () => {
     if (!OPENAI_API_KEY) {
-      console.error("[OpenAI] OPENAI_API_KEY not set");
+      console.error('[OpenAI] OPENAI_API_KEY not set');
       return null;
     }
-    const model = "gpt-realtime-mini-2025-12-15";
+    // noise reduction model
+    const model = 'gpt-realtime-mini-2025-12-15';
     const url = `wss://api.openai.com/v1/realtime?model=${model}`;
     const client = new WebSocket(url, {
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "OpenAI-Beta": "realtime=v1",
+        'OpenAI-Beta': 'realtime=v1',
       },
     });
 
     // Realtime API may send function_call via response.output_item.added + response.function_call_arguments.done
     const pendingFunctionCalls = {};
 
-    client.on("open", () => {
+    client.on('open', () => {
       console.log(`[OpenAI] Realtime connected for hospital: ${hospital.name}`);
       // Beta Realtime API format: no session.type, use modalities + input_audio_format etc.
       const sessionUpdate = {
-        type: "session.update",
+        type: 'session.update',
         session: {
-          modalities: ["text", "audio"],
+          modalities: ['text', 'audio'],
           instructions: hospitalInstructions, // Use hospital-specific instructions
-          voice: "alloy",
-          input_audio_format: "pcm16",
-          output_audio_format: "pcm16",
-          input_audio_transcription: { model: "whisper-1" },
+          voice: 'sage',
+          input_audio_format: 'pcm16',
+          output_audio_format: 'pcm16',
+          input_audio_transcription: {
+            model: 'gpt-4o-transcribe',
+            prompt:
+              'Indian names, first name and last name. Roman or Devanagari. Hospital appointment, patient. Medical: piles, bavasir, बवासीर, pain, dard, pet dard, seena dard, fever, bukhar, cough, cold, stomach, headache, skin rash, doctor, date, time.',
+          },
           tools,
-          tool_choice: "auto",
+          tool_choice: 'auto',
           turn_detection: {
-            type: "server_vad",
-            threshold: 0.5,
-            prefix_padding_ms: 300,
+            type: 'server_vad',
+            threshold: 0.4,
+            prefix_padding_ms: 200,
             silence_duration_ms: 200,
           },
         },
@@ -858,22 +971,22 @@ app.ws("/media/:hospitalId", async (ws, req) => {
       client.send(JSON.stringify(sessionUpdate));
     });
 
-    client.on("message", (message) => {
+    client.on('message', (message) => {
       try {
         const event = JSON.parse(message.toString());
 
         // Log Realtime events that are relevant to tools (optional: set to true to see all event types)
         const logEventTypes = [
-          "response.output_item.added",
-          "response.function_call_arguments.done",
-          "conversation.item.created",
+          'response.output_item.added',
+          'response.function_call_arguments.done',
+          'conversation.item.created',
         ];
         if (logEventTypes.includes(event.type)) {
           console.log(
-            "[Agent] Realtime event:",
+            '[Agent] Realtime event:',
             event.type,
-            event.item?.type || "",
-            event.item?.name || event.call_id || "",
+            event.item?.type || '',
+            event.item?.name || event.call_id || '',
           );
         }
 
@@ -881,54 +994,48 @@ app.ws("/media/:hospitalId", async (ws, req) => {
 
         const sendToolOutput = async (callId, outputObj) => {
           console.log(
-            "[Agent] Tool response (data sent to ChatGPT):",
+            '[Agent] Tool response (data sent to ChatGPT):',
             JSON.stringify(outputObj, null, 2),
           );
           client.send(
             JSON.stringify({
-              type: "conversation.item.create",
+              type: 'conversation.item.create',
               item: {
-                type: "function_call_output",
+                type: 'function_call_output',
                 call_id: callId,
                 output: JSON.stringify(outputObj ?? {}),
               },
             }),
           );
-          client.send(JSON.stringify({ type: "response.create" }));
+          client.send(JSON.stringify({ type: 'response.create' }));
         };
 
         const runTool = async (callId, name, args) => {
           console.log(
-            "[Agent] ChatGPT requested tool:",
+            '[Agent] ChatGPT requested tool:',
             name,
-            "| call_id:",
+            '| call_id:',
             callId,
-            "| hospitalId:",
-            String(hospitalObjectId || ""),
+            '| hospitalId:',
+            String(hospitalObjectId || ''),
           );
-          console.log(
-            "[Agent] ChatGPT tool args (full):",
-            JSON.stringify(args, null, 2),
-          );
+          console.log('[Agent] ChatGPT tool args (full):', JSON.stringify(args, null, 2));
           try {
-            if (name === "fetch_patient_by_patientId") {
-              const patientId = String(args.patientId || "").trim();
-              console.log(
-                "[Agent] fetch_patient_by_patientId: looking up patientId:",
-                patientId,
-              );
+            if (name === 'fetch_patient_by_patientId') {
+              const patientId = String(args.patientId || '').trim();
+              console.log('[Agent] fetch_patient_by_patientId: looking up patientId:', patientId);
               const patient = await PatientModel.findOne({
                 patientId,
                 hospital: hospitalObjectId,
               }).lean();
               if (!patient) {
                 console.log(
-                  "[Agent] fetch_patient_by_patientId: NOT FOUND for patientId:",
+                  '[Agent] fetch_patient_by_patientId: NOT FOUND for patientId:',
                   patientId,
                 );
                 return await sendToolOutput(callId, {
                   ok: false,
-                  message: "Patient not found for this hospital.",
+                  message: 'Patient not found for this hospital.',
                 });
               }
               const out = {
@@ -941,35 +1048,32 @@ app.ws("/media/:hospitalId", async (ws, req) => {
                   gender: patient.gender,
                   phoneNumber: patient.phoneNumber,
                   reason: patient.reason,
-                  hospital: String(patient.hospital || ""),
+                  hospital: String(patient.hospital || ''),
                 },
               };
               console.log(
-                "[Agent] fetch_patient_by_patientId: FOUND | _id:",
+                '[Agent] fetch_patient_by_patientId: FOUND | _id:',
                 out.patient._id,
-                "| patientId:",
+                '| patientId:',
                 out.patient.patientId,
-                "| fullName:",
+                '| fullName:',
                 out.patient.fullName,
               );
               return await sendToolOutput(callId, out);
             }
 
-            if (name === "create_patient") {
-              const fullName = String(args.fullName || "").trim();
+            if (name === 'create_patient') {
+              const fullName = String(args.fullName || '').trim();
               const age = Number(args.age);
-              const gender = String(args.gender || "").trim();
-              const reason = String(args.reason || "").trim();
+              const gender = String(args.gender || '').trim();
+              const reason = String(args.reason || '').trim();
               // Use Exotel caller number (number that called in); fall back to what model collected
-              const argsPhone = String(args.phoneNumber || "").trim();
-              const fromCall =
-                callerPhone && callerPhone !== "unknown" ? callerPhone : "";
+              const argsPhone = String(args.phoneNumber || '').trim();
+              const fromCall = callerPhone && callerPhone !== 'unknown' ? callerPhone : '';
               const phoneNumber =
                 fromCall ||
-                (argsPhone && argsPhone.toLowerCase() !== "not provided"
-                  ? argsPhone
-                  : "");
-              console.log("[Agent] create_patient inputs:", {
+                (argsPhone && argsPhone.toLowerCase() !== 'not provided' ? argsPhone : '');
+              console.log('[Agent] create_patient inputs:', {
                 fullName,
                 age,
                 gender,
@@ -978,19 +1082,11 @@ app.ws("/media/:hospitalId", async (ws, req) => {
                 phoneNumberUsed: phoneNumber,
                 reason,
               });
-              if (
-                !fullName ||
-                !Number.isFinite(age) ||
-                age < 0 ||
-                !phoneNumber ||
-                !reason
-              ) {
-                console.log(
-                  "[Agent] create_patient validation failed: missing/invalid fields",
-                );
+              if (!fullName || !Number.isFinite(age) || age < 0 || !phoneNumber || !reason) {
+                console.log('[Agent] create_patient validation failed: missing/invalid fields');
                 return await sendToolOutput(callId, {
                   ok: false,
-                  message: "Missing/invalid patient fields.",
+                  message: 'Missing/invalid patient fields.',
                 });
               }
               const year = new Date().getFullYear();
@@ -999,16 +1095,13 @@ app.ws("/media/:hospitalId", async (ws, req) => {
                 patientId: new RegExp(`^${prefix}`),
               })
                 .sort({ patientId: -1 })
-                .select("patientId")
+                .select('patientId')
                 .lean();
               const nextNum = last
                 ? parseInt(String(last.patientId).slice(prefix.length), 10) + 1
                 : 1;
-              const patientId = `${prefix}${String(nextNum).padStart(6, "0")}`;
-              console.log(
-                "[Agent] Creating patient in DB with patientId:",
-                patientId,
-              );
+              const patientId = `${prefix}${String(nextNum).padStart(6, '0')}`;
+              console.log('[Agent] Creating patient in DB with patientId:', patientId);
               const patient = await PatientModel.create({
                 hospital: hospitalObjectId,
                 patientId,
@@ -1028,40 +1121,40 @@ app.ws("/media/:hospitalId", async (ws, req) => {
                   gender: patient.gender,
                   phoneNumber: patient.phoneNumber,
                   reason: patient.reason,
-                  hospital: String(patient.hospital || ""),
+                  hospital: String(patient.hospital || ''),
                 },
               };
               console.log(
-                "[Agent] create_patient: CREATED | _id:",
+                '[Agent] create_patient: CREATED | _id:',
                 out.patient._id,
-                "| patientId:",
+                '| patientId:',
                 out.patient.patientId,
               );
               return await sendToolOutput(callId, out);
             }
 
-            if (name === "list_doctors") {
+            if (name === 'list_doctors') {
               console.log(
-                "[Agent] list_doctors: fetching ALL doctors for hospital:",
-                String(hospitalObjectId || ""),
+                '[Agent] list_doctors: fetching ALL doctors for hospital:',
+                String(hospitalObjectId || ''),
               );
               const doctors = await DoctorModel.find({
                 hospital: hospitalObjectId,
               })
-                .select("_id fullName doctorId designation availability status")
+                .select('_id fullName doctorId designation availability status')
                 .lean();
               const doctorsPayload = doctors.map((d) => ({
                 _id: String(d._id),
-                doctorId: d.doctorId || "",
+                doctorId: d.doctorId || '',
                 fullName: d.fullName,
                 designation: d.designation,
                 availability: d.availability,
                 status: d.status,
               }));
               console.log(
-                "[Agent] list_doctors: DB returned",
+                '[Agent] list_doctors: DB returned',
                 doctors.length,
-                "doctors. Full list (use _id to book):",
+                'doctors. Full list (use _id to book):',
                 JSON.stringify(doctorsPayload, null, 2),
               );
               return await sendToolOutput(callId, {
@@ -1071,34 +1164,28 @@ app.ws("/media/:hospitalId", async (ws, req) => {
               });
             }
 
-            if (name === "search_doctors") {
-              const query = String(args.query || "").trim();
+            if (name === 'search_doctors') {
+              const query = String(args.query || '').trim();
               const limit = Math.max(1, Math.min(20, Number(args.limit || 10)));
-              console.log(
-                "[Agent] search_doctors: query:",
-                query,
-                "limit:",
-                limit,
-              );
+              console.log('[Agent] search_doctors: query:', query, 'limit:', limit);
               if (!query)
                 return await sendToolOutput(callId, {
                   ok: false,
-                  message:
-                    "Query is required. To get all doctors use list_doctors.",
+                  message: 'Query is required. To get all doctors use list_doctors.',
                 });
-              const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-              const regex = new RegExp(escaped, "i");
+              const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              const regex = new RegExp(escaped, 'i');
               const doctors = await DoctorModel.find({
                 hospital: hospitalObjectId,
                 $or: [{ fullName: regex }, { designation: regex }],
               })
-                .select("_id fullName doctorId designation availability status")
+                .select('_id fullName doctorId designation availability status')
                 .limit(limit)
                 .lean();
               console.log(
-                "[Agent] search_doctors: DB returned",
+                '[Agent] search_doctors: DB returned',
                 doctors.length,
-                "doctors. Raw from DB:",
+                'doctors. Raw from DB:',
                 JSON.stringify(
                   doctors.map((d) => ({
                     _id: String(d._id),
@@ -1112,14 +1199,14 @@ app.ws("/media/:hospitalId", async (ws, req) => {
               );
               const doctorsPayload = doctors.map((d) => ({
                 _id: String(d._id),
-                doctorId: d.doctorId || "",
+                doctorId: d.doctorId || '',
                 fullName: d.fullName,
                 designation: d.designation,
                 availability: d.availability,
                 status: d.status,
               }));
               console.log(
-                "[Agent] search_doctors: sending to ChatGPT (each doctor has _id for create_appointment):",
+                '[Agent] search_doctors: sending to ChatGPT (each doctor has _id for create_appointment):',
                 JSON.stringify(doctorsPayload, null, 2),
               );
               return await sendToolOutput(callId, {
@@ -1128,22 +1215,20 @@ app.ws("/media/:hospitalId", async (ws, req) => {
               });
             }
 
-            if (name === "create_appointment") {
-              const doctorObjectId = String(args.doctorObjectId || "").trim();
-              const patientObjectId = String(args.patientObjectId || "").trim();
-              const reason = String(args.reason || "").trim();
-              const appointmentDateTimeISO = String(
-                args.appointmentDateTimeISO || "",
-              ).trim();
-              const type = String(args.type || "call").trim() || "call";
+            if (name === 'create_appointment') {
+              const doctorObjectId = String(args.doctorObjectId || '').trim();
+              const patientObjectId = String(args.patientObjectId || '').trim();
+              const reason = String(args.reason || '').trim();
+              const appointmentDateTimeISO = String(args.appointmentDateTimeISO || '').trim();
+              const type = String(args.type || 'call').trim() || 'call';
               console.log(
-                "[Agent] create_appointment: ChatGPT sent doctorObjectId:",
+                '[Agent] create_appointment: ChatGPT sent doctorObjectId:',
                 doctorObjectId,
-                "patientObjectId:",
+                'patientObjectId:',
                 patientObjectId,
-                "reason:",
+                'reason:',
                 reason,
-                "appointmentDateTimeISO:",
+                'appointmentDateTimeISO:',
                 appointmentDateTimeISO,
               );
               if (
@@ -1151,27 +1236,27 @@ app.ws("/media/:hospitalId", async (ws, req) => {
                 !mongoose.isValidObjectId(patientObjectId)
               ) {
                 console.log(
-                  "[Agent] create_appointment: REJECTED - invalid ObjectId (doctorObjectId valid:",
+                  '[Agent] create_appointment: REJECTED - invalid ObjectId (doctorObjectId valid:',
                   mongoose.isValidObjectId(doctorObjectId),
-                  "patientObjectId valid:",
+                  'patientObjectId valid:',
                   mongoose.isValidObjectId(patientObjectId),
-                  ")",
+                  ')',
                 );
                 return await sendToolOutput(callId, {
                   ok: false,
-                  message: "Invalid doctor or patient id.",
+                  message: 'Invalid doctor or patient id.',
                 });
               }
               const dt = new Date(appointmentDateTimeISO);
               if (Number.isNaN(dt.getTime()))
                 return await sendToolOutput(callId, {
                   ok: false,
-                  message: "Invalid appointmentDateTimeISO.",
+                  message: 'Invalid appointmentDateTimeISO.',
                 });
               if (!reason)
                 return await sendToolOutput(callId, {
                   ok: false,
-                  message: "Reason is required.",
+                  message: 'Reason is required.',
                 });
 
               const [doctor, patient] = await Promise.all([
@@ -1185,32 +1270,28 @@ app.ws("/media/:hospitalId", async (ws, req) => {
                 }).lean(),
               ]);
               console.log(
-                "[Agent] create_appointment: Doctor lookup by _id:",
+                '[Agent] create_appointment: Doctor lookup by _id:',
                 doctorObjectId,
-                "->",
-                doctor ? "FOUND" : "NOT FOUND",
-                doctor
-                  ? { _id: String(doctor._id), fullName: doctor.fullName }
-                  : "",
+                '->',
+                doctor ? 'FOUND' : 'NOT FOUND',
+                doctor ? { _id: String(doctor._id), fullName: doctor.fullName } : '',
               );
               console.log(
-                "[Agent] create_appointment: Patient lookup by _id:",
+                '[Agent] create_appointment: Patient lookup by _id:',
                 patientObjectId,
-                "->",
-                patient ? "FOUND" : "NOT FOUND",
-                patient
-                  ? { _id: String(patient._id), fullName: patient.fullName }
-                  : "",
+                '->',
+                patient ? 'FOUND' : 'NOT FOUND',
+                patient ? { _id: String(patient._id), fullName: patient.fullName } : '',
               );
               if (!doctor)
                 return await sendToolOutput(callId, {
                   ok: false,
-                  message: "Doctor not found for this hospital.",
+                  message: 'Doctor not found for this hospital.',
                 });
               if (!patient)
                 return await sendToolOutput(callId, {
                   ok: false,
-                  message: "Patient not found for this hospital.",
+                  message: 'Patient not found for this hospital.',
                 });
 
               const year = new Date().getFullYear();
@@ -1219,78 +1300,64 @@ app.ws("/media/:hospitalId", async (ws, req) => {
                 appointmentId: new RegExp(`^${prefix}`),
               })
                 .sort({ appointmentId: -1 })
-                .select("appointmentId")
+                .select('appointmentId')
                 .lean();
               const nextNum = last
-                ? parseInt(
-                    String(last.appointmentId).slice(prefix.length),
-                    10,
-                  ) + 1
+                ? parseInt(String(last.appointmentId).slice(prefix.length), 10) + 1
                 : 1;
-              const appointmentId = `${prefix}${String(nextNum).padStart(6, "0")}`;
+              const appointmentId = `${prefix}${String(nextNum).padStart(6, '0')}`;
               const appointmentPayload = {
                 hospital: hospitalObjectId,
                 appointmentId,
                 patient: patientObjectId,
                 doctor: doctorObjectId,
                 reason,
-                status: "Upcoming",
+                status: 'Upcoming',
                 type,
                 appointmentDateTime: dt,
               };
-              console.log(
-                "[Agent] create_appointment: exact payload before save to database:",
-              );
+              console.log('[Agent] create_appointment: exact payload before save to database:');
               console.log(JSON.stringify(appointmentPayload, null, 2));
-              const appointment =
-                await AppointmentModel.create(appointmentPayload);
+              const appointment = await AppointmentModel.create(appointmentPayload);
               return await sendToolOutput(callId, {
                 ok: true,
                 appointment: {
                   _id: String(appointment._id),
                   appointmentId: appointment.appointmentId,
-                  hospital: String(appointment.hospital || ""),
+                  hospital: String(appointment.hospital || ''),
                   patient: String(appointment.patient),
                   doctor: String(appointment.doctor),
                   reason: appointment.reason,
                   status: appointment.status,
                   type: appointment.type,
-                  appointmentDateTime:
-                    appointment.appointmentDateTime?.toISOString?.() || null,
+                  appointmentDateTime: appointment.appointmentDateTime?.toISOString?.() || null,
                 },
               });
             }
 
-            console.log("[Agent] Unknown tool:", name);
+            console.log('[Agent] Unknown tool:', name);
             return await sendToolOutput(callId, {
               ok: false,
               message: `Unknown tool: ${name}`,
             });
           } catch (err) {
-            console.error(
-              "[Agent] Tool execution error:",
-              err.message,
-              err.stack,
-            );
+            console.error('[Agent] Tool execution error:', err.message, err.stack);
             return await sendToolOutput(callId, {
               ok: false,
-              message: err.message || "Tool error",
+              message: err.message || 'Tool error',
             });
           }
         };
 
         // 1) Server sends conversation.item.created when an item (e.g. function_call) is added to the conversation
-        if (
-          event.type === "conversation.item.created" &&
-          event.item?.type === "function_call"
-        ) {
+        if (event.type === 'conversation.item.created' && event.item?.type === 'function_call') {
           const { name, arguments: argsJson, call_id } = event.item;
           let args = {};
           try {
             args = argsJson ? JSON.parse(argsJson) : {};
           } catch (e) {
             console.error(
-              "[Agent] Failed to parse function args (conversation.item.created):",
+              '[Agent] Failed to parse function args (conversation.item.created):',
               argsJson,
             );
           }
@@ -1298,26 +1365,15 @@ app.ws("/media/:hospitalId", async (ws, req) => {
             runTool(call_id, name, args);
           } else {
             pendingFunctionCalls[call_id] = { name };
-            console.log(
-              "[Agent] Stored pending function call (no args yet):",
-              name,
-              call_id,
-            );
+            console.log('[Agent] Stored pending function call (no args yet):', name, call_id);
           }
         }
 
         // 2) During response streaming, server sends response.output_item.added for each new item (e.g. function_call)
-        if (
-          event.type === "response.output_item.added" &&
-          event.item?.type === "function_call"
-        ) {
+        if (event.type === 'response.output_item.added' && event.item?.type === 'function_call') {
           const { name, call_id } = event.item;
           pendingFunctionCalls[call_id] = { name };
-          console.log(
-            "[Agent] Pending function call (response.output_item.added):",
-            name,
-            call_id,
-          );
+          console.log('[Agent] Pending function call (response.output_item.added):', name, call_id);
           const argsJson = event.item.arguments;
           if (argsJson) {
             try {
@@ -1325,16 +1381,13 @@ app.ws("/media/:hospitalId", async (ws, req) => {
               delete pendingFunctionCalls[call_id];
               runTool(call_id, name, args);
             } catch (e) {
-              console.error(
-                "[Agent] Failed to parse function args (output_item.added):",
-                argsJson,
-              );
+              console.error('[Agent] Failed to parse function args (output_item.added):', argsJson);
             }
           }
         }
 
         // 3) When function call arguments finish streaming, we get the full arguments here
-        if (event.type === "response.function_call_arguments.done") {
+        if (event.type === 'response.function_call_arguments.done') {
           const { call_id, arguments: argsJson } = event;
           const pending = pendingFunctionCalls[call_id];
           if (pending) {
@@ -1343,13 +1396,10 @@ app.ws("/media/:hospitalId", async (ws, req) => {
             try {
               args = argsJson ? JSON.parse(argsJson) : {};
             } catch (e) {
-              console.error(
-                "[Agent] Failed to parse function args (arguments.done):",
-                argsJson,
-              );
+              console.error('[Agent] Failed to parse function args (arguments.done):', argsJson);
             }
             console.log(
-              "[Agent] Running tool from response.function_call_arguments.done:",
+              '[Agent] Running tool from response.function_call_arguments.done:',
               pending.name,
               call_id,
             );
@@ -1357,113 +1407,128 @@ app.ws("/media/:hospitalId", async (ws, req) => {
           }
         }
 
-        if (event.type === "session.updated") {
+        if (event.type === 'session.updated') {
           openaiReady = true;
-          console.log("[OpenAI] Session ready");
-          while (audioQueue.length > 0) {
-            const b64 = audioQueue.shift();
-            client.send(
-              JSON.stringify({ type: "input_audio_buffer.append", audio: b64 }),
-            );
+          console.log('[OpenAI] Session ready');
+          if (!USE_TRANSCRIPT_ONLY) {
+            while (audioQueue.length > 0) {
+              const b64 = audioQueue.shift();
+              client.send(JSON.stringify({ type: 'input_audio_buffer.append', audio: b64 }));
+            }
+          } else {
+            audioQueue.length = 0;
           }
           try {
-            client.send(JSON.stringify({ type: "response.create" }));
+            client.send(JSON.stringify({ type: 'response.create' }));
           } catch (_) {}
         }
 
-        // Stream output audio to Exotel: 8kHz 16-bit PCM in 20ms (320-byte) chunks
-        if (
-          event.type === "response.audio.delta" ||
-          event.type === "response.output_audio.delta"
-        ) {
+        // Flush outbound bot buffer to Exotel (skip if user started speaking — drop audio)
+        const flushOutboundBotBuffer = (sendToExotel = true) => {
+          if (!sendToExotel || userIsSpeaking) {
+            outboundBotBuffer.length = 0;
+            return;
+          }
+          while (outboundBotBuffer.length > 0) {
+            const { sid, payload } = outboundBotBuffer.shift();
+            try {
+              ws.send(JSON.stringify({ event: 'media', streamSid: sid, media: { payload } }));
+            } catch (e) {
+              console.error('[Exotel] Send media error:', e);
+            }
+          }
+        };
+
+        if (USE_TRANSCRIPT_ONLY) {
+          transcriptOnlyState.cancelResponse = () => {
+            userIsSpeaking = true;
+            flushOutboundBotBuffer(false);
+            try {
+              client.send(JSON.stringify({ type: 'response.cancel' }));
+            } catch (_) {}
+          };
+        }
+
+        // Stream output audio to Exotel: buffer ~200ms then send, so we can drop unsent when user speaks
+        if (event.type === 'response.audio.delta' || event.type === 'response.output_audio.delta') {
+          userIsSpeaking = false; // new bot output = allow sending again (in case previous response was canceled)
           const b64 = event.delta || event.audio;
           if (b64) {
-            const sid = streamSid || "default";
+            const sid = streamSid || 'default';
             if (!streamSid && !warnedNoStreamSid) {
               warnedNoStreamSid = true;
               console.warn(
                 "[Exotel] streamSid was null; sending media with streamSid='default'. If no audio on call, check Exotel payload for stream ID.",
               );
             }
-            const pcm24k = Buffer.from(b64, "base64");
+            const pcm24k = Buffer.from(b64, 'base64');
             const pcm8k = resample24kTo8k(pcm24k);
             for (let i = 0; i < pcm8k.length; i += EXOTEL_CHUNK_BYTES) {
-              const chunk = pcm8k.subarray(
-                i,
-                Math.min(i + EXOTEL_CHUNK_BYTES, pcm8k.length),
-              );
-              const payload = chunk.toString("base64");
-              try {
-                ws.send(
-                  JSON.stringify({
-                    event: "media",
-                    streamSid: sid,
-                    media: { payload },
-                  }),
-                );
-              } catch (e) {
-                console.error("[Exotel] Send media error:", e);
-              }
+              const chunk = pcm8k.subarray(i, Math.min(i + EXOTEL_CHUNK_BYTES, pcm8k.length));
+              const payload = chunk.toString('base64');
+              outboundBotBuffer.push({ sid, payload });
+              if (outboundBotBuffer.length >= BOT_OUTBOUND_BUFFER_CHUNKS)
+                flushOutboundBotBuffer(true);
             }
             if (!isBotSpeaking) {
               isBotSpeaking = true;
-              console.log("[Exotel] Bot started speaking");
+              console.log('[Exotel] Bot started speaking');
             }
           }
         }
 
-        if (
-          event.type === "response.done" ||
-          event.type === "response.output_audio.done"
-        ) {
+        if (event.type === 'response.done' || event.type === 'response.output_audio.done') {
+          flushOutboundBotBuffer(true);
+          userIsSpeaking = false;
           if (isBotSpeaking) {
             isBotSpeaking = false;
-            console.log("[OpenAI] Bot finished speaking");
+            console.log('[OpenAI] Bot finished speaking');
           }
         }
 
-        if (event.type === "input_audio_buffer.speech_started") {
-          console.log("[OpenAI] User speech started");
+        if (event.type === 'input_audio_buffer.speech_started') {
+          console.log(
+            '[OpenAI] User speech started — canceling bot response and dropping buffered bot audio',
+          );
+          userIsSpeaking = true;
+          flushOutboundBotBuffer(false);
+          client.send(JSON.stringify({ type: 'response.cancel' }));
         }
-        if (event.type === "input_audio_buffer.speech_stopped") {
-          console.log("[OpenAI] User speech stopped");
+        if (event.type === 'input_audio_buffer.speech_stopped') {
+          console.log('[OpenAI] User speech stopped');
         }
-        // Collect user transcript
+        // Collect user transcript + log for debugging (Hindi/name transcription)
         if (
-          event.type ===
-            "conversation.item.input_audio_transcription.completed" &&
+          event.type === 'conversation.item.input_audio_transcription.completed' &&
           event.transcript
         ) {
-          callTranscript.push({ role: "user", text: event.transcript });
+          console.log('[Agent] Input transcription (Whisper):', event.transcript || '(empty)');
+          callTranscript.push({ role: 'user', text: event.transcript });
         }
         // Collect assistant transcript (Realtime API may send response.output_audio_transcript.done)
-        if (
-          event.type === "response.output_audio_transcript.done" &&
-          event.transcript
-        ) {
-          callTranscript.push({ role: "assistant", text: event.transcript });
+        if (event.type === 'response.output_audio_transcript.done' && event.transcript) {
+          console.log('[Agent] Assistant transcript:', event.transcript || '(empty)');
+          callTranscript.push({ role: 'assistant', text: event.transcript });
         }
-        if (
-          event.type === "response.audio_transcript.done" &&
-          event.transcript
-        ) {
-          callTranscript.push({ role: "assistant", text: event.transcript });
+        if (event.type === 'response.audio_transcript.done' && event.transcript) {
+          console.log('[Agent] Assistant transcript:', event.transcript || '(empty)');
+          callTranscript.push({ role: 'assistant', text: event.transcript });
         }
-        if (event.type === "error") {
-          console.error("[OpenAI] Event error:", event.error || event);
+        if (event.type === 'error') {
+          console.error('[OpenAI] Event error:', event.error || event);
         }
       } catch (e) {
-        console.error("[OpenAI] Message parse error:", e);
+        console.error('[OpenAI] Message parse error:', e);
       }
     });
 
-    client.on("error", (err) => {
-      console.error("[OpenAI] WebSocket error:", err);
+    client.on('error', (err) => {
+      console.error('[OpenAI] WebSocket error:', err);
       cleanupOpenAI();
     });
 
-    client.on("close", () => {
-      console.log("[OpenAI] Realtime closed");
+    client.on('close', () => {
+      console.log('[OpenAI] Realtime closed');
       openaiWs = null;
     });
 
@@ -1472,7 +1537,7 @@ app.ws("/media/:hospitalId", async (ws, req) => {
 
   // Extract stream ID from any of the keys Exotel/Twilio might use
   const extractStreamSid = (obj) => {
-    if (typeof obj !== "object") return null;
+    if (typeof obj !== 'object') return null;
     if (obj.streamSid) return obj.streamSid;
     if (obj.stream_id) return obj.stream_id;
     if (obj.CallSid) return obj.CallSid;
@@ -1485,7 +1550,7 @@ app.ws("/media/:hospitalId", async (ws, req) => {
   };
 
   let firstMessageLogged = false;
-  ws.on("message", (message) => {
+  ws.on('message', (message) => {
     try {
       if (!message) return;
       const data = JSON.parse(message.toString());
@@ -1493,65 +1558,118 @@ app.ws("/media/:hospitalId", async (ws, req) => {
       const extracted = extractStreamSid(data);
       if (extracted && extracted !== streamSid) {
         streamSid = extracted;
-        console.log("[Exotel] streamSid:", streamSid);
+        console.log('[Exotel] streamSid:', streamSid);
       }
 
       if (!firstMessageLogged) {
         firstMessageLogged = true;
         console.log(
-          "[Exotel] First message keys:",
-          Object.keys(data).join(", "),
-          data.start
-            ? " start.keys: " + Object.keys(data.start).join(", ")
-            : "",
+          '[Exotel] First message keys:',
+          Object.keys(data).join(', '),
+          data.start ? ' start.keys: ' + Object.keys(data.start).join(', ') : '',
         );
       }
 
-      if (data.event === "start") {
-        if (!streamSid)
-          streamSid = data.start?.streamSid ?? data.streamSid ?? null;
+      if (data.event === 'start') {
+        if (!streamSid) streamSid = data.start?.streamSid ?? data.streamSid ?? null;
         callerPhone =
           data.start?.customParameters?.From ??
           data.start?.callerId ??
           data.start?.from ??
-          "unknown";
-        console.log(
-          `[Exotel] Call start streamSid=${streamSid} caller=${callerPhone}`,
-        );
+          'unknown';
+        console.log(`[Exotel] Call start streamSid=${streamSid} caller=${callerPhone}`);
         openaiWs = connectOpenAIRealtime();
-      } else if (data.event === "media") {
+      } else if (data.event === 'media') {
         const payload = data.media?.payload;
-        if (!payload || !openaiWs || openaiWs.readyState !== WebSocket.OPEN)
-          return;
-        if (!streamSid)
-          streamSid = data.streamSid ?? data.media?.streamSid ?? streamSid;
-        const pcm8k = Buffer.from(payload, "base64");
+        if (!payload || !openaiWs || openaiWs.readyState !== WebSocket.OPEN) return;
+        if (!streamSid) streamSid = data.streamSid ?? data.media?.streamSid ?? streamSid;
+        const pcm8k = Buffer.from(payload, 'base64');
         const pcm24k = resample8kTo24k(pcm8k);
-        const b64 = pcm24k.toString("base64");
-        if (openaiReady) {
-          openaiWs.send(
-            JSON.stringify({
-              type: "input_audio_buffer.append",
-              audio: b64,
-            }),
-          );
+
+        if (USE_TRANSCRIPT_ONLY) {
+          const rms = computeRms(pcm24k);
+          const now = Date.now();
+          const isSpeech = rms > TRANSCRIPT_ONLY_SPEECH_THRESHOLD;
+
+          if (transcriptOnlyState.processing) {
+            // skip while transcribing previous turn
+          } else if (isSpeech) {
+            transcriptOnlyState.hadSpeechInTurn = true;
+            if (transcriptOnlyState.silenceStartedAt !== null) {
+              transcriptOnlyState.cancelResponse();
+            }
+            transcriptOnlyState.lastSpeechAt = now;
+            transcriptOnlyState.silenceStartedAt = null;
+            transcriptOnlyState.userChunks.push(Buffer.from(pcm24k));
+          } else {
+            transcriptOnlyState.userChunks.push(Buffer.from(pcm24k));
+            if (transcriptOnlyState.silenceStartedAt === null) {
+              transcriptOnlyState.silenceStartedAt = now;
+            }
+            const totalBytes = transcriptOnlyState.userChunks.reduce((s, c) => s + c.length, 0);
+            const silenceDuration = now - transcriptOnlyState.silenceStartedAt;
+            if (
+              transcriptOnlyState.hadSpeechInTurn &&
+              totalBytes >= MIN_SPEECH_BYTES_24K &&
+              silenceDuration >= TRANSCRIPT_ONLY_SILENCE_MS
+            ) {
+              const wavBuffer = pcm24kToWavBuffer(Buffer.concat(transcriptOnlyState.userChunks));
+              transcriptOnlyState.userChunks = [];
+              transcriptOnlyState.silenceStartedAt = null;
+              transcriptOnlyState.lastSpeechAt = 0;
+              transcriptOnlyState.hadSpeechInTurn = false;
+              transcriptOnlyState.processing = true;
+
+              transcribeWithWhisper(wavBuffer)
+                .then((transcript) => {
+                  if (!transcript || !openaiWs || openaiWs.readyState !== WebSocket.OPEN) return;
+                  console.log('[Agent] Input transcription (Whisper):', transcript);
+                  callTranscript.push({ role: 'user', text: transcript });
+                  openaiWs.send(
+                    JSON.stringify({
+                      type: 'conversation.item.create',
+                      item: {
+                        type: 'message',
+                        role: 'user',
+                        content: [{ type: 'input_text', text: transcript }],
+                      },
+                    }),
+                  );
+                  openaiWs.send(JSON.stringify({ type: 'response.create' }));
+                })
+                .catch((err) => {
+                  console.error('[Agent] Whisper transcription error:', err.message);
+                })
+                .finally(() => {
+                  transcriptOnlyState.processing = false;
+                });
+            }
+          }
         } else {
-          audioQueue.push(b64);
+          const b64 = pcm24k.toString('base64');
+          if (openaiReady) {
+            openaiWs.send(
+              JSON.stringify({
+                type: 'input_audio_buffer.append',
+                audio: b64,
+              }),
+            );
+          } else {
+            audioQueue.push(b64);
+          }
         }
-      } else if (data.event === "stop") {
+      } else if (data.event === 'stop') {
         console.log(`[Exotel] Call stop for hospital: ${hospital.name}`);
         appointmentDetails =
           parseAppointmentFromTranscript(callTranscript, callerPhone) ||
-          (callTranscript.some((t) =>
-            /appointment|book|hospital|dr\./i.test(t.text),
-          )
+          (callTranscript.some((t) => /appointment|book|hospital|dr\./i.test(t.text))
             ? {
                 hospital: hospital._id.toString(),
                 hospitalName: hospital.name,
                 doctorName: null,
                 patientName: null,
                 patientAge: null,
-                phone: callerPhone !== "unknown" ? callerPhone : null,
+                phone: callerPhone !== 'unknown' ? callerPhone : null,
                 preferredDate: null,
                 preferredTime: null,
                 callEndedAt: new Date().toISOString(),
@@ -1569,10 +1687,10 @@ app.ws("/media/:hospitalId", async (ws, req) => {
           hospitalName: hospital.name,
           callTranscript,
           appointmentDetails: appointmentDetails || {
-            status: "no_appointment",
+            status: 'no_appointment',
             callEndedAt: new Date().toISOString(),
           },
-          callerPhone: callerPhone !== "unknown" ? callerPhone : null,
+          callerPhone: callerPhone !== 'unknown' ? callerPhone : null,
           streamSid,
         };
         try {
@@ -1594,42 +1712,35 @@ app.ws("/media/:hospitalId", async (ws, req) => {
           //     "[Exotel] Call transcript and appointment JSON saved:",
           //     filename,
           //   );
-          console.log(
-            `[Exotel] Call stop for ${hospital.name}. (No auto-create on stop)`,
-          );
+          console.log(`[Exotel] Call stop for ${hospital.name}. (No auto-create on stop)`);
         } catch (e) {
-          console.error("[Exotel] Failed to write call JSON:", e);
-          console.log(
-            "[Exotel] Call summary (inline):",
-            JSON.stringify(callSummary, null, 2),
-          );
+          console.error('[Exotel] Failed to write call JSON:', e);
+          console.log('[Exotel] Call summary (inline):', JSON.stringify(callSummary, null, 2));
         }
         cleanupOpenAI();
         ws.close();
       }
     } catch (e) {
-      console.error("[Exotel] Message error:", e);
+      console.error('[Exotel] Message error:', e);
     }
   });
 
-  ws.on("close", () => {
-    console.log("[Exotel] WebSocket disconnected");
+  ws.on('close', () => {
+    console.log('[Exotel] WebSocket disconnected');
     if (!callSummaryWritten && callTranscript.length > 0) {
       let details = appointmentDetails;
       if (!details) {
         details = parseAppointmentFromTranscript(callTranscript, callerPhone);
         if (
           !details &&
-          callTranscript.some((t) =>
-            /appointment|book|hospital|dr\./i.test(t.text),
-          )
+          callTranscript.some((t) => /appointment|book|hospital|dr\./i.test(t.text))
         ) {
           details = {
             hospital: null,
             doctorName: null,
             patientName: null,
             patientAge: null,
-            phone: callerPhone !== "unknown" ? callerPhone : null,
+            phone: callerPhone !== 'unknown' ? callerPhone : null,
             preferredDate: null,
             preferredTime: null,
             callEndedAt: new Date().toISOString(),
@@ -1641,40 +1752,30 @@ app.ws("/media/:hospitalId", async (ws, req) => {
         hospitalName: hospital.name,
         callTranscript,
         appointmentDetails: details || {
-          status: "no_appointment",
+          status: 'no_appointment',
           callEndedAt: new Date().toISOString(),
         },
-        callerPhone: callerPhone !== "unknown" ? callerPhone : null,
+        callerPhone: callerPhone !== 'unknown' ? callerPhone : null,
         streamSid,
       };
       try {
-        const fs = require("fs");
-        const path = require("path");
-        const dir = path.join(process.cwd(), "call_logs");
+        const fs = require('fs');
+        const path = require('path');
+        const dir = path.join(process.cwd(), 'call_logs');
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        const filename = path.join(
-          dir,
-          `call_${streamSid || Date.now()}_${Date.now()}.json`,
-        );
-        fs.writeFileSync(
-          filename,
-          JSON.stringify(callSummary, null, 2),
-          "utf8",
-        );
+        const filename = path.join(dir, `call_${streamSid || Date.now()}_${Date.now()}.json`);
+        fs.writeFileSync(filename, JSON.stringify(callSummary, null, 2), 'utf8');
         callSummaryWritten = true;
-        console.log(
-          "[Exotel] Call transcript and appointment JSON saved (on close):",
-          filename,
-        );
+        console.log('[Exotel] Call transcript and appointment JSON saved (on close):', filename);
       } catch (e) {
-        console.error("[Exotel] Failed to write call JSON:", e);
+        console.error('[Exotel] Failed to write call JSON:', e);
       }
     }
     cleanupOpenAI();
   });
 
-  ws.on("error", (err) => {
-    console.error("[Exotel] WebSocket error:", err);
+  ws.on('error', (err) => {
+    console.error('[Exotel] WebSocket error:', err);
     cleanupOpenAI();
   });
 });
@@ -1682,25 +1783,25 @@ app.ws("/media/:hospitalId", async (ws, req) => {
 // =========================
 // Health / root
 // =========================
-app.get("/", (req, res) => {
+app.get('/', (req, res) => {
   res.send(
-    "Chat-bot Voice Agent (Exotel + OpenAI Realtime). Connect to /media/:hospitalId via WebSocket.",
+    'Chat-bot Voice Agent (Exotel + OpenAI Realtime). Connect to /media/:hospitalId via WebSocket.',
   );
 });
 
 // Health check endpoint
-app.get("/health", (req, res) => {
-  res.json({ success: true, service: "voice-agent" });
+app.get('/health', (req, res) => {
+  res.json({ success: true, service: 'voice-agent' });
 });
 
 // List available hospitals endpoint (for debugging/config)
-app.get("/hospitals", async (req, res) => {
+app.get('/hospitals', async (req, res) => {
   try {
     const PORT = env.AGENT_PORT || 5002;
     const CLOUDFLARE_DOMAIN = env.CLOUDFLARE_DOMAIN;
 
     const hospitals = await HospitalModel.find({})
-      .select("_id name phoneNumber email address city pincode")
+      .select('_id name phoneNumber email address city pincode')
       .lean();
 
     // Get doctor counts for each hospital
@@ -1736,8 +1837,8 @@ app.get("/hospitals", async (req, res) => {
         hospitals: hospitalsWithDoctors,
         cloudflareDomain: CLOUDFLARE_DOMAIN || null,
         note: CLOUDFLARE_DOMAIN
-          ? "Use cloudflareUrl for Exotel production connections"
-          : "Set CLOUDFLARE_DOMAIN in .env to get Cloudflare URLs",
+          ? 'Use cloudflareUrl for Exotel production connections'
+          : 'Set CLOUDFLARE_DOMAIN in .env to get Cloudflare URLs',
       },
     });
   } catch (err) {
@@ -1754,14 +1855,14 @@ const startAgent = async () => {
 
   // Fetch and log all hospitals from database at startup
   try {
-    console.log("\n🏥 Loading hospitals from database...");
+    console.log('\n🏥 Loading hospitals from database...');
     const hospitals = await HospitalModel.find({})
-      .select("_id name phoneNumber email address city pincode")
+      .select('_id name phoneNumber email address city pincode')
       .lean();
 
     if (hospitals.length === 0) {
       console.log(
-        "   ⚠️  No hospitals found in database. Add hospitals to enable voice agent endpoints.",
+        '   ⚠️  No hospitals found in database. Add hospitals to enable voice agent endpoints.',
       );
     } else {
       console.log(`   ✓ Found ${hospitals.length} hospital(s):\n`);
@@ -1770,14 +1871,14 @@ const startAgent = async () => {
       const hospitalsWithDetails = await Promise.all(
         hospitals.map(async (h) => {
           const doctors = await DoctorModel.find({ hospital: h._id })
-            .select("fullName designation availability status")
+            .select('fullName designation availability status')
             .lean();
           const doctorCount = doctors.length;
 
           // Group doctors by department
           const doctorsByDept = {};
           doctors.forEach((doc) => {
-            const dept = doc.designation || "General";
+            const dept = doc.designation || 'General';
             if (!doctorsByDept[dept]) {
               doctorsByDept[dept] = [];
             }
@@ -1816,7 +1917,7 @@ const startAgent = async () => {
         if (hospital.doctorCount > 0) {
           const deptList = Object.keys(hospital.doctorsByDept)
             .map((dept) => `${dept} (${hospital.doctorsByDept[dept].length})`)
-            .join(", ");
+            .join(', ');
           console.log(`      Departments: ${deptList}`);
         } else {
           console.log(`      ⚠️  No doctors assigned to this hospital`);
@@ -1826,66 +1927,51 @@ const startAgent = async () => {
         if (hospital.cloudflareUrl) {
           console.log(`      🌐 Cloudflare URL: ${hospital.cloudflareUrl}`);
         }
-        console.log("");
+        console.log('');
       });
 
-      console.log(
-        `📞 Chat-bot Voice Agent ready for ${hospitals.length} hospital(s)`,
-      );
+      console.log(`📞 Chat-bot Voice Agent ready for ${hospitals.length} hospital(s)`);
 
       // Show Exotel-ready endpoints (first 2 hospitals)
       if (hospitalsWithDetails.length > 0) {
-        console.log("\n📱 Exotel Configuration Endpoints:");
-        console.log(
-          "   Configure these WebSocket URLs in your Exotel voice app:\n",
-        );
+        console.log('\n📱 Exotel Configuration Endpoints:');
+        console.log('   Configure these WebSocket URLs in your Exotel voice app:\n');
 
         hospitalsWithDetails.slice(0, 2).forEach((hospital, index) => {
           const exotelUrl =
-            hospital.cloudflareUrl ||
-            hospital.websocketUrl.replace("0.0.0.0", "localhost");
+            hospital.cloudflareUrl || hospital.websocketUrl.replace('0.0.0.0', 'localhost');
           console.log(`   ${index + 1}. ${hospital.name}:`);
           console.log(`      WebSocket URL: ${exotelUrl}`);
           console.log(`      Hospital ID: ${hospital.id}`);
-          console.log("");
+          console.log('');
         });
 
         if (hospitalsWithDetails.length > 2) {
-          console.log(
-            `   ... and ${hospitalsWithDetails.length - 2} more hospital(s)`,
-          );
+          console.log(`   ... and ${hospitalsWithDetails.length - 2} more hospital(s)`);
           console.log(`   Use GET /hospitals API to see all endpoints\n`);
         }
 
         if (!CLOUDFLARE_DOMAIN) {
-          console.log("   ⚠️  CLOUDFLARE_DOMAIN not set in .env");
-          console.log(
-            "   Set CLOUDFLARE_DOMAIN=your-domain.com to get Cloudflare URLs\n",
-          );
+          console.log('   ⚠️  CLOUDFLARE_DOMAIN not set in .env');
+          console.log('   Set CLOUDFLARE_DOMAIN=your-domain.com to get Cloudflare URLs\n');
         }
       }
     }
   } catch (err) {
     console.error(`   ❌ Error loading hospitals: ${err.message}`);
-    console.error(
-      `   Agent will still start, but hospital validation may fail.`,
-    );
+    console.error(`   Agent will still start, but hospital validation may fail.`);
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log("\n📞 Chat-bot Voice Agent Server Started");
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log('\n📞 Chat-bot Voice Agent Server Started');
     console.log(`   Port: ${PORT}`);
     console.log(`   WebSocket Pattern: ws://0.0.0.0:${PORT}/media/:hospitalId`);
     if (CLOUDFLARE_DOMAIN) {
-      console.log(
-        `   Cloudflare Pattern: wss://${CLOUDFLARE_DOMAIN}/media/:hospitalId`,
-      );
+      console.log(`   Cloudflare Pattern: wss://${CLOUDFLARE_DOMAIN}/media/:hospitalId`);
     }
     console.log(`   Health Check: http://0.0.0.0:${PORT}/health`);
     console.log(`   Hospitals API: http://0.0.0.0:${PORT}/hospitals`);
-    console.log(
-      `   Exotel: Use Cloudflare URLs above for production connections.\n`,
-    );
+    console.log(`   Exotel: Use Cloudflare URLs above for production connections.\n`);
   });
 };
 
@@ -1895,11 +1981,11 @@ module.exports = { startAgent };
 // If this file is run directly (not imported), start the agent server
 if (require.main === module) {
   startAgent().catch((err) => {
-    console.error("[Agent] Failed to start:", err);
+    console.error('[Agent] Failed to start:', err);
     process.exit(1);
   });
-  process.on("SIGINT", () => {
-    console.log("\nShutting down...");
+  process.on('SIGINT', () => {
+    console.log('\nShutting down...');
     process.exit(0);
   });
 }
