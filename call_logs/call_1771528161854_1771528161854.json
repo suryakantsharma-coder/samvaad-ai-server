@@ -1,0 +1,35 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "user",
+      "text": "अगर"
+    },
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है। \n\nक्या आप हिंदी में बात करेंगे या गुजराती में? શું તમે હિન્દીમાં બોલશો કે ગુજરાતીમાં?"
+    },
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है।\n\nक्या आप हिंदी में बात करेंगे या गुजराती में? \n\nશું તમે હિન્દીમાં બોલશો કે ગુજરાતીમાં?"
+    },
+    {
+      "role": "user",
+      "text": "Hello"
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "hospitalName": "Delhi Hospital",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": null,
+    "phone": "08383801256",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T19:09:21.849Z"
+  },
+  "callerPhone": "08383801256",
+  "streamSid": null
+}

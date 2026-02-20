@@ -1,0 +1,123 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है। कृपया अपनी समस्या / बीमारी बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    },
+    {
+      "role": "assistant",
+      "text": "आपकी आवाज़ से लगता है कि आप हिंदी में बात कर रहे हैं। कृपया बताएं कि आपकी समस्या क्या है।"
+    },
+    {
+      "role": "user",
+      "text": "You"
+    },
+    {
+      "role": "assistant",
+      "text": "कोई बात नहीं, कृपया अपनी समस्या को थोड़ा विस्तार से बताएं। मैं ध्यान से सुन रही हूँ।"
+    },
+    {
+      "role": "user",
+      "text": "Thank you."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया ध्यान से बताएं कि आपको क्या परेशानी हो रही है।"
+    },
+    {
+      "role": "user",
+      "text": "Thank you very much."
+    },
+    {
+      "role": "assistant",
+      "text": "मैं समझ गया, कृपया अपनी समस्या बताएँ। मैं पूरी मदद करूँगी।"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है,"
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    },
+    {
+      "role": "user",
+      "text": "Be cautious."
+    },
+    {
+      "role": "user",
+      "text": "अने मनी गणी समय थी माधा मा दुखाबो ने थोड़ी चिक करा गरचा."
+    },
+    {
+      "role": "assistant",
+      "text": "ज़रूर, मैं आपकी मदद करने की पूरी कोशिश करूंगी। पहले हम यह"
+    },
+    {
+      "role": "user",
+      "text": "प्रिपा करेंगे हमारी योग्यत पास करेंगे"
+    },
+    {
+      "role": "user",
+      "text": "Okay, bye-bye."
+    },
+    {
+      "role": "assistant",
+      "text": "सुनिए, मैं आपकी समस्या समझ गई हूँ—आपको सिरदर्द और चक्कर"
+    },
+    {
+      "role": "assistant",
+      "text": "मैं आपकी"
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    },
+    {
+      "role": "user",
+      "text": "Bye-bye."
+    },
+    {
+      "role": "assistant",
+      "text": "मैं समझ गई हूँ। कृपया पुष्टि कर"
+    },
+    {
+      "role": "user",
+      "text": "Bye. "
+    },
+    {
+      "role": "user",
+      "text": "I do."
+    },
+    {
+      "role": "assistant",
+      "text": "मैं आपकी समस्या को कन्फर्म करना चाहती हूँ—आपको सिरदर्द और चक्कर आ रहे हैं, सही है?"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, धन्यवाद।"
+    },
+    {
+      "role": "user",
+      "text": "You"
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "hospitalName": "Delhi Hospital",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": null,
+    "phone": "08383801256",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T11:23:02.213Z"
+  },
+  "callerPhone": "08383801256",
+  "streamSid": null
+}

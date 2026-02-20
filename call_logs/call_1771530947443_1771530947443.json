@@ -1,0 +1,23 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है। कृपया अपनी समस्या बताइए।"
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "hospitalName": "Delhi Hospital",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": null,
+    "phone": "08383801256",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T19:55:47.441Z"
+  },
+  "callerPhone": "08383801256",
+  "streamSid": null
+}

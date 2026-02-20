@@ -1,0 +1,119 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है।\nक्या आप हिंदी में बात करेंगे या गुजराती में? શું તમે હિન્દીમાં બોલશો કે ગુજરાતીમાં?"
+    },
+    {
+      "role": "user",
+      "text": "o Gujaratino."
+    },
+    {
+      "role": "assistant",
+      "text": "સમજાયું. હું હવે Gujarati માં વાત કરીશ. \n\nહવે, કૃપા કરીને તમારી સમસ્યા / બીમારી જણાવશો."
+    },
+    {
+      "role": "user",
+      "text": "I'm going to turn it back over to Lisa for Q&A."
+    },
+    {
+      "role": "assistant",
+      "text": "હું તમારી સમસ્યા કન્ફર્મ કરી લઉં — તમને “હેડેક” છે, સાચું છે?"
+    },
+    {
+      "role": "user",
+      "text": "Thank you."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है,"
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    },
+    {
+      "role": "user",
+      "text": "I am Gujarati, Madhya Pradesh."
+    },
+    {
+      "role": "assistant",
+      "text": "હું તમારી સમસ્યા કન્ફર્મ કરી લઉં — તમને “માથામાં દુખાવો અને ચક્કર” છે, સાચું છે?"
+    },
+    {
+      "role": "user",
+      "text": "मारी समस्या इचे, कि मने घना तिवसुत नी माठा मा दुखावो औने थोड़ी चक्कर आदी रहा हो, तो कृपा करीने मने योग्य सार्वार आगो।"
+    },
+    {
+      "role": "user",
+      "text": "you"
+    },
+    {
+      "role": "assistant",
+      "text": "ધન્યવાદ,"
+    },
+    {
+      "role": "user",
+      "text": "బేకు కొను సా చూషా"
+    },
+    {
+      "role": "user",
+      "text": "मने माथा मा दुखावू आने चक्कर आवेजो।"
+    },
+    {
+      "role": "assistant",
+      "text": "સારું, હવે આગળ વધીએ. શું તમે અગાઉ આ હોસ્પિટલમાં સારવાર કરાવી છે? કે તમે અહીં ન"
+    },
+    {
+      "role": "user",
+      "text": "Yep."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है। कृपया बता"
+    },
+    {
+      "role": "user",
+      "text": "મુ આને પુષ્ટી કરીશી કૃપા કૃરીને આગળ ની તપાસ્કુત્તુ."
+    },
+    {
+      "role": "user",
+      "text": "What?"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया बताएं कि क्या आप पहले भी इस अस्पताल में इलाज करा चुके हैं, या आप यहाँ नए हैं?"
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    },
+    {
+      "role": "user",
+      "text": "हूँ पहला की आ होस्पिटल मा एक वक़ट चार बार करा देती हूँ।"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया अपना Patient ID बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "पण घणा वच्चे बड़ा, आ वक्षे मुझे फरीती चकाता नहीं।"
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "doctorName": null,
+    "patientName": "ID बताएं। पण घणा वच्चे बड़ा",
+    "patientAge": null,
+    "phone": "08383801256",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T11:43:19.917Z",
+    "hospitalName": "Delhi Hospital"
+  },
+  "callerPhone": "08383801256",
+  "streamSid": null
+}

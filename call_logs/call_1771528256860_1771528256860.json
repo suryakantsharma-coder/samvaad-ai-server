@@ -1,0 +1,83 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है। क्या आप हिंदी में बात करेंगे या गुजराती में? શું તમે હિન્દીમાં બોલશો કે ગુજરાતીમાં?"
+    },
+    {
+      "role": "user",
+      "text": "बेन्डि इम्री."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, आप हिंदी में बात कर रहे हैं। कृपया अपनी समस्या बताएँ।"
+    },
+    {
+      "role": "user",
+      "text": "एन्दी विष्ट"
+    },
+    {
+      "role": "user",
+      "text": "मेरे हाथ में दर्दोर है।"
+    },
+    {
+      "role": "assistant",
+      "text": "आपको Hand pain है, सही?"
+    },
+    {
+      "role": "user",
+      "text": "नहीं मेरे को पाइड़ सन।"
+    },
+    {
+      "role": "assistant",
+      "text": "कोई बात नहीं, कृपया सही समस्या बताएँ, ताकि मैं ठीक से समझ सकूं। आप स्पष्ट रूप से बताएं, फिर से कृपया बताएं कि आपको क्या परेशानी है।"
+    },
+    {
+      "role": "user",
+      "text": "प्राइइविस्तियों"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, तो आपको पैर में दर्द है, सही?"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, चलिए हम इस जानकारी को पक्का करते हैं। कृपया बताए कि आपको हाथ में दर्द है, सही?"
+    },
+    {
+      "role": "assistant",
+      "text": "समझ गया। कृपया ठीक से बताएं – आप पैरों में दर्द की बात कर रहे हैं, सही?"
+    },
+    {
+      "role": "user",
+      "text": "नहीं, मिर्कोपायूचन।"
+    },
+    {
+      "role": "user",
+      "text": "नहीं पाइर्स की पिक्छत है।"
+    },
+    {
+      "role": "assistant",
+      "text": "समझ गया। तो आपको पाइल्स की समस्या है, सही?"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, अब बताएं कि आप पहले यहाँ आ चुके हैं या नए हैं?"
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "hospitalName": "Delhi Hospital",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": null,
+    "phone": "08383801256",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T19:10:56.859Z"
+  },
+  "callerPhone": "08383801256",
+  "streamSid": null
+}

@@ -1,0 +1,111 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है। कृपया अपनी समस्या बताइए।"
+    },
+    {
+      "role": "user",
+      "text": "बवासीर"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, आपने कहा कि आपको बायर्स डेमेज है, सही?"
+    },
+    {
+      "role": "user",
+      "text": "नहीं मुझे पाइल्स है।"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, आपको बवासीर है, सही?"
+    },
+    {
+      "role": "user",
+      "text": "बवासीर"
+    },
+    {
+      "role": "assistant",
+      "text": "आपके बवासीर की जानकारी मिल गई। अब बताइए, आप पहले यहाँ आ चुके हैं या नए हैं?"
+    },
+    {
+      "role": "user",
+      "text": "दर्द"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया अपना पूरा नाम बताइए।"
+    },
+    {
+      "role": "user",
+      "text": "डॉक्टर कांसुल्ट."
+    },
+    {
+      "role": "assistant",
+      "text": "नाम है सूरज कुमार, सही?"
+    },
+    {
+      "role": "user",
+      "text": "सुरे कांत शर्मा."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, नाम है सूरज कांश शर्मा, सही?"
+    },
+    {
+      "role": "user",
+      "text": "मही सूर्यकांत शर्मा."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया एक बार और बताएं: नाम \"सूर्यकांत शर्मा\" है, सही?"
+    },
+    {
+      "role": "user",
+      "text": "बवासीर."
+    },
+    {
+      "role": "assistant",
+      "text": "बहुत बढ़िया। अब कृपया आपकी उम्र बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "पेट दर्द."
+    },
+    {
+      "role": "assistant",
+      "text": "धन्यवाद। अब कृपया आपका जेंडर बताएं (Male/Female/Other)।"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, अब कृपया आपका फोन नंबर बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "मेल"
+    },
+    {
+      "role": "user",
+      "text": "एक दो दिन चर बंचे सातार."
+    },
+    {
+      "role": "assistant",
+      "text": "अभी मैं आपका फोन नंबर नोट करती हूँ।\n\nआपका फोन नंबर है 9812345678, सही?"
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "hospitalName": "Delhi Hospital",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": null,
+    "phone": "08383801256",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T19:44:43.571Z"
+  },
+  "callerPhone": "08383801256",
+  "streamSid": null
+}

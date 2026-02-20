@@ -1,0 +1,87 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है। कृपया अपनी समस्या बताइए।"
+    },
+    {
+      "role": "user",
+      "text": "मेरे को हाथ में स्ट्रेक्ट्र है।"
+    },
+    {
+      "role": "assistant",
+      "text": "आपको स्ट्रोक है, सही?"
+    },
+    {
+      "role": "user",
+      "text": "नहीं, मेरे हाद में सक्टर है."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया बताए कि आपकी पूरी समस्या क्या है, और आप किस तरह का दर्द महसूस कर रहे हैं। मैं समझने की कोशिश कर रही हूँ।"
+    },
+    {
+      "role": "user",
+      "text": "मेरे हांग में फैक्टर है, संधी हो."
+    },
+    {
+      "role": "assistant",
+      "text": "समझ गई। आप कह रहे हैं कि आपके हाथ में फ्रैक्चर है, सही?"
+    },
+    {
+      "role": "user",
+      "text": "हाँ सहीन."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, अब कृपया बताएं कि आप पहले यहाँ आ चुके हैं या नए हैं?"
+    },
+    {
+      "role": "user",
+      "text": "नहीं हैं।"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, यानी आप नए पेशेंट हैं। कृपया अपना पूरा नाम spelling में बताएं, हर अक्षर बोलकर।"
+    },
+    {
+      "role": "user",
+      "text": "स्यूर्यकन्ट,"
+    },
+    {
+      "role": "assistant",
+      "text": "कृपया पूरा नाम हर अक्षर बोलकर स्पेलिंग में बताएं, जैसे S-Y-U-R-Y-A-K-A-N-T."
+    },
+    {
+      "role": "user",
+      "text": "स्यूर्वाई एक एन्टी,"
+    },
+    {
+      "role": "assistant",
+      "text": "ध्यान से सुनिए, कृपया पूरा नाम अक्षर दर अक्षर सही तरीके से बताएँ, मैं दोहराती हूँ: S-Y-U-R-V-I, ठीक इसी तरह बोलिए।"
+    },
+    {
+      "role": "user",
+      "text": "स्यूर्वाईए, के, ए, एन, टी,"
+    },
+    {
+      "role": "assistant",
+      "text": "आपने 'स-य-ू-र-वी-ए-के-ए-एन-टी' बताया है, सही?"
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "hospitalName": "Delhi Hospital",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": null,
+    "phone": "08383801256",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-20T03:05:05.831Z"
+  },
+  "callerPhone": "08383801256",
+  "streamSid": null
+}

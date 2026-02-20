@@ -1,0 +1,123 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है"
+    },
+    {
+      "role": "user",
+      "text": "Thank you."
+    },
+    {
+      "role": "assistant",
+      "text": "कृपया अपनी समस्या / बीमारी बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    },
+    {
+      "role": "assistant",
+      "text": "मैं समझ गया, कृपया बताएं कि आपको क्या समस्या है।"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है,"
+    },
+    {
+      "role": "user",
+      "text": "That's why I love it."
+    },
+    {
+      "role": "user",
+      "text": "Boa tarde, bom dia, dona."
+    },
+    {
+      "role": "assistant",
+      "text": "मैं आपकी समस्या समझने की कोशिश कर रही हूँ। कृपया बताए, आपको क्या परेशानी या बीमारी हो रही है?"
+    },
+    {
+      "role": "user",
+      "text": "Bye-bye. "
+    },
+    {
+      "role": "assistant",
+      "text": "क्या आप हिंदी में बात करेंगे या गुजराती में?"
+    },
+    {
+      "role": "user",
+      "text": "Bye. "
+    },
+    {
+      "role": "user",
+      "text": "Bye. "
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया बताए, आप हिंदी में बात करेंगे, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "સામા મંગા તાનીવુત્તુ"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, तो मैं समझ रही हूँ कि आप हिंदी में बात कर रहे हैं। कृपया अब अपनी समस्या बताएं।"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया बताएं कि आपको"
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    },
+    {
+      "role": "user",
+      "text": "We'll see you next week, everyone."
+    },
+    {
+      "role": "assistant",
+      "text": "कोई बात नहीं, कृप"
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    },
+    {
+      "role": "assistant",
+      "text": "मैं समझने की"
+    },
+    {
+      "role": "user",
+      "text": "Thank you. "
+    },
+    {
+      "role": "user",
+      "text": "I don't know."
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "hospitalName": "Delhi Hospital",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": null,
+    "phone": "08383801256",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T11:21:31.852Z"
+  },
+  "callerPhone": "08383801256",
+  "streamSid": null
+}

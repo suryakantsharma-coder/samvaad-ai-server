@@ -1,0 +1,87 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है। कृपया अपनी समस्या बताइए।"
+    },
+    {
+      "role": "user",
+      "text": "जुपाई जुपाई."
+    },
+    {
+      "role": "assistant",
+      "text": "अगर आपको लग रहा है कि आप हिंदी में बोल रहे हैं, तो कृपया थोड़ा विस्तार से बताएं कि समस्या क्या है।"
+    },
+    {
+      "role": "user",
+      "text": "मुझे पायिंच है।"
+    },
+    {
+      "role": "assistant",
+      "text": "आपको पाइल्स है, सही?"
+    },
+    {
+      "role": "user",
+      "text": "हम"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, अब कृपया बताएं कि आप पहले यहाँ आ चुके हैं या नए हैं?"
+    },
+    {
+      "role": "user",
+      "text": "नई हैं।"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, तो चलिए हम आपकी जानकारी इकट्ठा करते हैं। कृपया पूरे नाम बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "तूरे कान्च शर्म"
+    },
+    {
+      "role": "assistant",
+      "text": "आपका नाम 'तूरे कान्च शर्मा' है, सही?"
+    },
+    {
+      "role": "user",
+      "text": "नहीं, सूर्वे, कांट, शर्म,"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, अब थोड़ा ध्यान से सुनिए। क्या नाम है—सूर्वे, कांट, शर्मा? कृपया एक बार फिर से पुष्टि कर दीजिए।"
+    },
+    {
+      "role": "user",
+      "text": "कीतोनगेट प्रस्ठ कीतोनगेट स्थिन एर एकमाले, स्थिन एकμαले, स्थिन एकमाले,"
+    },
+    {
+      "role": "assistant",
+      "text": "समझ गया। चलिए हम अब एक बार फिर से नाम कन्फर्म कर लेते हैं। कृपया ध्यान से बताएं: आपका पूरा नाम क्या है?"
+    },
+    {
+      "role": "user",
+      "text": "सोज़े,"
+    },
+    {
+      "role": "assistant",
+      "text": "आपका नाम 'सोज़े' है, सही?"
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "hospitalName": "Delhi Hospital",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": null,
+    "phone": "08383801256",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T20:15:54.381Z"
+  },
+  "callerPhone": "08383801256",
+  "streamSid": null
+}

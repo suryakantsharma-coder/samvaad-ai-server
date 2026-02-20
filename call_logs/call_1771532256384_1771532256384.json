@@ -1,0 +1,55 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है। कृपया अपनी समस्या बताइए।"
+    },
+    {
+      "role": "user",
+      "text": "मैं नुखे रता हूँ।"
+    },
+    {
+      "role": "assistant",
+      "text": "आपको बुखार है, सही?"
+    },
+    {
+      "role": "user",
+      "text": "इन नहीं।"
+    },
+    {
+      "role": "assistant",
+      "text": "कोई बात नहीं, कृपया अपनी समस्या एक बार फिर से बताएं, ताकि मैं सही समझ सकूं।"
+    },
+    {
+      "role": "user",
+      "text": "नहीं, क्या तुम गुझराती में बात कर सकते हूँ?"
+    },
+    {
+      "role": "assistant",
+      "text": "ज़रूर, मैं अब गुजराती में बात करूंगी।\n\nહવે કૃપા કરીને તમારી સમસ્યા કહી શકો છો?"
+    },
+    {
+      "role": "user",
+      "text": "शुरून्ड का स्तेंगान पहलद साँख शुरून्ड का स्टेळ मेचे बहासी का फाल 조�त मांट रहा है मी मान अमरिस sauce"
+    },
+    {
+      "role": "assistant",
+      "text": "I’m sorry, मैं पूरी तरह समझ नहीं पा रही हूँ। क्या आप कृपया अपनी समस्या को थोड़ा और स्पष्ट बता सकते हैं? आपके शब्दों को दोहराने में सहायता हो सकती है।"
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "hospitalName": "Delhi Hospital",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": null,
+    "phone": "08383801256",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T20:17:36.382Z"
+  },
+  "callerPhone": "08383801256",
+  "streamSid": null
+}

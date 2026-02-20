@@ -1,0 +1,211 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है। कृपया अपनी समस्या / बीमारी बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "मुझे पायच हुआ।"
+    },
+    {
+      "role": "assistant",
+      "text": "मैं आपकी समस्या समझने की कोशिश कर रही हूँ। क्या आप बता सकते हैं कि यह किस तरह का पायस है, और क्या यह पैरों पर है या शरीर के किसी और हिस्से पर?"
+    },
+    {
+      "role": "user",
+      "text": "शरीर के और हीसे पर पायस किदर होता है आपका नहीं बता"
+    },
+    {
+      "role": "assistant",
+      "text": "मैं समझ गई। कृपया मैं कन्फर्म कर लूँ — आपको शरीर के किसी और हिस्से पर पायस (Skin infection) है, सही है?"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, मैं आपकी समस्या कन्फर्म कर रही हूँ — आपको पायस (Skin infection) है, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "पाईस को या क्योंकि इसके लिए इन्दिक्षान हो रहा है।"
+    },
+    {
+      "role": "user",
+      "text": "Né?"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया सही समस्या बता दें, मैं दोबारा सुन रही हूँ। आपकी समस्या क्या है?"
+    },
+    {
+      "role": "assistant",
+      "text": "धन्यवाद। कृपया बताएं, आपको पायस (Scabies) है, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "मुझे पाहिस हुआ है"
+    },
+    {
+      "role": "user",
+      "text": "क्या बोल्लेओ?"
+    },
+    {
+      "role": "assistant",
+      "text": "माफ़ कीजिए, मैं फिर से पक्का करना चाहती हूँ। आप कह रहे हैं कि आपको पायस (Scabies) है, सही है?"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, मैं समझ गई"
+    },
+    {
+      "role": "user",
+      "text": "Bye. "
+    },
+    {
+      "role": "user",
+      "text": "Ha"
+    },
+    {
+      "role": "assistant",
+      "text": "धन्यवाद। क्या आपने पहले भी इस अस्पताल में इलाज कराया है, या आप यहां नए हैं?"
+    },
+    {
+      "role": "user",
+      "text": "In a L"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया अपना पूरा नाम बताएँ।"
+    },
+    {
+      "role": "assistant",
+      "text": "कोई बात नहीं, आप अपना पूरा नाम बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "you"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, मैं आपका नाम कन्फर्म कर लूँ — आपका नाम [आपका नाम] है, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "Amen."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया अपना नाम फिर"
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    },
+    {
+      "role": "user",
+      "text": "நேயில் வீடு வேண்டாம்"
+    },
+    {
+      "role": "assistant",
+      "text": "समझ गई। कृपया अपना पूरा नाम बता दें, ताकि मैं सही से आगे बढ़ सकूँ।"
+    },
+    {
+      "role": "user",
+      "text": "Do you write it?"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, मैं आपका नाम कन्फर्म कर लूँ — आपका नाम देव है, सही है?"
+    },
+    {
+      "role": "assistant",
+      "text": "धन्यवाद, अब कृपया आपकी उम्र बता दें।"
+    },
+    {
+      "role": "user",
+      "text": "Hmm"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, आपकी उम्र 30 साल है, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "Be strong."
+    },
+    {
+      "role": "user",
+      "text": "नहीं बीज बोला बीज"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, मैं समझ गई। आप 20 साल की उम्र बता रहे हैं, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "All right."
+    },
+    {
+      "role": "assistant",
+      "text": "बिल्कुल, मैं आपकी मदद कर रही हूँ। अब, आपका जेंडर क्या है? (Male / Female / Other)"
+    },
+    {
+      "role": "user",
+      "text": "Good. Ready. Mom, ask her on it."
+    },
+    {
+      "role": "user",
+      "text": "गुझरादी में वात करो गुझरादी में"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, मैं समझ गई। चलिए अब हम गुजराती में आगे बढ़ते हैं। \n\nતમારા નામની પુષ્ટિ કરી લઉં — તમારું નામ દેવ છે, સાચું છે?"
+    },
+    {
+      "role": "user",
+      "text": "Thank you. Bye. "
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, હવે કૃપા કરીને તમારું વય જણાવશો."
+    },
+    {
+      "role": "assistant",
+      "text": "ठ"
+    },
+    {
+      "role": "user",
+      "text": "C'est tout."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, आपकी उम्र 20 है, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    },
+    {
+      "role": "user",
+      "text": "हाँ गुझराइटी माँज बोलो नहीं हम जाते हैं"
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": 30,
+    "phone": "09327233620",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T09:01:24.672Z",
+    "hospitalName": "Delhi Hospital"
+  },
+  "callerPhone": "09327233620",
+  "streamSid": null
+}

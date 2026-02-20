@@ -1,0 +1,43 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है। कृपया अपनी समस्या / बीमारी बताएं।"
+    },
+    {
+      "role": "assistant",
+      "text": "क्या आप हिंदी में बात करेंगे या गुजराती में?"
+    },
+    {
+      "role": "user",
+      "text": "Bye. "
+    },
+    {
+      "role": "user",
+      "text": "Nothing I said is needed."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया बताएं कि आपको क्या समस्या है।"
+    },
+    {
+      "role": "user",
+      "text": "All right. Thank you."
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "hospitalName": "Delhi Hospital",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": null,
+    "phone": "07046733823",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T09:14:59.391Z"
+  },
+  "callerPhone": "07046733823",
+  "streamSid": null
+}

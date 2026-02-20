@@ -1,0 +1,131 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "user",
+      "text": "You know."
+    },
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है। कृपया अपनी समस्या / बीमारी बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "मेरे सर में दर्द हो रहा है"
+    },
+    {
+      "role": "assistant",
+      "text": "मैं आपकी समस्या समझ रही हूँ। मैं कन्फर्म कर लूँ — आपको सिर में दर्द हो रहा है, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "ہاں، صحیح ہے۔ گوجراتی میں بات کر سکتے ہو کیا؟"
+    },
+    {
+      "role": "assistant",
+      "text": "ज़रूर, मैं अब गुजराती में बात करूंगी।\n\nશું તમે આગલીવાર આ હોસ્પિટલમાં સારવાર કરાવી છે, કે તમે અહીં નવા છો?"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, चलिए मैं आगे बढ़ती हूँ। कृपया अपना पूरा नाम बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "на лачо."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक छे, હવે હું ફરીથી પુછું છું: કૃપા કરીને તમારું પૂરું નામ જણાવશો."
+    },
+    {
+      "role": "user",
+      "text": "गुझराती में कंटिन्यू करो"
+    },
+    {
+      "role": "assistant",
+      "text": "હું તમારું નામ કન્ફર્મ કરી લઉં — તમારું નામ સુર્યા છે, સાચું છે?"
+    },
+    {
+      "role": "user",
+      "text": "Thank you."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, अब કૃપા કરીને તમારી ઉંમર જણાવશો."
+    },
+    {
+      "role": "user",
+      "text": "That's one."
+    },
+    {
+      "role": "user",
+      "text": "Uh..."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, आपकी उम्र 22 साल है, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "Деньги."
+    },
+    {
+      "role": "user",
+      "text": "BEEF"
+    },
+    {
+      "role": "assistant",
+      "text": "धन्यवाद पुष्टि करने के लिए। अब कृपया आपका जेंडर बताएं: Male, Female, या Other?"
+    },
+    {
+      "role": "user",
+      "text": "Be thorough and medium-rare."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, मैं आपकी उम्र 22 समझ लेती हूँ। अब कृपया अपना जेंडर बताएं: Male, Female, या Other?"
+    },
+    {
+      "role": "user",
+      "text": "Bees, bees, bees."
+    },
+    {
+      "role": "user",
+      "text": "20 उमर है मेरी"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, चलिए मैं फिर से पूर्ण नाम, उम्र, और जेंडर पर ध्यान देती हूँ। कृपया अपना जेंडर स्पष्ट करें: Male, Female, या Other?"
+    },
+    {
+      "role": "user",
+      "text": "mail."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, मैं आपका नाम कन्फर्म कर लूँ — आपका नाम सुर्या है, उम्र 22, जेंडर Male, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "بيث على الهبيث"
+    },
+    {
+      "role": "assistant",
+      "text": "समझ गई। अब कृपया अपना फोन नंबर बताएं, अगर आप चाहें तो।"
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": 22,
+    "phone": "08383801256",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T09:17:27.902Z",
+    "hospitalName": "Delhi Hospital"
+  },
+  "callerPhone": "08383801256",
+  "streamSid": null
+}

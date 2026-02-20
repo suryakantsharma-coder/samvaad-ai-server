@@ -1,0 +1,55 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है। कृपया अपनी समस्या बताइए।"
+    },
+    {
+      "role": "user",
+      "text": "मुझे पाइल्स हैं।"
+    },
+    {
+      "role": "assistant",
+      "text": "आपको बवासीर है, सही?"
+    },
+    {
+      "role": "user",
+      "text": "नहीं मेरे सर में दर्द है।"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, तो आप कह रहे हैं कि आपको सर में दर्द है, सही?"
+    },
+    {
+      "role": "assistant",
+      "text": "आपके पैर में"
+    },
+    {
+      "role": "user",
+      "text": "नहीं मेरे पैल"
+    },
+    {
+      "role": "user",
+      "text": "मेरी मोरता गई है."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक, अब मैं समझ गई। कृपया बताएं कि आपने पहले इस अस्पताल में चेक-अप कराया है या आप नए मरीज़ हैं?"
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "hospitalName": "Delhi Hospital",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": null,
+    "phone": "08383801256",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T20:04:23.713Z"
+  },
+  "callerPhone": "08383801256",
+  "streamSid": null
+}

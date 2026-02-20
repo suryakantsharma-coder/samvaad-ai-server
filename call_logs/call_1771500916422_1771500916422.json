@@ -1,0 +1,235 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है। कृपया अपनी समस्या / बीमारी बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "You"
+    },
+    {
+      "role": "assistant",
+      "text": "ध्यान से सुन रही हूँ। कृपया अपनी समस्या बताएँ।"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया बताए आपकी समस्या क्या है।"
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    },
+    {
+      "role": "assistant",
+      "text": "मैं पूरा ध्यान से सुन रही हूँ। कृपया आप अपनी समस्या/बीमारी बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "Yeah."
+    },
+    {
+      "role": "user",
+      "text": "میرے سر دل دو رہا ہے۔"
+    },
+    {
+      "role": "assistant",
+      "text": "मैं आपकी समस्या समझ रही हूँ। मैं इसकी पुष्टि करना चाहती हूँ — आपको सिरदर्द है, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "That's not their argument."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, मैं समझ गई। आपका सिरदर्द है। चलिए, आगे बढ़ते हैं। क्या आपने पहले भी इस अस्पताल में इलाज कराया है, या आप यहाँ नए हैं?"
+    },
+    {
+      "role": "user",
+      "text": "NANI?"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, आप नए हैं। कृपया अपना पूरा नाम बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "ないね、メガネ"
+    },
+    {
+      "role": "assistant",
+      "text": "मुझे खेद है, कृपया अपना पूरा नाम बताएं, जिससे मैं आगे बढ़ सकूं।"
+    },
+    {
+      "role": "assistant",
+      "text": "आपका नाम लैकान्त शर्मा है, सही है? कृपया अपने नाम की स्पेलिंग बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "So there comes Sharma."
+    },
+    {
+      "role": "user",
+      "text": "MBC 뉴스 이덕영입니다."
+    },
+    {
+      "role": "user",
+      "text": "Such interest."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, चलिए मैं सुन रही हूँ। कृपया अपने नाम की स्पेलिंग बताएं, ताकि मैं सही तरीके से लिख सकूँ।"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, मैं समझ गई। आपका नाम सूर्याकांत शर्मा है, सही है? कृपया स्पेलिंग बताएं – S-U-R-Y-A-K-A-N-T, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "नहीं सूरे कान शर्मा"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया नाम की स्पेलिंग बताएं। मैं धीरे-धीरे सुन रही हूँ।"
+    },
+    {
+      "role": "user",
+      "text": "F-U-R-Y-A."
+    },
+    {
+      "role": "user",
+      "text": "k a n t."
+    },
+    {
+      "role": "user",
+      "text": "S-H-A-R-M-A."
+    },
+    {
+      "role": "assistant",
+      "text": "समझ गई। आपका नाम है S-U-R-Y-A-K-A-N-T शर्मा। कृपया पुष्टि करें कि यह सही है।"
+    },
+    {
+      "role": "user",
+      "text": "是 這是正確的"
+    },
+    {
+      "role": "assistant",
+      "text": "बहुत बढ़िया। अब मैं आगे बढ़ती हूँ। आपकी उम्र क्या है?"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, आपकी उम्र 23 साल है, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "medium deep there"
+    },
+    {
+      "role": "user",
+      "text": "You"
+    },
+    {
+      "role": "assistant",
+      "text": "ध्यान देने के लिए धन्यवाद। आपकी उम्र 30 साल है, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "तीस नहीं तीस साल है"
+    },
+    {
+      "role": "user",
+      "text": "हाँ सही है"
+    },
+    {
+      "role": "assistant",
+      "text": "अच्छा, अब कृपया आपका जेंडर बताएं – Male, Female, या Other?"
+    },
+    {
+      "role": "user",
+      "text": "Don't don't"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, तो आपका जेंडर पुरुष है, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "Woodus"
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    },
+    {
+      "role": "user",
+      "text": "嗯 才耶"
+    },
+    {
+      "role": "assistant",
+      "text": "अच्छा, अब कृपया आपका फोन नंबर बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "No, no."
+    },
+    {
+      "role": "user",
+      "text": "文字が苦手なの。"
+    },
+    {
+      "role": "user",
+      "text": "मुझे नहीं बताना भाई"
+    },
+    {
+      "role": "assistant",
+      "text": "कोई बात नहीं, अगर आप चाहें तो अभी फोन नंबर छोड़ सकते हैं। चलिए अब डॉक्टर से जुड़ी जानकारी पूरी कर लेते हैं। अब आइए डॉक्टर के बारे में बात करें। आपके सिरदर्द के लिए मैं एक जनरल डॉक्टर चुन रही हूँ। चलिए अब टारीख बताएं, आप किस तारीख को अपॉइंटमेंट चाहते हैं?"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, आप 10 तारीख को अपॉइंटमेंट चाहते हैं। कृपया बताएं, आप किस समय आना चाहेंगे?"
+    },
+    {
+      "role": "user",
+      "text": "Il codați tare cu ceie"
+    },
+    {
+      "role": "user",
+      "text": "Thank you."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया बताएं कि आप किस समय आना चाहेंगे?"
+    },
+    {
+      "role": "user",
+      "text": "Do widzenia."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, तो आप दोपहर में किस समय आना चाहेंगे? कृपया समय बताएं।"
+    },
+    {
+      "role": "assistant",
+      "text": "समझ गई। अब मैं प"
+    },
+    {
+      "role": "user",
+      "text": "Do fermo e dopo c'è..."
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": 23,
+    "phone": "08383801256",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T11:35:16.415Z",
+    "hospitalName": "Delhi Hospital"
+  },
+  "callerPhone": "08383801256",
+  "streamSid": null
+}

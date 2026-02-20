@@ -1,0 +1,87 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है। कृपया अपनी समस्या / बीमारी बताएं।"
+    },
+    {
+      "role": "assistant",
+      "text": "(Waits for response)"
+    },
+    {
+      "role": "user",
+      "text": "You"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, मैं समझ गई। आप फीवर की बात कर रहे हैं। क्या आप हिंदी में बात करेंगे या गुजराती में?"
+    },
+    {
+      "role": "user",
+      "text": "मुझे फीवर है। गुजराधी में वाथ करण।"
+    },
+    {
+      "role": "user",
+      "text": "बन गुझरादी मां वाज़ करा"
+    },
+    {
+      "role": "assistant",
+      "text": "समझ गई, मैं अब गुजराती માં જોઈશ. \n\nહું પુછું છું — હું તમારી સમસ્યા કન્ફર્મ કરી લઉં — તમને ફીવર છે, સાચું છે?"
+    },
+    {
+      "role": "user",
+      "text": "Bye."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, धन्यवाद। अब कृपया बताएं: શું તમે અગાઉ આ હોસ્પિટલમાં સારવાર કરાવી છે, કે તમે અહીં નવા છો?"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है,"
+    },
+    {
+      "role": "user",
+      "text": "But there was a question about what it was."
+    },
+    {
+      "role": "user",
+      "text": "না ন঵া জੋ"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, तो आप नए पेशेंट हैं।\n\nकृपया अपना पूरा नाम बताएँ।"
+    },
+    {
+      "role": "assistant",
+      "text": "मैं आपका नाम कन्फर्म कर लूँ — आपका नाम \"देव\" है, सही है?"
+    },
+    {
+      "role": "user",
+      "text": "मारु नाम दियो जेसे"
+    },
+    {
+      "role": "user",
+      "text": "गुजराती में बात करो, नहीं समझेगा मुझे"
+    },
+    {
+      "role": "assistant",
+      "text": "माफ़ कीजिए, अभी मैं हिंदी में ही बात कर रही थी। क्या आप कृपया मुझे बताएँगे कि आप \"देव\" नाम सही कह रहे हैं?"
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "hospitalName": "Delhi Hospital",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": null,
+    "phone": "07046733823",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T09:16:03.214Z"
+  },
+  "callerPhone": "07046733823",
+  "streamSid": null
+}

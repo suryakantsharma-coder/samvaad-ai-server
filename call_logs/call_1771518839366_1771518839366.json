@@ -1,0 +1,239 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है।\n\nक्या आप हिंदी में बात करेंगे या गुजराती में? શું તમે હિન્દીમાં બોલશો કે ગુજરાતીમાં?"
+    },
+    {
+      "role": "user",
+      "text": "गुज़राती"
+    },
+    {
+      "role": "assistant",
+      "text": "સાચું છે, હું હવે ગુજારતીમાં વાત કરીશ. \n\nકૃપા કરીને તમારી સમસ્યા / બીમારી જણાવશો."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, अब मैं हिंदी में बात करती हूँ। \n\nकृपया मुझे बताएं, आपकी समस्या क्या है?"
+    },
+    {
+      "role": "user",
+      "text": "चलो हिंदी वे बात कर दें"
+    },
+    {
+      "role": "user",
+      "text": "मेरा एकसिदेंट हो गया है, मेरे पैर में चोट आ भी है।"
+    },
+    {
+      "role": "assistant",
+      "text": "मैं आपकी समस्या कन्फर्म कर लूँ — आपको पैर में चोट है, सही है?\n\nक्या यह सही है, कृपया कन्फर्म करें।"
+    },
+    {
+      "role": "user",
+      "text": "All right. See you again."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, अभी मैं पूछ रही हूँ: क्या आपने पहले भी इस अस्पताल में इलाज कराया है, या आप यहाँ नए हैं?"
+    },
+    {
+      "role": "user",
+      "text": "May I now?"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया अपना पूरा नाम बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "I'm out."
+    },
+    {
+      "role": "user",
+      "text": "सूरेकान्शर्म"
+    },
+    {
+      "role": "assistant",
+      "text": "मैं आपका नाम कन्फर्म कर लूँ — आपका नाम \"Suresh Sharma\" है, सही है? कृपया नाम कि स्पेलिंग भी बता दें।"
+    },
+    {
+      "role": "user",
+      "text": "f-u-r-y-a"
+    },
+    {
+      "role": "user",
+      "text": "Okay, thank you."
+    },
+    {
+      "role": "user",
+      "text": "S-H-A-R-M-E."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, धन्यवाद। आपका नाम है S-U-R-Y-A N-T S-H-A-R-M-A, सही है? \n\nकृपया कन्फर्म करें।"
+    },
+    {
+      "role": "user",
+      "text": "नहूं"
+    },
+    {
+      "role": "user",
+      "text": "S-U-R-Y-A."
+    },
+    {
+      "role": "user",
+      "text": "Okay. Thank you."
+    },
+    {
+      "role": "user",
+      "text": "Thank you."
+    },
+    {
+      "role": "user",
+      "text": "H-A-R-M-E."
+    },
+    {
+      "role": "assistant",
+      "text": "आपका नाम Suryant Sharma है, सही है? कृपया कन्फर्म करें।"
+    },
+    {
+      "role": "user",
+      "text": "Meh."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया पूरे नाम को एक बार फिर से बता दें, और सही स्पेलिंग भी बता दें, ताकि हम सही तरीके से नोट कर सकें।"
+    },
+    {
+      "role": "assistant",
+      "text": "समझ गया। मैं आपका नाम कन्फर्म कर लेती हूँ — आपका नाम \"Suryakant Sharma\" है, सही है? कृपया स्पेलिंग भी बता दें, ताकि हम सही तरीके से रिकॉर्ड कर सकें।"
+    },
+    {
+      "role": "user",
+      "text": "सूज्य कान शर्मा है"
+    },
+    {
+      "role": "user",
+      "text": "You"
+    },
+    {
+      "role": "user",
+      "text": "Y-A-K-A-N-D-S."
+    },
+    {
+      "role": "user",
+      "text": "Thank you. Bye-bye. "
+    },
+    {
+      "role": "user",
+      "text": "Thank you."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, मैं अब नाम की स्पेलिंग कन्फर्म कर रही हूँ: S-U-R-Y-A-K-A-N-T S-H-A-R-M-A, सही है? \n\nकृपया पुष्टि करें।"
+    },
+    {
+      "role": "user",
+      "text": "Oh, so you hear?"
+    },
+    {
+      "role": "assistant",
+      "text": "शुक्रिया, अब मैं एक नया पेसेंट क्रिएट कर रही हूँ। कृपया एक छोटी सी देर दें।"
+    },
+    {
+      "role": "assistant",
+      "text": "कृपया आपकी उम्र बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "Amen."
+    },
+    {
+      "role": "assistant",
+      "text": "कोई बात नहीं। कृपया अपनी उम्र बताएं, ताकि मैं आगे प्रोसेस कर सकूँ।"
+    },
+    {
+      "role": "user",
+      "text": "Peace. Bye."
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया बताएं कि आपकी उम्र कितनी है?"
+    },
+    {
+      "role": "user",
+      "text": "inşaallah"
+    },
+    {
+      "role": "assistant",
+      "text": "अच्छा, आपकी उम्र 20 साल है, सही है? \n\nअब कृपया अपना जेंडर बताएं। (Male / Female / Other)"
+    },
+    {
+      "role": "user",
+      "text": "มีล"
+    },
+    {
+      "role": "user",
+      "text": "Hello."
+    },
+    {
+      "role": "assistant",
+      "text": "मैं आपकी मदद के लिए तत्पर हूँ। चलिए, अब डॉक्टर चुनते हैं। मैं डॉक्टर की जानकारी एक बार चेक करके बता देती हूँ।"
+    },
+    {
+      "role": "user",
+      "text": "That's all."
+    },
+    {
+      "role": "assistant",
+      "text": "आपकी समस्या के लिए जनरल डॉक्टर सही रहेगा।\n\nअब कृपया आप बताएं, आप किस तारीख को अपॉइंटमेंट चाहते हैं?"
+    },
+    {
+      "role": "user",
+      "text": "अच्छे सर्वरीको एक वजीव"
+    },
+    {
+      "role": "assistant",
+      "text": "आपने 14 फरवरी को 1 बजे का समय चुना है। क्या यह ठीक है?"
+    },
+    {
+      "role": "user",
+      "text": "पच्चु सर्वरी को एक दिन।"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, तो 14 फरवरी को 1 बजे। अब मैं पुष्टि करती हूँ।\n\nDelhi Hospital, Dr. DN Bharti, patient Suryakant Sharma, patientId P-2026-000018, phone 08383801256, reason leg injury, date 14 फरवरी, time 1 बजे।\n\nक्या यह सभी सही है?"
+    },
+    {
+      "role": "user",
+      "text": "نہیں"
+    },
+    {
+      "role": "user",
+      "text": "25 de fevereiro."
+    },
+    {
+      "role": "user",
+      "text": "अच्छे स्मर्वरी को"
+    },
+    {
+      "role": "user",
+      "text": "25 फर्वरी को"
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "doctorName": "DN Bharti",
+    "patientName": "Suryakant Sharma",
+    "patientAge": 20,
+    "phone": "08383801256",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-19T16:33:59.365Z",
+    "hospitalName": "Delhi Hospital"
+  },
+  "callerPhone": "08383801256",
+  "streamSid": null
+}

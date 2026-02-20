@@ -1,0 +1,71 @@
+{
+  "hospitalId": "698db886747cdef3ecafbf59",
+  "hospitalName": "Delhi Hospital",
+  "callTranscript": [
+    {
+      "role": "assistant",
+      "text": "नमस्ते, Delhi Hospital की तरफ से आपका स्वागत है। कृपया अपनी समस्या बताइए।"
+    },
+    {
+      "role": "user",
+      "text": "मेरे कुपा इसे?"
+    },
+    {
+      "role": "assistant",
+      "text": "आपको बवासीर है, सही?"
+    },
+    {
+      "role": "user",
+      "text": "वहाँ।"
+    },
+    {
+      "role": "assistant",
+      "text": "अच्छा, तो आप पहले यहाँ आ चुके हैं या नए हैं?"
+    },
+    {
+      "role": "user",
+      "text": "नहीं हैं।"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, आप नए हैं। कृपया अपना पूरा नाम spelling में बताएं, हर अक्षर बोलकर।"
+    },
+    {
+      "role": "user",
+      "text": "स्यूर्वाईए, के एंटी,"
+    },
+    {
+      "role": "assistant",
+      "text": "ठीक है, कृपया धीरे-धीरे और साफ़ बोलें, ताकि मैं सही से लिख सकूँ। आप पूरा नाम एक-एक अक्षर करके बताएं।"
+    },
+    {
+      "role": "user",
+      "text": "स्यूर्यकन्ति"
+    },
+    {
+      "role": "assistant",
+      "text": "नाम मैंने सुना, कृपया स्पेलिंग फिर से बताएं, हर अक्षर बोलकर, ताकि मैं सही तरीके से लिख सकूं।"
+    },
+    {
+      "role": "user",
+      "text": "स्यूर्यकन्ति"
+    },
+    {
+      "role": "assistant",
+      "text": "समझ गया। कृपया इसे एक बार अक्षर दर अक्षर धीरे बोलें, जैसे S, Y, U, R, Y, A, N, T, I।"
+    }
+  ],
+  "appointmentDetails": {
+    "hospital": "698db886747cdef3ecafbf59",
+    "hospitalName": "Delhi Hospital",
+    "doctorName": null,
+    "patientName": null,
+    "patientAge": null,
+    "phone": "08383801256",
+    "preferredDate": null,
+    "preferredTime": null,
+    "callEndedAt": "2026-02-20T03:55:51.138Z"
+  },
+  "callerPhone": "08383801256",
+  "streamSid": null
+}
