@@ -1,8 +1,15 @@
 //  create a context for authentication
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { getUserProfile, login, logout, register } from "../data/auth";
-import { User } from "../types/auth.type";
+import {
+  getHospitalUsers,
+  getUserProfile,
+  login,
+  logout,
+  register,
+  updateUserRoleByHospitalId,
+} from "../data/auth";
+import { User, HospitalUser, HospitalUsersResponse } from "../types/auth.type";
 import { useNavigate } from "react-router-dom";
 
 export const AuthContext = createContext<{
@@ -15,9 +22,17 @@ export const AuthContext = createContext<{
     email: string,
     password: string,
     name: string,
-    role: string
+    role: string,
+    hospitalId: string,
   ) => Promise<void>;
   user: User | null;
+  hospitalUsers: User[] | null;
+  handleGetHospitalUsers: (hospitalId: string) => Promise<void>;
+  handleChangeUserRole: (
+    userId: string,
+    role: string,
+    hospitalId: string,
+  ) => Promise<void>;
 }>({
   accessToken: null,
   setAccessToken: () => {},
@@ -26,11 +41,19 @@ export const AuthContext = createContext<{
   handleLogout: async () => {},
   handleRegister: async () => {},
   user: null,
+  hospitalUsers: [],
+  handleGetHospitalUsers: async (hospitalId: string) => {},
+  handleChangeUserRole: async (
+    userId: string,
+    role: string,
+    hospitalId: string,
+  ) => {},
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [hospitalUsers, setHospitalUsers] = useState<HospitalUser[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const navigate = useNavigate();
 
@@ -45,6 +68,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const handleUserProfile = async (token: string) => {
     try {
       const data = await getUserProfile();
+      // @ts-ignore
       setUser(data.data.user);
       setAccessToken(token);
       setIsAuthenticated(true);
@@ -76,13 +100,50 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     email: string,
     password: string,
     name: string,
-    role: string
+    role: string,
+    hospitalId: string,
   ) => {
-    console.log("Registering user:", { email, password, name, role });
-    const data = await register(email, password, name, role);
+    console.log("Registering user:", {
+      email,
+      password,
+      name,
+      role,
+      hospitalId,
+    });
+    const data = await register(email, password, name, role, hospitalId);
     setAccessToken(data.data?.accessToken ?? null);
     setIsAuthenticated(!!data.data?.accessToken);
   };
+
+  const handleGetHospitalUsers = async (hospitalId: string) => {
+    const data = await getHospitalUsers(hospitalId);
+    const users = (data as HospitalUsersResponse)?.data
+      ?.users as HospitalUser[];
+    setHospitalUsers(users);
+  };
+
+  const handleChangeUserRole = async (
+    userId: string,
+    role: string,
+    hospitalId: string,
+  ) => {
+    const data = await updateUserRoleByHospitalId(userId, role, hospitalId);
+    const users = (data as HospitalUsersResponse)?.data
+      ?.users as HospitalUser[];
+    setHospitalUsers(users);
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      handleUserProfile(token).catch((error) => {
+        console.error("Error checking token:", error);
+        navigate("/login");
+      });
+    } else {
+      navigate("/login");
+    }
+  }, []);
 
   return (
     <AuthContext.Provider
@@ -94,6 +155,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         handleLogout,
         handleRegister,
         user,
+        hospitalUsers,
+        handleGetHospitalUsers,
+        handleChangeUserRole,
       }}
     >
       {children}

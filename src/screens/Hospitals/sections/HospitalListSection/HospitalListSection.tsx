@@ -24,6 +24,9 @@ import {
   TableHeader,
   TableRow,
 } from "../../../../components/ui/table";
+import { ListError } from "../../../../components/ui/list-error";
+import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
+import { API_BASE_URL } from "../../../../config";
 import { useHospital } from "../../../../contexts/HospitalProvider";
 import { Hospital } from "../../../../types/hospital.type";
 
@@ -218,7 +221,7 @@ const HospitalIcon = ({
     )}
     {iconName && (
       <img
-        src={"http://localhost:3000" + iconName}
+        src={`${API_BASE_URL}${iconName}`}
         alt="logo"
         className="w-9 h-9 object-cover rounded-full"
       />
@@ -232,15 +235,15 @@ export const HospitalListSection = (): JSX.Element => {
   const {
     hospitals,
     searchedHospitals,
+    isLoading,
+    error,
     handleGetHospitals,
     handleSearchHospitals,
     resetSearchedHospitals,
   } = useHospital();
 
   const listToShow =
-    searchQuery.trim() === ""
-      ? hospitals
-      : searchedHospitals ?? [];
+    searchQuery.trim() === "" ? hospitals : (searchedHospitals ?? []);
 
   useEffect(() => {
     handleGetHospitals();
@@ -256,6 +259,24 @@ export const HospitalListSection = (): JSX.Element => {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  const showLoading = isLoading && hospitals.length === 0 && listToShow.length === 0;
+  const showError = error && !isLoading;
+
+  if (showLoading) {
+    return (
+      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
+        <LoadingSpinner />
+      </section>
+    );
+  }
+  if (showError) {
+    return (
+      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
+        <ListError message={error} />
+      </section>
+    );
+  }
 
   return (
     <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">

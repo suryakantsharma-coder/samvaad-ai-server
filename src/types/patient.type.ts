@@ -44,3 +44,24 @@ export interface UpdatePatientPayload {
   phoneNumber: string;
   reason: string;
 }
+
+/** Response from GET /api/patients/:patientId/overview */
+export interface PatientOverviewResponse {
+  data?: {
+    patient?: Patients;
+    appointments?: Array<{
+      _id: string;
+      patient?: { _id: string; fullName?: string; phoneNumber?: string; age?: number; gender?: string };
+      doctor?: { _id: string; fullName?: string; doctorId?: string; designation?: string };
+      reason?: string;
+      status?: string;
+      type?: string;
+      appointmentDateTime: string;
+      createdAt?: string;
+      updatedAt?: string;
+      appointmentId?: string;
+      __v?: number;
+    }>;
+    prescriptions?: unknown[];
+  };
+}

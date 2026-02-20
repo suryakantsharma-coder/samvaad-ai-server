@@ -2,6 +2,7 @@ import {
   AppointmentPayload,
   RescheduleAppointmentPayload,
 } from "../types/appointment.type";
+import { authFetch } from "./api";
 
 export interface AppointmentListParams {
   page: number;
@@ -27,16 +28,9 @@ export const getAppointments = async (params: AppointmentListParams) => {
   if (params.patientId) search.set("patientId", params.patientId);
   if (params.status) search.set("status", params.status);
 
-  const response = await fetch(
-    `http://localhost:3000/api/appointments?${search.toString()}`,
-    {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    },
-  );
-  const data = await response.json();
-  return data;
+  return authFetch(`/api/appointments?${search.toString()}`, {
+    method: "GET",
+  });
 };
 
 export const searchAppointments = async (
@@ -44,87 +38,42 @@ export const searchAppointments = async (
   page: number,
   limit: number,
 ) => {
-  const params = new URLSearchParams({ q, page: String(page), limit: String(limit) });
-  const response = await fetch(
-    `http://localhost:3000/api/appointments/search?${params.toString()}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    },
-  );
-  return response.json();
+  const params = new URLSearchParams({
+    q,
+    page: String(page),
+    limit: String(limit),
+  });
+  return authFetch(`/api/appointments/search?${params.toString()}`, {
+    method: "GET",
+  });
 };
 
-// curl -X POST "http://localhost:3000/api/appointments" \
-//   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-//   -H "Content-Type: application/json" \
-// -d '{"patient":"PATIENT_ID","doctor":"DOCTOR_ID","reason":"Follow-up check","status":"Upcoming","type":"Hospital","appointmentDateTime":"2025-02-10T10:00:00.000Z"}'
-
 export const createAppointment = async (appointment: AppointmentPayload) => {
-  const response = await fetch("http://localhost:3000/api/appointments", {
+  return authFetch("/api/appointments", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(appointment),
+    body: appointment as object,
   });
-  const data = await response.json();
-  return data;
 };
 
 export const deleteAppointment = async (appointmentId: string) => {
-  const response = await fetch(
-    `http://localhost:3000/api/appointments/${appointmentId}`,
-    {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    },
-  );
-  return response.json();
+  return authFetch(`/api/appointments/${appointmentId}`, {
+    method: "DELETE",
+  });
 };
-
-// curl -X PATCH "http://localhost:3000/api/appointments/APPOINTMENT_ID" \
-//   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-//   -H "Content-Type: application/json" \
-// -d '{"status":"Completed"}'
 
 export const updateAppointment = async (
   appointmentId: string,
   payload: RescheduleAppointmentPayload,
 ) => {
-  const response = await fetch(
-    `http://localhost:3000/api/appointments/${appointmentId}`,
-    {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        appointmentDateTime: payload.appointmentDateTime,
-      }),
-    },
-  );
-  return response.json();
+  return authFetch(`/api/appointments/${appointmentId}`, {
+    method: "PATCH",
+    body: { appointmentDateTime: payload.appointmentDateTime } as object,
+  });
 };
 
 export const MarkAsDoneAppointment = async (appointmentId: string) => {
-  const response = await fetch(
-    `http://localhost:3000/api/appointments/${appointmentId}`,
-    {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ status: "Completed" }),
-    },
-  );
-  const data = await response.json();
-  return data;
+  return authFetch(`/api/appointments/${appointmentId}`, {
+    method: "PATCH",
+    body: { status: "Completed" } as object,
+  });
 };

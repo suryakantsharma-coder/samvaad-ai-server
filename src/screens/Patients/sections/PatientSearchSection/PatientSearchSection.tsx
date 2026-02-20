@@ -100,6 +100,12 @@ export const PatientSearchSection = (): JSX.Element => {
           icon: "/calender.svg",
           path: "/appointments",
         },
+        {
+          id: "prescriptions",
+          label: "Prescriptions",
+          icon: "/pill.svg",
+          path: "/prescriptions",
+        },
       ]);
     }
   }, [user]);

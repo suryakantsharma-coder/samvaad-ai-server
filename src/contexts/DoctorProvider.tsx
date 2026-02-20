@@ -7,6 +7,7 @@ import { getDoctors, addDoctor, searchDoctors } from "../data/doctor";
 export const DoctorContext = createContext<{
   doctors: Doctor[];
   loading: boolean;
+  error: string | null;
   page: number;
   limit: number;
   getDoctorsData: () => Promise<void>;
@@ -17,6 +18,7 @@ export const DoctorContext = createContext<{
 }>({
   doctors: [],
   loading: false,
+  error: null,
   page: 1,
   limit: 20,
   getDoctorsData: () => Promise.resolve(),
@@ -30,19 +32,21 @@ export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [searchedDoctors, setSearchedDoctors] = useState<Doctor[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
 
   const getDoctorsData = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await getDoctors(1, 20);
       setDoctors(response.data.doctors as Doctor[]);
       const page = response.data.pagination;
       setPage(page.page);
       setLimit(page.limit);
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load doctors");
     } finally {
       setLoading(false);
     }
@@ -51,11 +55,12 @@ export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
   const handleAddDoctor = async (doctor: CreateDoctorPayload) => {
     try {
       setLoading(true);
+      setError(null);
       const response = await addDoctor(doctor);
       setDoctors([...doctors, response.data.doctor]);
       alert("Doctor added successfully");
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add doctor");
     } finally {
       setLoading(false);
     }
@@ -68,10 +73,11 @@ export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
       setLoading(true);
+      setError(null);
       const response = await searchDoctors(q.trim(), 1, 20);
       setSearchedDoctors((response.data?.doctors ?? []) as Doctor[]);
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to search doctors");
       setSearchedDoctors([]);
     } finally {
       setLoading(false);
@@ -88,6 +94,7 @@ export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
       value={{
         doctors,
         loading,
+        error,
         page,
         limit,
         getDoctorsData,

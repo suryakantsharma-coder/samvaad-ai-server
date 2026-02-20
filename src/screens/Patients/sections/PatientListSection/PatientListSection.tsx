@@ -33,15 +33,26 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "../../../../components/ui/toggle-group";
+import { ListError } from "../../../../components/ui/list-error";
+import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
 import { PatientData } from "../../../../components/modals/AddPatientModal";
 import { usePatient } from "../../../../contexts/PatientProvider";
 
-const filterTabs = [
-  { id: "all", label: "All" },
-  { id: "today", label: "Today (350)" },
-  { id: "completed", label: "Completed (670)" },
-  { id: "cancelled", label: "Cancelled (110)" },
-];
+const filterTabIds = ["all", "today", "tomorrow"] as const;
+type PatientFilterTab = (typeof filterTabIds)[number];
+
+function getFilterTabLabel(id: PatientFilterTab, counts: { all: number; today: number; tomorrow: number }): string {
+  switch (id) {
+    case "all":
+      return `All (${counts.all})`;
+    case "today":
+      return `Today (${counts.today})`;
+    case "tomorrow":
+      return `Tomorrow (${counts.tomorrow})`;
+    default:
+      return id;
+  }
+}
 
 const patientsData = [
   {
@@ -159,7 +170,7 @@ export const PatientListSection = ({
   onEditPatient,
   onDeletePatient,
 }: PatientListSectionProps): JSX.Element => {
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState<PatientFilterTab>("all");
   const {
     patients,
     searchedPatients,
@@ -168,6 +179,10 @@ export const PatientListSection = ({
     handlePatient,
     handleSearchPatients,
     resetSearchedPatients,
+    loading,
+    error,
+    counts,
+    limit,
   } = usePatient();
 
   const listToShow =
@@ -176,8 +191,8 @@ export const PatientListSection = ({
       : searchedPatients;
 
   useEffect(() => {
-    handlePatient();
-  }, []);
+    handlePatient(1, limit, activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -190,22 +205,46 @@ export const PatientListSection = ({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  const handleTabChange = (value: string) => {
+    if (filterTabIds.includes(value as PatientFilterTab)) {
+      setActiveTab(value as PatientFilterTab);
+    }
+  };
+
+  const showLoading = loading;
+  const showError = error && !loading;
+
+  if (showLoading) {
+    return (
+      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
+        <LoadingSpinner />
+      </section>
+    );
+  }
+  if (showError) {
+    return (
+      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
+        <ListError message={error} />
+      </section>
+    );
+  }
+
   return (
     <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 px-5 md:px-6 pt-5 md:pt-6 pb-[26px]">
         <ToggleGroup
           type="single"
           value={activeTab}
-          onValueChange={setActiveTab}
+          onValueChange={handleTabChange}
           className="inline-flex items-center gap-[15px] p-[3px] bg-grey-light rounded-[100px]"
         >
-          {filterTabs.map((tab) => (
+          {filterTabIds.map((id) => (
             <ToggleGroupItem
-              key={tab.id}
-              value={tab.id}
+              key={id}
+              value={id}
               className="inline-flex items-center justify-center gap-[5px] px-5 py-[5px] rounded-[100px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] data-[state=on]:bg-primary-2 data-[state=on]:text-white bg-transparent text-x-70"
             >
-              {tab.label}
+              {getFilterTabLabel(id, counts)}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>

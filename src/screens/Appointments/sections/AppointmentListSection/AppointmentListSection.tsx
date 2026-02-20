@@ -37,6 +37,8 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "../../../../components/ui/toggle-group";
+import { ListError } from "../../../../components/ui/list-error";
+import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
 import { useAppointments } from "../../../../contexts/AppointmentProvider";
 import { Appointments } from "../../../../types/appointment.type";
 
@@ -75,6 +77,8 @@ export const AppointmentListSection = ({
     handleGetAppointments,
     handleSearchAppointments,
     resetSearchedAppointments,
+    loading,
+    error,
   } = useAppointments();
 
   const listToShow =
@@ -106,6 +110,24 @@ export const AppointmentListSection = ({
       setActiveTab(value);
     }
   };
+
+  const showLoading = loading;
+  const showError = error && !loading;
+
+  if (showLoading) {
+    return (
+      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
+        <LoadingSpinner />
+      </section>
+    );
+  }
+  if (showError) {
+    return (
+      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
+        <ListError message={error} />
+      </section>
+    );
+  }
 
   return (
     <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">

@@ -1,11 +1,6 @@
 import {
-  Calendar as CalendarIcon,
-  Clock as ClockIcon,
   Filter as FilterIcon,
-  MoveVertical as MoreVerticalIcon,
-  Phone as PhoneIcon,
   Search as SearchIcon,
-  Video as VideoIcon,
   MoreVertical as ThreeDotsVerticalIcon,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
@@ -37,158 +32,114 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "../../../../components/ui/toggle-group";
-import { useAppointments } from "../../../../contexts/AppointmentProvider";
-import { Appointments } from "../../../../types/appointment.type";
-import { useDoctor } from "../../../../contexts/DoctorProvider";
+import { ListError } from "../../../../components/ui/list-error";
+import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
+import { usePrescription } from "../../../../contexts/PrescriptionProvider";
+import type { PrescriptionStatusFilter } from "../../../../data/prescription";
+import { Prescription } from "../../../../types/prescription.type";
 
-const filterTabs = [
+const STATUS_TABS: { id: "all" | PrescriptionStatusFilter; label: string }[] = [
   { id: "all", label: "All" },
-  { id: "today", label: "Today (4)" },
-  { id: "upcoming", label: "Upcoming (15)" },
-  { id: "completed", label: "Completed (670)" },
-  { id: "cancelled", label: "Cancelled (110)" },
+  { id: "Draft", label: "Draft" },
+  { id: "Sent", label: "Sent" },
+  { id: "Completed", label: "Completed" },
 ];
 
-const todayAppointments = [
-  {
-    patientName: "Olivia Turner",
-    phone: "+91 3456728902",
-    reason: "Dizziness or weakness",
-    doctorAssigned: "Dr. Sophia Adams",
-    status: "Today",
-    statusColor: "bg-[#d5eaff] text-[#007cff]",
-    type: "Hospital",
-    appointmentDate: "4 Nov 2025",
-    appointmentTime: "11:30 AM",
-  },
-  {
-    patientName: "Ethan Miller",
-    phone: "+91 3456728902",
-    reason: "Routine health check-up",
-    doctorAssigned: "Dr. Liam Brooks",
-    status: "Today",
-    statusColor: "bg-[#d5eaff] text-[#007cff]",
-    type: "Zoom",
-    appointmentDate: "8 Nov 2025",
-    appointmentTime: "11:30 AM",
-  },
-  {
-    patientName: "Sophia Adams",
-    phone: "+91 3456728902",
-    reason: "Fever or flu symptoms",
-    doctorAssigned: "Dr. Emily Cooper",
-    status: "Today",
-    statusColor: "bg-[#d5eaff] text-[#007cff]",
-    type: "Hospital",
-    appointmentDate: "8 Nov 2025",
-    appointmentTime: "11:30 AM",
-  },
-];
-
-const scheduledAppointments = [
-  {
-    patientName: "Olivia Turner",
-    dateCreated: "4 Nov 2025",
-    medicines: 4,
-    duration: "7 days",
-    status: "Active",
-    followUp: "After 5 days",
-    endDate: "9 Nov 2025",
-    action: "more",
-  },
-  {
-    patientName: "Ethan Miller",
-    dateCreated: "4 Nov 2025",
-    medicines: 2,
-    duration: "7 days",
-    status: "Completed",
-    followUp: "After 5 days",
-    endDate: "9 Nov 2025",
-    action: "more",
-  },
-  {
-    patientName: "Sophia Adams",
-    dateCreated: "4 Nov 2025",
-    medicines: 3,
-    duration: "7 days",
-    status: "Active",
-    followUp: "After 5 days",
-    endDate: "9 Nov 2025",
-    action: "more",
-  },
-  {
-    patientName: "Liam Brooks",
-    dateCreated: "4 Nov 2025",
-    medicines: 2,
-    duration: "7 days",
-    status: "Completed",
-    followUp: "After 5 days",
-    endDate: "9 Nov 2025",
-    action: "more",
-  },
-  {
-    patientName: "Ava Johnson",
-    dateCreated: "4 Nov 2025",
-    medicines: 4,
-    duration: "7 days",
-    status: "Completed",
-    followUp: "After 5 days",
-    endDate: "9 Nov 2025",
-    action: "more",
-  },
-  {
-    patientName: "Noah Carter",
-    dateCreated: "4 Nov 2025",
-    medicines: 1,
-    duration: "7 days",
-    status: "Active",
-    followUp: "After 5 days",
-    endDate: "9 Nov 2025",
-    action: "more",
-  },
-  {
-    patientName: "Grace Mitchell",
-    dateCreated: "4 Nov 2025",
-    medicines: 4,
-    duration: "7 days",
-    status: "Completed",
-    followUp: "After 5 days",
-    endDate: "9 Nov 2025",
-    action: "more",
-  },
-  {
-    patientName: "James Parker",
-    dateCreated: "4 Nov 2025",
-    medicines: 5,
-    duration: "7 days",
-    status: "Active",
-    followUp: "After 5 days",
-    endDate: "9 Nov 2025",
-    action: "more",
-  },
-];
-
-// create a status color map function
 const statusColorMap = (status: string) => {
   switch (status) {
-    case "Upcoming":
-      return "bg-[#fff1e0] text-[#ff9000]";
     case "Completed":
       return "bg-[#dffff2] text-[#00955b]";
-    case "Cancelled":
-      return "bg-[#ffe9e9] text-[#ff0004]";
-    default:
+    case "Sent":
       return "bg-[#d5eaff] text-[#007cff]";
+    case "Draft":
+      return "bg-[#fff1e0] text-[#ff9000]";
+    default:
+      return "bg-[#e6e6e6] text-[#757575]";
   }
 };
 
-export const PrescriptionListSection = ({}: {
-  onEditPrescription: (prescription: any) => void;
-  onDeletePrescription: (prescription: any) => void;
-  onMarkAsDonePrescription: (prescription: any) => void;
+function formatFollowUp(
+  followUp: Prescription["followUp"],
+): string {
+  if (!followUp) return "—";
+  return `${followUp.value} ${followUp.unit}`;
+}
+
+function formatDuration(prescription: Prescription): string {
+  const first = prescription.medicines?.[0];
+  if (!first?.duration) return "—";
+  return `${first.duration.value} ${first.duration.unit}`;
+}
+
+export const PrescriptionListSection = ({
+  onEditPrescription,
+  onDeletePrescription,
+  onMarkAsDonePrescription,
+  onViewRecord,
+}: {
+  onEditPrescription: (prescription: Prescription) => void;
+  onDeletePrescription: (prescription: Prescription) => void;
+  onMarkAsDonePrescription: (prescription: Prescription) => void;
+  onViewRecord?: (prescription: Prescription) => void;
 }): JSX.Element => {
-  const [activeTab, setActiveTab] = useState("all");
-  const { searchDoctorsByName } = useDoctor();
+  const [activeTab, setActiveTab] = useState<"all" | PrescriptionStatusFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const {
+    prescriptions,
+    searchedPrescriptions,
+    loading,
+    error,
+    limit,
+    handleGetPrescriptions,
+    handleSearchPrescriptions,
+    resetSearchedPrescriptions,
+  } = usePrescription();
+
+  const listToShow =
+    searchQuery.trim() === ""
+      ? prescriptions
+      : searchedPrescriptions ?? [];
+
+  useEffect(() => {
+    handleGetPrescriptions(1, limit, {
+      status: activeTab === "all" ? undefined : activeTab,
+    });
+  }, [activeTab]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery.trim()) {
+        handleSearchPrescriptions(searchQuery);
+      } else {
+        resetSearchedPrescriptions();
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleTabChange = (value: string) => {
+    if (value === "all" || value === "Draft" || value === "Sent" || value === "Completed") {
+      setActiveTab(value as "all" | PrescriptionStatusFilter);
+    }
+  };
+
+  const showLoading = loading;
+  const showError = error && !loading;
+
+  if (showLoading) {
+    return (
+      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
+        <LoadingSpinner />
+      </section>
+    );
+  }
+  if (showError) {
+    return (
+      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
+        <ListError message={error ?? undefined} />
+      </section>
+    );
+  }
 
   return (
     <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
@@ -196,10 +147,10 @@ export const PrescriptionListSection = ({}: {
         <ToggleGroup
           type="single"
           value={activeTab}
-          onValueChange={setActiveTab}
+          onValueChange={handleTabChange}
           className="inline-flex items-center gap-[15px] p-[3px] bg-grey-light rounded-[100px]"
         >
-          {filterTabs.map((tab) => (
+          {STATUS_TABS.map((tab) => (
             <ToggleGroupItem
               key={tab.id}
               value={tab.id}
@@ -214,7 +165,9 @@ export const PrescriptionListSection = ({}: {
           <div className="flex w-full lg:w-[372px] items-center gap-2.5 px-2 py-2 bg-grey-light rounded-[100px] h-[38px]">
             <SearchIcon className="w-6 h-6 text-black opacity-70" />
             <Input
-              placeholder="Search patient...."
+              placeholder="Search patient, medicine, status..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 border-0 bg-transparent opacity-70 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] focus-visible:ring-0 focus-visible:ring-offset-0 p-0"
             />
           </div>
@@ -225,10 +178,9 @@ export const PrescriptionListSection = ({}: {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="upcoming">Upcoming</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="Draft">Draft</SelectItem>
+              <SelectItem value="Sent">Sent</SelectItem>
+              <SelectItem value="Completed">Completed</SelectItem>
             </SelectContent>
           </Select>
 
@@ -266,10 +218,7 @@ export const PrescriptionListSection = ({}: {
                     Follow Up
                   </TableHead>
                   <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                    End Date
-                  </TableHead>
-                  <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                    Action
+                    Appointment Date
                   </TableHead>
                   <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
                     Action
@@ -277,70 +226,53 @@ export const PrescriptionListSection = ({}: {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {scheduledAppointments.map((appointment, index: number) => (
+                {listToShow.map((prescription) => (
                   <TableRow
-                    key={index}
+                    key={prescription._id}
                     className="border-b border-[#dedee1] hover:bg-grey-light/50"
                   >
                     <TableCell className="p-[0px]">
                       <span className="font-title-4l px-[20px] py-[16px] text-black font-medium text-[14px] leading-[19px] font-[number:var(--title-4l-font-weight)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                        {appointment.patientName}
-                      </span>
-                    </TableCell>
-                    <TableCell className="p-[0px]">
-                      <div className="inline-flex items-center gap-[5px]">
-                        <PhoneIcon className="w-4 h-4" />
-                        <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                          {appointment.medicines}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="p-[0px]">
-                      <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                        {appointment.duration.length > 20
-                          ? appointment.duration.slice(0, 20) + "..."
-                          : appointment.duration}
+                        {prescription.patientName}
                       </span>
                     </TableCell>
                     <TableCell className="p-[0px]">
                       <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                        {appointment.status}
+                        {prescription.medicines?.length ?? 0} medicine(s)
+                        {prescription.medicines?.length
+                          ? `: ${prescription.medicines.map((m) => m.name).join(", ")}`
+                          : ""}
+                      </span>
+                    </TableCell>
+                    <TableCell className="p-[0px]">
+                      <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                        {formatDuration(prescription)}
                       </span>
                     </TableCell>
                     <TableCell className="px-[10px] py-[16px]">
                       <Badge
                         className={`${statusColorMap(
-                          appointment.status,
-                        )}  rounded-[100px] px-2.5 py-[5px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] hover:${statusColorMap(
-                          appointment.status,
+                          prescription.status,
+                        )} rounded-[100px] px-2.5 py-[5px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] hover:${statusColorMap(
+                          prescription.status,
                         )}`}
                       >
-                        {appointment.status}
+                        {prescription.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="p-[0px]">
-                      <div className="inline-flex items-center gap-2.5 px-[20px] py-[16px]">
-                        {appointment.followUp === "Hospital" ? (
-                          <img
-                            src="/pill.svg"
-                            alt="Hospital"
-                            className="w-4 h-4"
-                          />
-                        ) : (
-                          <VideoIcon className="w-4 h-4" />
-                        )}
-                        <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                          {appointment.followUp}
-                        </span>
-                      </div>
+                      <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                        {formatFollowUp(prescription.followUp)}
+                      </span>
                     </TableCell>
                     <TableCell className="p-[0px]">
                       <div className="flex flex-col gap-[3px] px-[20px] py-[16px]">
                         <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                          {new Date(appointment.endDate).toLocaleDateString()}
-                        </span>
-                        <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
-                          {new Date(appointment.endDate).toLocaleTimeString()}
+                          {prescription.appointmentDate
+                            ? new Date(
+                                prescription.appointmentDate,
+                              ).toLocaleDateString()
+                            : "—"}
                         </span>
                       </div>
                     </TableCell>
@@ -356,20 +288,31 @@ export const PrescriptionListSection = ({}: {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          {onViewRecord && (
+                            <DropdownMenuItem
+                              onClick={() => onViewRecord(prescription)}
+                            >
+                              View record
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem
-                          // onClick={() => onRescheduleAppointment(appointment)}
+                            onClick={() => onEditPrescription(prescription)}
                           >
-                            Reschedule
+                            Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                          // onClick={() => onMarkAsDoneAppointment(appointment)}
+                            onClick={() =>
+                              onMarkAsDonePrescription(prescription)
+                            }
                           >
                             Mark as done
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                          // onClick={() => onCancelAppointment(appointment)}
+                            onClick={() =>
+                              onDeletePrescription(prescription)
+                            }
                           >
-                            Cancel appointment
+                            Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

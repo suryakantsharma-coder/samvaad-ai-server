@@ -61,12 +61,12 @@ export const Login = (): JSX.Element => {
             Sign in
           </Button>
         </form>
-        <p className="text-center text-sm text-muted-foreground">
+        {/* <p className="text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
           <Link to="/signup" className="text-primary hover:underline">
             Sign up
           </Link>
-        </p>
+        </p> */}
       </div>
     </div>
   );

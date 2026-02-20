@@ -35,6 +35,8 @@ import {
   TableHeader,
   TableRow,
 } from "../../../../components/ui/table";
+import { ListError } from "../../../../components/ui/list-error";
+import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
 import { useDoctor } from "../../../../contexts/DoctorProvider";
 
 const doctorsData = [
@@ -156,6 +158,7 @@ export const DoctorListSection = (): JSX.Element => {
     doctors,
     searchedDoctors,
     loading,
+    error,
     page,
     limit,
     getDoctorsData,
@@ -183,8 +186,22 @@ export const DoctorListSection = (): JSX.Element => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  if (loading && doctors.length === 0 && listToShow.length === 0) {
-    return <div>Loading...</div>;
+  const showLoading = loading && doctors.length === 0 && listToShow.length === 0;
+  const showError = error && !loading;
+
+  if (showLoading) {
+    return (
+      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
+        <LoadingSpinner />
+      </section>
+    );
+  }
+  if (showError) {
+    return (
+      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
+        <ListError message={error} />
+      </section>
+    );
   }
 
   //  10:00 AM - 1:00 PM&#x2F;n2:00 AM - 6:00 PM make function to split the string and return the array of strings

@@ -1,35 +1,17 @@
-// curl -s -X POST "http://localhost:3000/api/hospitals" \
-//   -H "Authorization: Bearer $ACCESS" \
-//   -H "Content-Type: application/json" \
-// -d '{"name":"Test Hospital","phoneNumber":"1234567890","email":"test@hospital.com","contactPerson":"Admin","registrationNumber":"REG001","address":"1 Main St","city":"Mumbai","pincode":"400001","url":"https://test.com"}'
-
-import { CreateHospitalPayload, Hospital } from "../types/hospital.type";
+import { CreateHospitalPayload } from "../types/hospital.type";
+import { authFetch } from "./api";
 
 export const createHospital = async (hospital: CreateHospitalPayload) => {
-  const response = await fetch("http://localhost:3000/api/hospitals", {
+  const data = (await authFetch("/api/hospitals", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
-    body: JSON.stringify(hospital),
-  });
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ message: response.statusText }));
-    throw new Error(error?.message ?? "Failed to create hospital");
-  }
-  return response.json();
+    body: hospital as object,
+  })) as { message?: string };
+  if (data?.message) throw new Error(data.message);
+  return data;
 };
 
 export const getHospitals = async () => {
-  const response = await fetch("http://localhost:3000/api/hospitals", {
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
-  });
-  return response.json();
+  return authFetch("/api/hospitals", { method: "GET" });
 };
 
 export const searchHospitals = async (
@@ -37,15 +19,12 @@ export const searchHospitals = async (
   page: number,
   limit: number,
 ) => {
-  const params = new URLSearchParams({ q, page: String(page), limit: String(limit) });
-  const response = await fetch(
-    `http://localhost:3000/api/hospitals/search?${params.toString()}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    },
-  );
-  return response.json();
+  const params = new URLSearchParams({
+    q,
+    page: String(page),
+    limit: String(limit),
+  });
+  return authFetch(`/api/hospitals/search?${params.toString()}`, {
+    method: "GET",
+  });
 };

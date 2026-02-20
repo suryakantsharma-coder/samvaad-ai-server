@@ -7,6 +7,8 @@ import { createHospital, getHospitals, searchHospitals } from "../data/hospital"
 interface HospitalContextType {
   hospitals: Hospital[];
   searchedHospitals: Hospital[] | null;
+  isLoading: boolean;
+  error: string | null;
   handleCreateHospital: (payload: CreateHospitalPayload) => Promise<void>;
   handleGetHospitals: () => Promise<void>;
   handleSearchHospitals: (q: string) => Promise<void>;
@@ -20,6 +22,8 @@ export const HospitalContext = createContext<HospitalContextType>({
   resetSearchedHospitals: () => {},
   hospitals: [],
   searchedHospitals: null,
+  isLoading: false,
+  error: null,
 });
 
 export const HospitalProvider = ({ children }: { children: ReactNode }) => {
@@ -46,16 +50,18 @@ export const HospitalProvider = ({ children }: { children: ReactNode }) => {
 
   const handleGetHospitals = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const response = await getHospitals();
       setHospitals(response.data?.hospitals ?? []);
       setSuccess("Hospitals fetched successfully");
       setShowToast(true);
-    } catch (error) {
+    } catch (err) {
       setError("Failed to get hospitals");
       setShowToast(true);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const handleSearchHospitals = async (q: string) => {
@@ -82,6 +88,8 @@ export const HospitalProvider = ({ children }: { children: ReactNode }) => {
       value={{
         hospitals,
         searchedHospitals,
+        isLoading,
+        error,
         handleCreateHospital,
         handleGetHospitals,
         handleSearchHospitals,

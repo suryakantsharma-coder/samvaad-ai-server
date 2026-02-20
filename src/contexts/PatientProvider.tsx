@@ -17,13 +17,20 @@ export interface PatientOverall {
   totalPatients?: number;
 }
 
+export interface PatientCounts {
+  all: number;
+  today: number;
+  tomorrow: number;
+}
+
 interface PatientContextType {
   patients: Patients[];
   overall: PatientOverall;
+  counts: PatientCounts;
   loading: boolean;
   error: string | null;
   handleAddPatient: (patient: CreatePatientPayload) => void;
-  handlePatient: () => void;
+  handlePatient: (page?: number, limit?: number, filter?: "all" | "today" | "tomorrow") => void;
   totalPages: number;
   currentPage: number;
   limit: number;
@@ -48,6 +55,7 @@ export const PatientProvider = ({
 }) => {
   const [patients, setPatients] = useState<Patients[]>([]);
   const [overall, setOverall] = useState<PatientOverall>({});
+  const [counts, setCounts] = useState<PatientCounts>({ all: 0, today: 0, tomorrow: 0 });
   const [searchedPatients, setSearchedPatients] = useState<Patients[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -73,20 +81,32 @@ export const PatientProvider = ({
     }
   };
 
-  const handlePatient = async () => {
+  const handlePatient = async (
+    page = 1,
+    pageLimit = 10,
+    filter: "all" | "today" | "tomorrow" = "all",
+  ) => {
     try {
       setLoading(true);
-      const response = await getPatients(1, 10);
+      const response = await getPatients(page, pageLimit, filter);
       setPatients(response.data?.patients ?? []);
       const nextOverall = response.data?.overall;
       if (nextOverall && typeof nextOverall.totalPatients === "number") {
         setOverall({ totalPatients: nextOverall.totalPatients });
       }
-      const page = response.data?.pagination;
-      if (page) {
-        setTotalPages(page.totalPages);
-        setCurrentPage(page.page);
-        setLimit(page.limit);
+      const nextCounts = response.data?.counts;
+      if (nextCounts && typeof nextCounts.all === "number") {
+        setCounts({
+          all: nextCounts.all ?? 0,
+          today: nextCounts.today ?? 0,
+          tomorrow: nextCounts.tomorrow ?? 0,
+        });
+      }
+      const pagination = response.data?.pagination;
+      if (pagination) {
+        setTotalPages(pagination.totalPages);
+        setCurrentPage(pagination.page);
+        setLimit(pagination.limit);
       }
     } catch (error) {
       setError(error as string);
@@ -101,7 +121,7 @@ export const PatientProvider = ({
   ) => {
     try {
       await updatePatient(patientId, patient);
-      await handlePatient();
+      await handlePatient(1, limit, "all");
       alert("Patient updated successfully");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -131,7 +151,7 @@ export const PatientProvider = ({
   const handleDeletePatient = async (patientId: string) => {
     try {
       await deletePatient(patientId);
-      await handlePatient();
+      await handlePatient(1, limit, "all");
       alert("Patient deleted successfully");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -145,6 +165,7 @@ export const PatientProvider = ({
       value={{
         patients,
         overall,
+        counts,
         loading,
         error,
         handleAddPatient,
