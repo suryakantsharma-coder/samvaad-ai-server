@@ -152,8 +152,17 @@ const getStatusColor = (status: string) => {
   }
 };
 
+const STATUS_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "On Duty", label: "On Duty" },
+  { value: "On Break", label: "On Break" },
+  { value: "Off Duty", label: "Off Duty" },
+  { value: "On Leave", label: "On Leave" },
+] as const;
+
 export const DoctorListSection = (): JSX.Element => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const {
     doctors,
     searchedDoctors,
@@ -166,10 +175,12 @@ export const DoctorListSection = (): JSX.Element => {
     resetSearchedDoctors,
   } = useDoctor();
 
+  const baseList =
+    searchQuery.trim() === "" ? doctors : searchedDoctors ?? [];
   const listToShow =
-    searchQuery.trim() === ""
-      ? doctors
-      : searchedDoctors ?? [];
+    statusFilter === "all"
+      ? baseList
+      : baseList.filter((d) => d.status === statusFilter);
 
   useEffect(() => {
     getDoctorsData();
@@ -223,16 +234,19 @@ export const DoctorListSection = (): JSX.Element => {
         </div>
 
         <div className="flex flex-wrap items-center gap-[15px]">
-          <Select>
+          <Select
+            value={statusFilter}
+            onValueChange={setStatusFilter}
+          >
             <SelectTrigger className="flex w-[107px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="on-duty">On Duty</SelectItem>
-              <SelectItem value="on-break">On Break</SelectItem>
-              <SelectItem value="off-duty">Off Duty</SelectItem>
-              <SelectItem value="on-leave">On Leave</SelectItem>
+              {STATUS_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 

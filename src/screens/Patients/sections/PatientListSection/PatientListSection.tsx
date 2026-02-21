@@ -35,13 +35,18 @@ import {
 } from "../../../../components/ui/toggle-group";
 import { ListError } from "../../../../components/ui/list-error";
 import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
+import { Pagination } from "../../../../components/ui/pagination";
 import { PatientData } from "../../../../components/modals/AddPatientModal";
 import { usePatient } from "../../../../contexts/PatientProvider";
+import { useNavigate } from "react-router-dom";
 
 const filterTabIds = ["all", "today", "tomorrow"] as const;
 type PatientFilterTab = (typeof filterTabIds)[number];
 
-function getFilterTabLabel(id: PatientFilterTab, counts: { all: number; today: number; tomorrow: number }): string {
+function getFilterTabLabel(
+  id: PatientFilterTab,
+  counts: { all: number; today: number; tomorrow: number },
+): string {
   switch (id) {
     case "all":
       return `All (${counts.all})`;
@@ -170,7 +175,11 @@ export const PatientListSection = ({
   onEditPatient,
   onDeletePatient,
 }: PatientListSectionProps): JSX.Element => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<PatientFilterTab>("all");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "completed" | "today" | "upcoming" | "cancelled"
+  >("all");
   const {
     patients,
     searchedPatients,
@@ -183,12 +192,19 @@ export const PatientListSection = ({
     error,
     counts,
     limit,
+    totalPages,
+    currentPage,
   } = usePatient();
 
+  const baseList = searchQuery.trim() === "" ? patients : searchedPatients;
   const listToShow =
-    searchQuery.trim() === ""
-      ? patients
-      : searchedPatients;
+    statusFilter === "all"
+      ? baseList
+      : baseList.filter((p) =>
+          p.appointments?.some(
+            (a) => a.status?.toLowerCase() === statusFilter.toLowerCase(),
+          ),
+        );
 
   useEffect(() => {
     handlePatient(1, limit, activeTab);
@@ -260,7 +276,20 @@ export const PatientListSection = ({
             />
           </div>
 
-          <Select>
+          <Select
+            value={statusFilter}
+            onValueChange={(value) => {
+              if (
+                value === "all" ||
+                value === "completed" ||
+                value === "today" ||
+                value === "upcoming" ||
+                value === "cancelled"
+              ) {
+                setStatusFilter(value);
+              }
+            }}
+          >
             <SelectTrigger className="flex w-[107px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -307,23 +336,6 @@ export const PatientListSection = ({
               Filter
             </span>
           </Button>
-
-          {/* <div className="inline-flex items-center p-[2px] bg-grey-light rounded-[100px]">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full hover:bg-white"
-            >
-              <img alt="List view" src="/frame-2147229233.svg" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full hover:bg-white"
-            >
-              <img alt="Grid view" src="/frame-2147229236.svg" />
-            </Button>
-          </div> */}
         </div>
       </div>
 
@@ -504,6 +516,13 @@ export const PatientListSection = ({
                       >
                         Delete
                       </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          navigate(`/prescriptions/patient/${patient._id}`)
+                        }
+                      >
+                        Patient History
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -512,6 +531,14 @@ export const PatientListSection = ({
           </TableBody>
         </Table>
       </div>
+      {searchQuery.trim() === "" && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={(page) => handlePatient(page, limit, activeTab)}
+          disabled={loading}
+        />
+      )}
     </section>
   );
 };

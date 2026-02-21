@@ -57,3 +57,13 @@ export interface CreateHospitalPayload {
   url: string;
   logoUrl: string;
 }
+
+/** Payload for PATCH /hospitals/:id */
+export interface UpdateHospitalPayload {
+  name?: string;
+  phoneNumber?: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  pincode?: string;
+}

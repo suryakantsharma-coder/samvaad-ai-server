@@ -1,4 +1,8 @@
-import { CreateHospitalPayload } from "../types/hospital.type";
+import {
+  CreateHospitalPayload,
+  Hospital,
+  UpdateHospitalPayload,
+} from "../types/hospital.type";
 import { authFetch } from "./api";
 
 export const createHospital = async (hospital: CreateHospitalPayload) => {
@@ -12,6 +16,32 @@ export const createHospital = async (hospital: CreateHospitalPayload) => {
 
 export const getHospitals = async () => {
   return authFetch("/api/hospitals", { method: "GET" });
+};
+
+/**
+ * GET /api/hospitals/:hospitalId
+ * Fetches a single hospital by ID (Bearer token required).
+ */
+export const getHospitalById = async (
+  hospitalId: string,
+): Promise<{ success?: boolean; data?: { hospital?: Hospital } }> => {
+  return authFetch(`/api/hospitals/${hospitalId}`, {
+    method: "GET",
+  }) as Promise<{ success?: boolean; data?: { hospital?: Hospital } }>;
+};
+
+/**
+ * PATCH /api/hospitals/:hospitalId
+ * Updates hospital details (Bearer token required).
+ */
+export const updateHospital = async (
+  hospitalId: string,
+  payload: UpdateHospitalPayload,
+): Promise<{ success?: boolean; data?: { hospital?: Hospital } }> => {
+  return authFetch(`/api/hospitals/${hospitalId}`, {
+    method: "PATCH",
+    body: payload as object,
+  }) as Promise<{ success?: boolean; data?: { hospital?: Hospital } }>;
 };
 
 export const searchHospitals = async (

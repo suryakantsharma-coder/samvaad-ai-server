@@ -157,13 +157,13 @@ export const PatientSearchSection = (): JSX.Element => {
       </nav>
 
       <div className="inline-flex flex-wrap items-center gap-3 md:gap-5">
-        <Button
+        {/* <Button
           variant="ghost"
           size="icon"
           className="inline-flex items-center gap-[13px] p-2 bg-white rounded-[50px] h-auto hover:bg-white"
         >
           <img className="w-6 h-6" alt="Search" src="/search.svg" />
-        </Button>
+        </Button> */}
 
         <div className="inline-flex items-center gap-[13px] px-2.5 py-2 bg-white rounded-[50px]">
           <Button

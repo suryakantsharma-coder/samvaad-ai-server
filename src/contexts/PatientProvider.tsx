@@ -1,6 +1,7 @@
 // create patient provider
 
 import { createContext, useContext, useState } from "react";
+import { showSuccess, showError } from "../lib/toast";
 import {
   getPatients,
   searchPatients,
@@ -74,10 +75,11 @@ export const PatientProvider = ({
         reason: patient.reason,
       });
       setPatients([...patients, response.data.patient]);
-      alert("Patient added successfully");
+      showSuccess("Success!", "Patient added successfully.");
     } catch (error) {
-      setError(error as string);
-      alert(error as string);
+      const msg = error as string;
+      setError(msg);
+      showError("Error", msg);
     }
   };
 
@@ -122,11 +124,11 @@ export const PatientProvider = ({
     try {
       await updatePatient(patientId, patient);
       await handlePatient(1, limit, "all");
-      alert("Patient updated successfully");
+      showSuccess("Success!", "Patient updated successfully.");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
-      alert(message);
+      showError("Error", message);
     }
   };
 
@@ -152,11 +154,11 @@ export const PatientProvider = ({
     try {
       await deletePatient(patientId);
       await handlePatient(1, limit, "all");
-      alert("Patient deleted successfully");
+      showSuccess("Success!", "Patient deleted successfully.");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message);
-      alert(message);
+      showError("Error", message);
     }
   };
 

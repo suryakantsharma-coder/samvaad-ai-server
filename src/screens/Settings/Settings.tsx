@@ -23,6 +23,8 @@ import {
   UserPlusIcon,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthProvider";
+import { useHospital } from "../../contexts/HospitalProvider";
+import { showSuccess, showError, showWarning } from "../../lib/toast";
 import {
   createUserAsAdmin,
   getHospitalUsers,
@@ -38,6 +40,13 @@ const BASE_SETTINGS_TABS = [
 
 export const Settings = (): JSX.Element => {
   const { user } = useAuth();
+  const {
+    currentHospital,
+    currentHospitalLoading,
+    currentHospitalError,
+    fetchHospitalById,
+    updateHospitalById,
+  } = useHospital();
   const isHospitalAdmin = user?.role === "hospital_admin";
 
   const settingsTabs = useMemo(() => {
@@ -80,7 +89,10 @@ export const Settings = (): JSX.Element => {
         prev.map((u) => (u._id === userId ? { ...u, role: newRole } : u)),
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update role");
+      showError(
+        "Error",
+        err instanceof Error ? err.message : "Failed to update role",
+      );
     } finally {
       setUpdatingRoleId(null);
     }
@@ -118,21 +130,64 @@ export const Settings = (): JSX.Element => {
   const [listUpdating, setListUpdating] = useState(false);
   const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    fullName: "Patric Peters",
-    phone: "569 334 3366",
+    fullName: "",
+    phone: "",
     countryCode: "+91",
     password: "••••••••",
-    email: "peterpatric@gmail.com",
-    hospitalName: "Central Medical Hospital",
-    address: "Physical location123 Baker Street, India",
-    hospitalId: "HSP-1005",
+    email: "",
+    hospitalName: "",
+    address: "",
+    hospitalId: "",
+    city: "",
+    pincode: "",
     workingHours: "8:00 AM - 9:00 PM",
-    phoneRouting: "569 334 3366",
+    phoneRouting: "",
     phoneRoutingCountryCode: "+91",
-    whatsappNumber: "9876 543 210",
+    whatsappNumber: "",
     whatsappCountryCode: "+91",
-    officialEmail: "peterpatric@gmail.com",
+    officialEmail: "",
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        fullName: user.name ?? prev.fullName,
+        email: user.email ?? prev.email,
+      }));
+    }
+  }, [user?.name, user?.email]);
+
+  // Fetch hospital when viewing hospital tab and user has a linked hospital
+  useEffect(() => {
+    if (activeTab === "hospital" && user?.hospital) {
+      fetchHospitalById(user.hospital);
+    }
+  }, [activeTab, user?.hospital]);
+
+  // Fill hospital form when currentHospital is loaded
+  useEffect(() => {
+    if (currentHospital) {
+      setFormData((prev) => ({
+        ...prev,
+        hospitalName: currentHospital.name ?? prev.hospitalName,
+        address: currentHospital.address ?? prev.address,
+        hospitalId: currentHospital._id ?? prev.hospitalId,
+        city: currentHospital.city ?? prev.city,
+        pincode: currentHospital.pincode ?? prev.pincode,
+        phoneRouting: currentHospital.phoneNumber ?? prev.phoneRouting,
+        phoneRoutingCountryCode:
+          currentHospital.phoneCountryCode ?? prev.phoneRoutingCountryCode,
+        officialEmail: currentHospital.email ?? prev.officialEmail,
+        whatsappNumber: currentHospital.phoneNumber ?? prev.whatsappNumber,
+      }));
+    }
+  }, [currentHospital]);
+
+  const [hospitalSaveLoading, setHospitalSaveLoading] = useState(false);
+  const [hospitalSaveError, setHospitalSaveError] = useState<string | null>(
+    null,
+  );
 
   const [integrations, setIntegrations] = useState({
     whatsapp: true,
@@ -148,18 +203,42 @@ export const Settings = (): JSX.Element => {
     console.log("Saving personal information:", formData);
   };
 
-  const handleSaveHospital = () => {
-    console.log("Saving hospital information:", formData);
+  const handleSaveHospital = async () => {
+    const hospitalId = user?.hospital as string | undefined;
+    if (!hospitalId) {
+      setHospitalSaveError("No hospital linked to your account.");
+      return;
+    }
+    setHospitalSaveError(null);
+    setHospitalSaveLoading(true);
+    try {
+      await updateHospitalById(hospitalId, {
+        name: formData.hospitalName || undefined,
+        phoneNumber: formData.phoneRouting || undefined,
+        email: formData.officialEmail || undefined,
+        address: formData.address || undefined,
+        city: formData.city || undefined,
+        pincode: formData.pincode || undefined,
+      });
+      showSuccess("Success!", "Hospital information updated successfully.");
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to update hospital";
+      setHospitalSaveError(msg);
+      showError("Error", msg);
+    } finally {
+      setHospitalSaveLoading(false);
+    }
   };
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newUserForm.password !== newUserForm.confirmPassword) {
-      alert("Passwords do not match");
+      showWarning("Warning", "Passwords do not match.");
       return;
     }
     if (!newUserForm.email || !newUserForm.name || !newUserForm.password) {
-      alert("Please fill in name, email, and password");
+      showWarning("Warning", "Please fill in name, email, and password.");
       return;
     }
     setAddUserLoading(true);
@@ -173,8 +252,12 @@ export const Settings = (): JSX.Element => {
         user?.hospital as string,
       );
       handleAddUserSuccess();
+      showSuccess("Success!", "User created successfully.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to create user");
+      showError(
+        "Error",
+        err instanceof Error ? err.message : "Failed to create user",
+      );
     } finally {
       setAddUserLoading(false);
     }
@@ -205,12 +288,22 @@ export const Settings = (): JSX.Element => {
     try {
       await handleChangeUserRole(userId, newRole, hospitalId);
       await handleGetHospitalUsers(hospitalId);
+      showSuccess("Success!", "User role updated successfully.");
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to update role");
+      showError(
+        "Error",
+        err instanceof Error ? err.message : "Failed to update role",
+      );
     } finally {
       setListUpdating(false);
       setUpdatingRoleId(null);
     }
+  };
+
+  const getFirstCharacterAfterSpace = (name: string) => {
+    const nameParts = name.split(" ");
+    const character = nameParts?.map((part) => part.charAt(0));
+    return character?.join("") || "";
   };
 
   return (
@@ -275,10 +368,10 @@ export const Settings = (): JSX.Element => {
                     <div className="flex items-center gap-4">
                       <div className="w-[60px] h-[60px] rounded-full bg-grey-light flex items-center justify-center">
                         <span className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)]">
-                          PP
+                          {getFirstCharacterAfterSpace(formData.fullName)}
                         </span>
                       </div>
-                      <Button
+                      {/* <Button
                         variant="outline"
                         className="inline-flex items-center gap-2 px-4 py-2 h-[38px] border border-[#dedee1] rounded-[10px] bg-white hover:bg-grey-light"
                       >
@@ -293,7 +386,7 @@ export const Settings = (): JSX.Element => {
                         className="w-9 h-9 text-red-500 hover:bg-red-50 bg-[#FFF1F1]"
                       >
                         <Trash2Icon className="w-5 h-5" />
-                      </Button>
+                      </Button> */}
                     </div>
                   </div>
 
@@ -624,206 +717,257 @@ export const Settings = (): JSX.Element => {
                   </h3>
                 </div>
 
-                <div className="flex flex-col gap-[20px]">
-                  <div className="flex flex-col gap-2">
-                    <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                      Hospital Logo
-                    </label>
-                    <div className="flex items-center gap-4">
-                      <div className="w-[60px] h-[60px] rounded-full bg-grey-light flex items-center justify-center">
-                        <span className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)]">
-                          CMH
-                        </span>
+                {!user?.hospital ? (
+                  <p className="text-x-70 font-title-4r">
+                    You are not linked to a hospital. Contact your admin to get
+                    access.
+                  </p>
+                ) : currentHospitalLoading && !currentHospital ? (
+                  <p className="text-x-70 font-title-4r">Loading hospital…</p>
+                ) : (
+                  <>
+                    {(currentHospitalError || hospitalSaveError) && (
+                      <p className="text-red-600 font-title-4r">
+                        {currentHospitalError ?? hospitalSaveError}
+                      </p>
+                    )}
+                    <div className="flex flex-col gap-[20px]">
+                      <div className="flex flex-col gap-2">
+                        <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                          Hospital Logo
+                        </label>
+                        <div className="flex items-center gap-4">
+                          <div className="w-[60px] h-[60px] rounded-full bg-grey-light flex items-center justify-center">
+                            <span className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)]">
+                              {formData.hospitalName
+                                ?.slice(0, 2)
+                                .toUpperCase() ?? "—"}
+                            </span>
+                          </div>
+                          <Button
+                            variant="outline"
+                            className="inline-flex items-center gap-2 px-4 py-2 h-[38px] border border-[#dedee1] rounded-[10px] bg-white hover:bg-grey-light"
+                          >
+                            <UploadIcon className="w-4 h-4" />
+                            <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)]">
+                              Upload Picture
+                            </span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="w-9 h-9 text-red-500 hover:bg-red-50 bg-[#FFF1F1]"
+                          >
+                            <Trash2Icon className="w-5 h-5" />
+                          </Button>
+                        </div>
                       </div>
-                      <Button
-                        variant="outline"
-                        className="inline-flex items-center gap-2 px-4 py-2 h-[38px] border border-[#dedee1] rounded-[10px] bg-white hover:bg-grey-light"
-                      >
-                        <UploadIcon className="w-4 h-4" />
-                        <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)]">
-                          Upload Picture
-                        </span>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="w-9 h-9 text-red-500 hover:bg-red-50 bg-[#FFF1F1]"
-                      >
-                        <Trash2Icon className="w-5 h-5" />
-                      </Button>
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
-                    <div className="flex flex-col gap-2">
-                      <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                        Hospital Name
-                      </label>
-                      <Input
-                        value={formData.hospitalName}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            hospitalName: e.target.value,
-                          })
-                        }
-                        className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
-                      />
-                    </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Hospital Name
+                          </label>
+                          <Input
+                            value={formData.hospitalName}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                hospitalName: e.target.value,
+                              })
+                            }
+                            className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                          />
+                        </div>
 
-                    <div className="flex flex-col gap-2">
-                      <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                        Address
-                      </label>
-                      <Input
-                        value={formData.address}
-                        onChange={(e) =>
-                          setFormData({ ...formData, address: e.target.value })
-                        }
-                        className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
-                      />
-                    </div>
-                  </div>
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Address
+                          </label>
+                          <Input
+                            value={formData.address}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                address: e.target.value,
+                              })
+                            }
+                            className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                          />
+                        </div>
+                      </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
-                    <div className="flex flex-col gap-2">
-                      <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                        Hospital ID
-                      </label>
-                      <Input
-                        value={formData.hospitalId}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            hospitalId: e.target.value,
-                          })
-                        }
-                        className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
-                      />
-                    </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Hospital ID
+                          </label>
+                          <Input
+                            value={formData.hospitalId}
+                            readOnly
+                            disabled
+                            className="h-[44px] px-4 py-2 bg-grey-light border border-[#dedee1] rounded-[10px] text-x-70"
+                          />
+                        </div>
 
-                    <div className="flex flex-col gap-[15px]">
-                      <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                        Working Hours
-                      </label>
-                      <div className="relative">
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            City
+                          </label>
+                          <Input
+                            value={formData.city}
+                            onChange={(e) =>
+                              setFormData({ ...formData, city: e.target.value })
+                            }
+                            className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Pincode
+                          </label>
+                          <Input
+                            value={formData.pincode}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                pincode: e.target.value,
+                              })
+                            }
+                            className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-[15px]">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Working Hours
+                          </label>
+                          <div className="relative">
+                            <Input
+                              value={formData.workingHours}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  workingHours: e.target.value,
+                                })
+                              }
+                              className="h-[44px] px-4 py-2 pr-12 bg-white border border-[#dedee1] rounded-[10px]"
+                            />
+                            <ClockIcon className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-x-70" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Phone Routing Number
+                          </label>
+                          <div className="flex gap-2.5">
+                            <Select
+                              value={formData.phoneRoutingCountryCode}
+                              onValueChange={(value) =>
+                                setFormData({
+                                  ...formData,
+                                  phoneRoutingCountryCode: value,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="w-[100px] h-[44px] px-3 py-2 bg-white border border-[#dedee1] rounded-[10px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="+91">+91</SelectItem>
+                                <SelectItem value="+1">+1</SelectItem>
+                                <SelectItem value="+44">+44</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="tel"
+                              value={formData.phoneRouting}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  phoneRouting: e.target.value,
+                                })
+                              }
+                              className="flex-1 h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-[10px]">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            WhatsApp Number
+                          </label>
+                          <div className="flex gap-2.5">
+                            <Select
+                              value={formData.whatsappCountryCode}
+                              onValueChange={(value) =>
+                                setFormData({
+                                  ...formData,
+                                  whatsappCountryCode: value,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="w-[100px] h-[44px] px-3 py-2 bg-white border border-[#dedee1] rounded-[10px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="+91">+91</SelectItem>
+                                <SelectItem value="+1">+1</SelectItem>
+                                <SelectItem value="+44">+44</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="tel"
+                              value={formData.whatsappNumber}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  whatsappNumber: e.target.value,
+                                })
+                              }
+                              className="flex-1 h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                          Official Email
+                        </label>
                         <Input
-                          value={formData.workingHours}
+                          type="email"
+                          value={formData.officialEmail}
                           onChange={(e) =>
                             setFormData({
                               ...formData,
-                              workingHours: e.target.value,
+                              officialEmail: e.target.value,
                             })
                           }
-                          className="h-[44px] px-4 py-2 pr-12 bg-white border border-[#dedee1] rounded-[10px]"
+                          className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
                         />
-                        <ClockIcon className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-x-70" />
                       </div>
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex flex-col gap-2">
-                      <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                        Phone Routing Number
-                      </label>
-                      <div className="flex gap-2.5">
-                        <Select
-                          value={formData.phoneRoutingCountryCode}
-                          onValueChange={(value) =>
-                            setFormData({
-                              ...formData,
-                              phoneRoutingCountryCode: value,
-                            })
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={handleSaveHospital}
+                          disabled={
+                            hospitalSaveLoading || currentHospitalLoading
                           }
+                          className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
                         >
-                          <SelectTrigger className="w-[100px] h-[44px] px-3 py-2 bg-white border border-[#dedee1] rounded-[10px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="+91">+91</SelectItem>
-                            <SelectItem value="+1">+1</SelectItem>
-                            <SelectItem value="+44">+44</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          type="tel"
-                          value={formData.phoneRouting}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              phoneRouting: e.target.value,
-                            })
-                          }
-                          className="flex-1 h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
-                        />
+                          {hospitalSaveLoading ? "Saving…" : "Save"}
+                        </Button>
                       </div>
                     </div>
-
-                    <div className="flex flex-col gap-[25px]">
-                      <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                        WhatsApp Number
-                      </label>
-                      <div className="flex gap-2.5">
-                        <Select
-                          value={formData.whatsappCountryCode}
-                          onValueChange={(value) =>
-                            setFormData({
-                              ...formData,
-                              whatsappCountryCode: value,
-                            })
-                          }
-                        >
-                          <SelectTrigger className="w-[100px] h-[44px] px-3 py-2 bg-white border border-[#dedee1] rounded-[10px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="+91">+91</SelectItem>
-                            <SelectItem value="+1">+1</SelectItem>
-                            <SelectItem value="+44">+44</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          type="tel"
-                          value={formData.whatsappNumber}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              whatsappNumber: e.target.value,
-                            })
-                          }
-                          className="flex-1 h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                      Official Email
-                    </label>
-                    <Input
-                      type="email"
-                      value={formData.officialEmail}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          officialEmail: e.target.value,
-                        })
-                      }
-                      className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
-                    />
-                  </div>
-
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={handleSaveHospital}
-                      className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
-                    >
-                      Save
-                    </Button>
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -953,6 +1097,51 @@ export const Settings = (): JSX.Element => {
             </div>
           </div>
         )}
+
+        {/* Toast preview: three buttons at bottom to show custom toasts */}
+        {/* <div className="mt-8 pt-6 border-t border-[#dedee1]">
+          <p className="font-title-4m text-black text-[length:var(--title-4m-font-size)] mb-3">
+            Toast preview
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              type="button"
+              onClick={() =>
+                showSuccess(
+                  "Success!",
+                  "Your changes have been saved successfully.",
+                )
+              }
+              className="bg-[#00955C] hover:bg-[#00804d] text-white rounded-[10px] px-5 py-2"
+            >
+              Show Success Toast
+            </Button>
+            <Button
+              type="button"
+              onClick={() =>
+                showError(
+                  "Error",
+                  "Something went wrong. Please try again later.",
+                )
+              }
+              className="bg-[#dc2626] hover:bg-[#b91c1c] text-white rounded-[10px] px-5 py-2"
+            >
+              Show Error Toast
+            </Button>
+            <Button
+              type="button"
+              onClick={() =>
+                showWarning(
+                  "Warning",
+                  "Please review the details before proceeding.",
+                )
+              }
+              className="bg-[#ea580c] hover:bg-[#c2410c] text-white rounded-[10px] px-5 py-2"
+            >
+              Show Warning Toast
+            </Button>
+          </div>
+        </div> */}
       </div>
     </div>
   );

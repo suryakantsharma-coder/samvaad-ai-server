@@ -31,22 +31,57 @@ export const login = async (email: string, password: string) => {
     throw new Error(data?.message || data?.error || "Login failed");
   }
   const token = data?.data?.accessToken;
+  const refreshToken = data?.data?.refreshToken;
   if (token) {
     localStorage.setItem("token", token);
+  }
+  if (refreshToken) {
+    localStorage.setItem("refreshToken", refreshToken);
   }
   return data;
 };
 
+/**
+ * Refreshes the access token using the stored refresh token.
+ * Does not use authFetch to avoid circular calls when access token is expired.
+ * @returns New access token, or null if refresh failed (e.g. refresh token expired).
+ */
+export const refreshAccessToken = async (): Promise<string | null> => {
+  const refreshToken = localStorage.getItem("refreshToken");
+  if (!refreshToken) return null;
+  const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data?.success) {
+    return null;
+  }
+  const newAccessToken = data?.data?.accessToken;
+  const newRefreshToken = data?.data?.refreshToken;
+  if (newAccessToken) {
+    localStorage.setItem("token", newAccessToken);
+  }
+  if (newRefreshToken) {
+    localStorage.setItem("refreshToken", newRefreshToken);
+  }
+  return newAccessToken ?? null;
+};
+
 export const logout = async () => {
   const accessToken = localStorage.getItem("token");
+  const refreshToken = localStorage.getItem("refreshToken");
   const response = await fetch(`${API_BASE_URL}/api/auth/logout`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`,
     },
+    body: refreshToken ? JSON.stringify({ refreshToken }) : undefined,
   });
   localStorage.removeItem("token");
+  localStorage.removeItem("refreshToken");
   return response.json();
 };
 

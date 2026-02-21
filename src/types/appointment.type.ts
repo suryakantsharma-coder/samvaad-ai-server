@@ -1,5 +1,37 @@
 // make a type for this response
 
+export interface CreateAppointmentPayload {
+  patient: string;
+  doctor: string;
+  appointmentDateTime: string;
+  reason: string;
+  type: string;
+  status: string;
+}
+
+export interface UpdateAppointmentPayload {
+  appointmentDateTime: string;
+  reason: string;
+  type: string;
+  status: string;
+}
+
+export interface RescheduleAppointmentPayload {
+  appointmentDateTime: string;
+  reason: string;
+  type: string;
+  status: string;
+}
+
+export interface AppointmentPayload {
+  patient: string;
+  doctor: string;
+  appointmentDateTime: string;
+  reason: string;
+  type: string;
+  status: string;
+}
+
 export interface Patients {
   _id: string;
   hospital: string;
@@ -10,12 +42,20 @@ export interface Patients {
   gender: string;
 }
 
+/** Populated patient when API returns expand */
+export interface AppointmentPatient {
+  _id: string;
+  fullName?: string;
+  phoneNumber?: string;
+}
+
 export interface Appointments {
   _id: string;
   hospital: string;
   appointmentId: string;
-  patient: string;
-  doctor: Doctor;
+  /** Patient ID or populated patient object from API */
+  patient: string | AppointmentPatient;
+  doctor: Doctor | string;
   appointmentDateTime: string;
   reason: string;
   type: string;

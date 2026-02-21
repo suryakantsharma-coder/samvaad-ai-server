@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { showSuccess, showError } from "../../lib/toast";
 import { NewPrescriptionModal } from "../../components/modals";
 import type { NewPrescriptionPayload } from "../../components/modals/NewPrescriptionModal";
 import { usePrescription } from "../../contexts/PrescriptionProvider";
@@ -72,8 +73,12 @@ export const Prescriptions = (): JSX.Element => {
       );
       handleCloseModal(false);
       await handleGetPrescriptions(1, limit);
+      showSuccess("Success!", "Prescription created successfully.");
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to create prescription");
+      showError(
+        "Error",
+        e instanceof Error ? e.message : "Failed to create prescription",
+      );
     }
   };
 
@@ -85,8 +90,12 @@ export const Prescriptions = (): JSX.Element => {
       await handleUpdatePrescription(prescriptionId, payload);
       handleCloseModal(false);
       await handleGetPrescriptions(1, limit);
+      showSuccess("Success!", "Prescription updated successfully.");
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Failed to update prescription");
+      showError(
+        "Error",
+        e instanceof Error ? e.message : "Failed to update prescription",
+      );
     }
   };
 

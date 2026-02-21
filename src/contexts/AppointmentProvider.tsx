@@ -1,6 +1,7 @@
 // src/contexts/AppointmentProvider.tsx
 
 import { createContext, useContext, useState } from "react";
+import { showSuccess, showError } from "../lib/toast";
 import {
   createAppointment,
   deleteAppointment,
@@ -152,8 +153,11 @@ export const AppointmentProvider = ({
     try {
       const response = await createAppointment(appointment);
       setAppointments([...appointments, response.data.appointment]);
+      showSuccess("Success!", "Appointment created successfully.");
     } catch (error) {
-      setError(error as string);
+      const msg = error instanceof Error ? error.message : String(error);
+      setError(msg);
+      showError("Error", msg);
     }
   };
 
@@ -161,9 +165,11 @@ export const AppointmentProvider = ({
     try {
       await deleteAppointment(appointmentId);
       await handleGetAppointments(currentPage, limit, { filter: currentFilter });
-      alert("Appointment deleted successfully");
+      showSuccess("Success!", "Appointment deleted successfully.");
     } catch (error) {
-      setError(error as string);
+      const msg = error instanceof Error ? error.message : String(error);
+      setError(msg);
+      showError("Error", msg);
     }
   };
 
@@ -174,9 +180,11 @@ export const AppointmentProvider = ({
     try {
       await updateAppointment(_appointmentId, payload);
       await handleGetAppointments(currentPage, limit, { filter: currentFilter });
-      alert("Appointment updated successfully");
+      showSuccess("Success!", "Appointment updated successfully.");
     } catch (error) {
-      setError(error as string);
+      const msg = error instanceof Error ? error.message : String(error);
+      setError(msg);
+      showError("Error", msg);
     }
   };
 
@@ -184,9 +192,11 @@ export const AppointmentProvider = ({
     try {
       await MarkAsDoneAppointment(appointmentId);
       await handleGetAppointments(currentPage, limit, { filter: currentFilter });
-      alert("Appointment marked as done successfully");
+      showSuccess("Success!", "Appointment marked as done successfully.");
     } catch (error) {
-      setError(error as string);
+      const msg = error instanceof Error ? error.message : String(error);
+      setError(msg);
+      showError("Error", msg);
     }
   };
 

@@ -1,6 +1,7 @@
 // create a doctor context
 
 import { createContext, useContext, useState } from "react";
+import { showSuccess, showError } from "../lib/toast";
 import { CreateDoctorPayload, Doctor } from "../types/doctor.type";
 import { getDoctors, addDoctor, searchDoctors } from "../data/doctor";
 
@@ -58,9 +59,11 @@ export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
       setError(null);
       const response = await addDoctor(doctor);
       setDoctors([...doctors, response.data.doctor]);
-      alert("Doctor added successfully");
+      showSuccess("Success!", "Doctor added successfully.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add doctor");
+      const msg = err instanceof Error ? err.message : "Failed to add doctor";
+      setError(msg);
+      showError("Error", msg);
     } finally {
       setLoading(false);
     }

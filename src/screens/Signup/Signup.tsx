@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import { useAuth } from "../../contexts/AuthProvider";
+import { showError, showWarning } from "../../lib/toast";
 
 export const Signup = (): JSX.Element => {
   const [email, setEmail] = useState("");
@@ -24,7 +25,7 @@ export const Signup = (): JSX.Element => {
     e.preventDefault();
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match");
+      showWarning("Warning", "Passwords do not match.");
       return;
     }
 
@@ -32,7 +33,7 @@ export const Signup = (): JSX.Element => {
       await handleRegister(email, password, name, role);
       navigate("/login");
     } catch (error) {
-      alert("Failed to sign up");
+      showError("Error", "Failed to sign up. Please try again.");
     }
 
     console.log("Signup:", { email, password, confirmPassword, name, role });

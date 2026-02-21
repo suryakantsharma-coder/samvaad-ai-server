@@ -34,6 +34,7 @@ import {
 } from "../../../../components/ui/toggle-group";
 import { ListError } from "../../../../components/ui/list-error";
 import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
+import { Pagination } from "../../../../components/ui/pagination";
 import { usePrescription } from "../../../../contexts/PrescriptionProvider";
 import type { PrescriptionStatusFilter } from "../../../../data/prescription";
 import { Prescription } from "../../../../types/prescription.type";
@@ -90,6 +91,8 @@ export const PrescriptionListSection = ({
     loading,
     error,
     limit,
+    totalPages,
+    currentPage,
     handleGetPrescriptions,
     handleSearchPrescriptions,
     resetSearchedPrescriptions,
@@ -172,7 +175,10 @@ export const PrescriptionListSection = ({
             />
           </div>
 
-          <Select>
+          <Select
+            value={activeTab}
+            onValueChange={handleTabChange}
+          >
             <SelectTrigger className="flex w-[107px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -324,6 +330,18 @@ export const PrescriptionListSection = ({
           </div>
         </div>
       </div>
+      {searchQuery.trim() === "" && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={(page) =>
+            handleGetPrescriptions(page, limit, {
+              status: activeTab === "all" ? undefined : activeTab,
+            })
+          }
+          disabled={loading}
+        />
+      )}
     </section>
   );
 };

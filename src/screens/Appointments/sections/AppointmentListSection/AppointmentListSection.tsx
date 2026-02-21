@@ -1,14 +1,11 @@
 import {
-  Calendar as CalendarIcon,
-  Clock as ClockIcon,
   Filter as FilterIcon,
-  MoveVertical as MoreVerticalIcon,
   Phone as PhoneIcon,
   Search as SearchIcon,
   Video as VideoIcon,
   MoreVertical as ThreeDotsVerticalIcon,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "../../../../components/ui/badge";
 import { Button } from "../../../../components/ui/button";
 import {
@@ -39,6 +36,7 @@ import {
 } from "../../../../components/ui/toggle-group";
 import { ListError } from "../../../../components/ui/list-error";
 import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
+import { Pagination } from "../../../../components/ui/pagination";
 import { useAppointments } from "../../../../contexts/AppointmentProvider";
 import { Appointments } from "../../../../types/appointment.type";
 
@@ -68,12 +66,17 @@ export const AppointmentListSection = ({
   const [activeTab, setActiveTab] = useState<"all" | "today" | "tomorrow">(
     "all",
   );
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "today" | "upcoming" | "completed" | "cancelled"
+  >("all");
   const [searchQuery, setSearchQuery] = useState("");
   const {
     appointments,
     searchedAppointments,
     counts,
     limit,
+    totalPages,
+    currentPage,
     handleGetAppointments,
     handleSearchAppointments,
     resetSearchedAppointments,
@@ -81,8 +84,8 @@ export const AppointmentListSection = ({
     error,
   } = useAppointments();
 
-  const listToShow =
-    searchQuery.trim() === "" ? appointments : (searchedAppointments ?? []);
+  // const listToShow =
+  //   searchQuery.trim() === "" ? appointments : (searchedAppointments ?? []);
 
   const tabs = [
     { id: "all" as const, label: `All (${counts.all})` },
@@ -91,8 +94,16 @@ export const AppointmentListSection = ({
   ];
 
   useEffect(() => {
-    handleGetAppointments(1, limit, { filter: activeTab });
-  }, [activeTab]);
+    // API expects status with capital first letter (e.g. "Upcoming", "Completed", "Cancelled")
+    const statusForApi =
+      statusFilter === "all"
+        ? undefined
+        : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1);
+    handleGetAppointments(1, limit, {
+      filter: activeTab,
+      status: statusForApi,
+    });
+  }, [activeTab, statusFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -110,6 +121,33 @@ export const AppointmentListSection = ({
       setActiveTab(value);
     }
   };
+
+  // filter appointments by status
+
+  const filteredAppointments = useMemo(() => {
+    return (appointments ?? []).filter((appointment: Appointments) => {
+      if (statusFilter === "all") {
+        return true;
+      }
+      return appointment.status.toLowerCase() === statusFilter.toLowerCase();
+    });
+  }, [appointments, statusFilter]);
+
+  const filteredSearchedAppointments = useMemo(() => {
+    return (searchedAppointments ?? []).filter((appointment: Appointments) => {
+      if (statusFilter === "all") {
+        return true;
+      }
+      return appointment.status.toLowerCase() === statusFilter.toLowerCase();
+    });
+  }, [searchedAppointments, statusFilter]);
+
+  const listToShow = useMemo(() => {
+    if (searchQuery.trim() === "") {
+      return filteredAppointments;
+    }
+    return filteredSearchedAppointments;
+  }, [filteredAppointments, filteredSearchedAppointments, searchQuery]);
 
   const showLoading = loading;
   const showError = error && !loading;
@@ -160,7 +198,20 @@ export const AppointmentListSection = ({
             />
           </div>
 
-          <Select>
+          <Select
+            value={statusFilter}
+            onValueChange={(value) => {
+              if (
+                value === "all" ||
+                value === "today" ||
+                value === "upcoming" ||
+                value === "completed" ||
+                value === "cancelled"
+              ) {
+                setStatusFilter(value);
+              }
+            }}
+          >
             <SelectTrigger className="flex w-[107px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -229,7 +280,10 @@ export const AppointmentListSection = ({
                         </span> */}
                       <div className="flex flex-col px-[20px] py-[15px]">
                         <span className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                          {appointment.patient.fullName}
+                          {typeof appointment.patient === "object" &&
+                          appointment.patient !== null
+                            ? (appointment.patient.fullName ?? "—")
+                            : "—"}
                         </span>
                         <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
                           {appointment.appointmentId}
@@ -240,7 +294,10 @@ export const AppointmentListSection = ({
                       <div className="inline-flex items-center gap-[5px]">
                         <PhoneIcon className="w-4 h-4" />
                         <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                          {appointment.patient.phoneNumber}
+                          {typeof appointment.patient === "object" &&
+                          appointment.patient !== null
+                            ? (appointment.patient.phoneNumber ?? "—")
+                            : "—"}
                         </span>
                       </div>
                     </TableCell>
@@ -251,7 +308,11 @@ export const AppointmentListSection = ({
                     </TableCell>
                     <TableCell className="p-[0px]">
                       <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                        {appointment.doctor.fullName}
+                        {typeof appointment.doctor === "object" &&
+                        appointment.doctor !== null
+                          ? ((appointment.doctor as { fullName?: string })
+                              .fullName ?? "—")
+                          : "—"}
                       </span>
                     </TableCell>
                     <TableCell className="px-[10px] py-[16px]">
@@ -332,6 +393,16 @@ export const AppointmentListSection = ({
           </div>
         </div>
       </div>
+      {searchQuery.trim() === "" && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={(page) =>
+            handleGetAppointments(page, limit, { filter: activeTab })
+          }
+          disabled={loading}
+        />
+      )}
     </section>
   );
 };

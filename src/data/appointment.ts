@@ -1,8 +1,8 @@
-import {
-  AppointmentPayload,
-  RescheduleAppointmentPayload,
-} from "../types/appointment.type";
 import { authFetch } from "./api";
+import {
+  RescheduleAppointmentPayload,
+  AppointmentPayload,
+} from "../types/appointment.type";
 
 export interface AppointmentListParams {
   page: number;

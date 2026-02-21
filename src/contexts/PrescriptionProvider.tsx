@@ -6,6 +6,7 @@ import {
   searchPrescriptions,
   updatePrescription,
 } from "../data/prescription";
+import { showSuccess, showError } from "../lib/toast";
 import type { PrescriptionStatusFilter } from "../data/prescription";
 import {
   CreatePrescriptionPayload,
@@ -153,8 +154,11 @@ export const PrescriptionProvider = ({
       await handleGetPrescriptions(currentPage, limit, {
         status: currentStatusFilter ?? undefined,
       });
+      showSuccess("Success!", "Prescription deleted successfully.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
+      showError("Error", msg);
       throw err;
     }
   };

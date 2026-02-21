@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { useAuth } from "../../contexts/AuthProvider";
+import { showError } from "../../lib/toast";
 
 export const Login = (): JSX.Element => {
   const [email, setEmail] = useState("");
@@ -17,7 +18,7 @@ export const Login = (): JSX.Element => {
       await handleLogin(email, password);
       navigate("/patients");
     } catch (error) {
-      alert("Failed to login");
+      showError("Error", "Failed to login. Please check your credentials.");
     }
   };
 

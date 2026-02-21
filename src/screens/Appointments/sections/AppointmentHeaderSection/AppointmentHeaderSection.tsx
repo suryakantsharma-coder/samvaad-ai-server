@@ -53,31 +53,6 @@ export const AppointmentHeaderSection = ({
           </div>
         </div>
 
-        {typeof totalPatients === "number" && (
-          <div className="inline-flex items-center gap-2.5 px-[15px] py-[6px] bg-white rounded-[50px] h-[36px]">
-            <div className="inline-flex items-center gap-[5px]">
-              <span className="mt-[-1.00px] font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] whitespace-nowrap [font-style:var(--title-3m-font-style)]">
-                {totalPatients}
-              </span>
-              <span className="mt-[-0.50px] font-title-4r font-[number:var(--title-4r-font-weight)] text-x-70 text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
-                Total Patients
-              </span>
-            </div>
-          </div>
-        )}
-
-        <div className="inline-flex items-center gap-2.5 px-[15px] py-[6px] bg-white rounded-[50px] h-[36px]">
-          <div className="inline-flex items-center gap-[5px]">
-            <span className="mt-[-1.00px] font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] whitespace-nowrap [font-style:var(--title-3m-font-style)]">
-              Today ({todayCount})
-            </span>
-            <span className="text-x-70 font-title-4r">·</span>
-            <span className="mt-[-0.50px] font-title-4r font-[number:var(--title-4r-font-weight)] text-x-70 text-[length:var(--title-4r-font-size)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
-              Tomorrow ({tomorrowCount})
-            </span>
-          </div>
-        </div>
-
         <div className="inline-flex items-center gap-2.5 px-[15px] py-[6px] bg-white rounded-[50px] h-[36px]">
           <div className="inline-flex items-center gap-[5px]">
             <CalendarIcon className="w-5 h-5" />

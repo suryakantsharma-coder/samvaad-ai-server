@@ -10,6 +10,7 @@ import {
   Search,
   Trash2Icon,
 } from "lucide-react";
+import { showWarning } from "../../lib/toast";
 
 import { Button } from "../../components/ui/button";
 import {
@@ -439,7 +440,7 @@ export const NewAppointmentModal = ({
                   formData.appointmentDateTime,
                   !selectedDoctor?._id || !selectedPatient?._id)
                 ) {
-                  alert("Please fill all the fields");
+                  showWarning("Warning", "Please fill all the fields.");
                   return;
                 } else {
                   const payload: AppointmentPayload = {
@@ -452,7 +453,6 @@ export const NewAppointmentModal = ({
                   };
 
                   await handleCreateAppointment(payload);
-                  alert("Appointment created successfully");
                   onSave({
                     patientName: selectedPatient?.fullName || "",
                     doctorName: selectedDoctor?.fullName || "",
@@ -494,10 +494,9 @@ export const RescheduleModal = ({
         ).toISOString(),
       };
       handleUpdateAppointment(data?._id || "", payload);
-      alert("Appointment rescheduled successfully");
       onReschedule();
     } else {
-      alert("No changes made");
+      showWarning("Warning", "No changes made.");
     }
     setOnEdit(false);
     onClose();

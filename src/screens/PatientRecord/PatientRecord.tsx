@@ -7,6 +7,7 @@ import {
   RefreshCw,
   User,
   Video,
+  PhoneCallIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
@@ -200,19 +201,19 @@ export const PatientRecord = (): JSX.Element => {
     <div className="bg-app-background w-full min-h-screen flex flex-col">
       <PatientSearchSection />
 
-      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 md:px-6 py-6 flex flex-col gap-6">
+      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 md:px-6 py-6 flex flex-col gap-[24px]">
         {/* Two-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr,1fr] gap-8 flex-1">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr,1fr] gap-4 flex-1">
           {/* Left column: Patient info + Appointment history */}
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-0 bg-white rounded-[10px] border border-[#dedee1]">
             {/* Patient header */}
-            <div className="flex justify-between gap-3">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-3">
+            <div className="flex justify-between gap-3 border-b border-[#dedee1]  p-4">
+              <div className="flex flex-col gap-0">
+                <div className="flex items-center">
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full shrink-0"
+                    className="drounded-full shrink-0"
                     onClick={() => navigate(-1)}
                     aria-label="Back"
                   >
@@ -222,31 +223,39 @@ export const PatientRecord = (): JSX.Element => {
                     <div className="flex items-center justify-center w-9 h-9 rounded-full bg-grey-light border border-[#dedee1] shrink-0">
                       <User className="h-5 w-5 text-x-70" />
                     </div>
-                    <h1 className="font-title-3m text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] truncate">
-                      {p.fullName}
-                    </h1>
+                    <div className="flex flex-col gap-0">
+                      <div className="h-[26px] items-center justify-start">
+                        <h1 className=" font-title-3m text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] truncate">
+                          {p.fullName}
+                        </h1>
+                        <p className="font-title-5l text-[#57575f] text-[length:var(--title-5l-font-size)]">
+                          {p.age} years old • {p.gender} • {p.phoneNumber}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <p className="font-title-5l text-[#57575f] text-[length:var(--title-5l-font-size)] pl-12">
-                  {p.age} years old • {p.gender} • {p.phoneNumber}
-                </p>
               </div>
               <div className="flex items-center gap-8 pl-12">
                 <div className="flex flex-col gap-1">
-                  <Calendar className="h-4 w-4 text-[#57575f]" aria-hidden />
-                  <span className="font-title-5l text-[#57575f] text-sm">
-                    Last Visit
-                  </span>
-                  <span className="font-title-4r text-[#333333] text-sm">
+                  <div className="h-[26px] flex items-center justify-start gap-[5px]">
+                    <Calendar className="h-4 w-4 text-[#57575f]" aria-hidden />
+                    <span className="font-title-5l text-[#57575f] text-sm">
+                      Last Visit
+                    </span>
+                  </div>
+                  <span className="font-title-4r text-[#333333] text-sm pl-5">
                     {lastVisitDate}
                   </span>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Calendar className="h-4 w-4 text-[#57575f]" aria-hidden />
-                  <span className="font-title-5l text-[#57575f] text-sm">
-                    Total Visit
-                  </span>
-                  <span className="font-title-4r text-[#333333] text-sm">
+                  <div className="h-[26px] flex items-center justify-start gap-[5px]">
+                    <Calendar className="h-4 w-4 text-[#57575f]" aria-hidden />
+                    <span className="font-title-5l text-[#57575f] text-sm">
+                      Total Visit
+                    </span>
+                  </div>
+                  <span className="font-title-4r text-[#333333] text-sm pl-5">
                     {appointments.length}
                   </span>
                 </div>
@@ -254,14 +263,14 @@ export const PatientRecord = (): JSX.Element => {
             </div>
 
             {/* Appointment history */}
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 p-4">
               <h2 className="font-title-3m text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)]">
                 Appointment History
               </h2>
               <div className="relative flex flex-col gap-0">
                 {/* Timeline line */}
                 <div
-                  className="absolute left-[11px] top-2 bottom-2 w-px bg-[#dedee1]"
+                  className="absolute left-[11px] top-[48px] bottom-12 w-px bg-[#dedee1]"
                   aria-hidden
                 />
                 {appointments.map((apt) => {
@@ -272,36 +281,47 @@ export const PatientRecord = (): JSX.Element => {
                       className="relative flex gap-4 pl-10 pb-4 last:pb-0"
                     >
                       <div
-                        className={`absolute left-0 w-[22px] h-[22px] rounded-full border-2 border-white shrink-0 ${
-                          isSelected ? "bg-primary-2" : "bg-primary-2/60"
-                        }`}
-                        style={{ top: 4 }}
+                        className={`absolute left-[3px] w-[16px] h-[16px] rounded-full border-2 border-white shrink-0 ${"bg-primary-2"}`}
+                        style={{ top: 48 }}
                       />
                       <div className="flex-1 min-w-0 rounded-[10px] border border-[#dedee1] bg-white p-4 flex flex-col gap-3">
-                        <p className="font-title-4m text-[#333333]">
-                          {formatAppointmentDate(apt.appointmentDateTime)} |{" "}
-                          {formatAppointmentTime(apt.appointmentDateTime)}
-                        </p>
-                        <p className="font-title-5l text-[#57575f] text-sm">
-                          Reason: {apt.reason || "—"}
-                        </p>
-                        <div className="flex flex-wrap items-center justify-end gap-2">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary-2 text-white font-title-4r text-xs">
+                        <div className="flex justify-between items-center gap-2">
+                          <p className="font-title-4m text-[#333333]">
+                            {formatAppointmentDate(apt.appointmentDateTime)} |{" "}
+                            {formatAppointmentTime(apt.appointmentDateTime)}
+                          </p>
+                          <span className="inline-flex items-center gap-[5px] px-[10px] py-[6px] rounded-full bg-[#DFFFF3] text-[#00955C] font-title-4r text-xs">
                             {apt.type === "Hospital" ? (
                               <Building2 className="h-3.5 w-3.5" />
                             ) : (
-                              <Video className="h-3.5 w-3.5" />
+                              <PhoneCallIcon className="h-3.5 w-3.5" />
                             )}
                             {apt.type || "Hospital"}
                           </span>
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-[6px] font-title-4r text-[#333333] hover:text-primary-2 hover:bg-primary-2/10 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-primary-2 focus:ring-offset-1"
-                            onClick={() => handleViewPrescription(apt._id)}
-                          >
-                            <Eye className="h-4 w-4" />
-                            View Prescription
-                          </button>
+                        </div>
+
+                        <div className="flex justify-between items-center gap-2">
+                          <p className=" w-[75%] font-title-5l text-[#57575f] text-sm bg-[#F6F6F6] p-2 rounded-[2px]">
+                            Reason: {apt.reason || "—"}
+                          </p>
+                          <div className="w-[28%] flex items-center justify-end gap-2">
+                            {/* <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary-2 text-white font-title-4r text-xs">
+                              {apt.type === "Hospital" ? (
+                                <Building2 className="h-3.5 w-3.5" />
+                              ) : (
+                                <Video className="h-3.5 w-3.5" />
+                              )}
+                              {apt.type || "Hospital"}
+                            </span> */}
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1.5 h-8 rounded-[6px] text-[14px] text-[#333333] hover:text-primary-2 hover:bg-primary-2/10 cursor-pointer transition-colors focus:outline-none"
+                              onClick={() => handleViewPrescription(apt._id)}
+                            >
+                              <Eye className="h-4 w-4" />
+                              View Prescription
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -319,14 +339,16 @@ export const PatientRecord = (): JSX.Element => {
           {/* Right column: Prescription detail */}
           <div id="prescription-detail-column" className="flex flex-col gap-6">
             <div className="rounded-[10px] border border-[#dedee1] bg-white overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[#dedee1]">
+              <div className="flex items-center justify-between px-5 py-4  border-[#dedee1]">
                 <div className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-x-70" />
                   <h2 className="font-title-3m text-black text-[length:var(--title-3m-font-size)]">
                     Prescription
-                    {selectedPrescription?.medicines?.length != null
-                      ? ` (${selectedPrescription.medicines.length} Medicines)`
-                      : ""}
+                    <span className="font-title-5l text-[#57575f] text-sm">
+                      {selectedPrescription?.medicines?.length != null
+                        ? ` (${selectedPrescription.medicines.length} Medicines)`
+                        : ""}
+                    </span>
                   </h2>
                 </div>
                 {selectedPrescription?.appointmentDate && (

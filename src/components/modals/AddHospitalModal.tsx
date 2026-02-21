@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { useHospital } from "../../contexts/HospitalProvider";
+import { showSuccess, showError } from "../../lib/toast";
 import { CreateHospitalPayload } from "../../types/hospital.type";
 
 export interface AddHospitalData {
@@ -128,9 +129,11 @@ export const AddHospitalModal = ({
       setFormData(DEFAULT_FORM);
       onOpenChange(false);
       onSave?.(dataToNotify);
+      showSuccess("Success!", "Hospital created successfully.");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to create hospital";
       setSubmitError(message);
+      showError("Error", message);
     } finally {
       setIsSubmitting(false);
     }
