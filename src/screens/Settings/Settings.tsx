@@ -21,15 +21,33 @@ import {
   BellIcon,
   ShieldCheckIcon,
   UserPlusIcon,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Circle,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthProvider";
 import { useHospital } from "../../contexts/HospitalProvider";
 import { showSuccess, showError, showWarning } from "../../lib/toast";
+import { connectWhatsAppEmbeddedSignup } from "../../lib/whatsappConnect";
 import {
   createUserAsAdmin,
   getHospitalUsers,
   updateUserRole,
 } from "../../data/auth";
+import {
+  fetchWhatsappCredsForOnboarding,
+  getWhatsappOnboardingStatus,
+  hasWhatsappHospitalCreds,
+} from "../../data/whatsapp";
+import {
+  defaultOnboardingSteps,
+  extractGraphCredsFromCredsApi,
+  isOnboardingFullyComplete,
+  runWhatsappGraphOnboarding,
+  stepsFromOnboardingFlags,
+  type WhatsappOnboardingStepState,
+} from "../../lib/whatsappGraphOnboarding";
 import type { User } from "../../types/auth.type";
 
 const BASE_SETTINGS_TABS = [
@@ -192,6 +210,155 @@ export const Settings = (): JSX.Element => {
   const [integrations, setIntegrations] = useState({
     whatsapp: true,
   });
+
+  const settingsHospitalId = useMemo(
+    () => (typeof user?.hospital === "string" ? user.hospital.trim() : ""),
+    [user?.hospital],
+  );
+
+  const [whatsappCredsLinked, setWhatsappCredsLinked] = useState(false);
+  const [whatsappCredsLoading, setWhatsappCredsLoading] = useState(false);
+  const [whatsappOnboardingComplete, setWhatsappOnboardingComplete] =
+    useState(false);
+  const [whatsappOnboardingSteps, setWhatsappOnboardingSteps] = useState<
+    WhatsappOnboardingStepState[]
+  >(() => defaultOnboardingSteps());
+  const [whatsappOnboardingRunning, setWhatsappOnboardingRunning] =
+    useState(false);
+
+  useEffect(() => {
+    if (activeTab !== "integrations" || !settingsHospitalId) return;
+    let cancelled = false;
+    void getWhatsappOnboardingStatus(settingsHospitalId).then((flags) => {
+      if (cancelled) return;
+      if (!flags) {
+        setWhatsappOnboardingComplete(false);
+        setWhatsappOnboardingSteps(defaultOnboardingSteps());
+        return;
+      }
+      setWhatsappOnboardingComplete(isOnboardingFullyComplete(flags));
+      setWhatsappOnboardingSteps(
+        stepsFromOnboardingFlags(
+          flags.registrationPhone,
+          flags.subscribeApp,
+          flags.verifyRegistration,
+        ),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, settingsHospitalId]);
+
+  useEffect(() => {
+    if (activeTab !== "integrations") return;
+    if (!settingsHospitalId) {
+      setWhatsappCredsLinked(false);
+      setWhatsappCredsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setWhatsappCredsLoading(true);
+    hasWhatsappHospitalCreds(settingsHospitalId)
+      .then((linked) => {
+        if (!cancelled) setWhatsappCredsLinked(linked);
+      })
+      .finally(() => {
+        if (!cancelled) setWhatsappCredsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, settingsHospitalId]);
+
+  useEffect(() => {
+    if (!settingsHospitalId) return;
+    const refresh = () => {
+      void hasWhatsappHospitalCreds(settingsHospitalId).then((linked) =>
+        setWhatsappCredsLinked(linked),
+      );
+    };
+    window.addEventListener("samvaad:whatsapp-creds-stored", refresh);
+    return () =>
+      window.removeEventListener("samvaad:whatsapp-creds-stored", refresh);
+  }, [settingsHospitalId]);
+
+  const handleWhatsAppConnect = () => {
+    if (!integrations.whatsapp) return;
+    const result = connectWhatsAppEmbeddedSignup(
+      typeof user?.hospital === "string" ? user.hospital : undefined,
+    );
+    if (!result.ok) {
+      if (result.reason === "no_config") {
+        showError(
+          "WhatsApp",
+          "Set VITE_META_WHATSAPP_CONFIG_ID to your Meta Embedded Signup configuration ID.",
+        );
+        return;
+      }
+      if (result.reason === "no_hospital") {
+        showError(
+          "WhatsApp",
+          "Your account must be linked to a hospital before connecting WhatsApp.",
+        );
+        return;
+      }
+      showError(
+        "WhatsApp",
+        "Facebook SDK is not loaded. Check VITE_FACEBOOK_APP_ID and refresh the page.",
+      );
+    }
+  };
+
+  const handleWhatsappStartOnboarding = async () => {
+    if (!settingsHospitalId || whatsappOnboardingRunning) return;
+    setWhatsappOnboardingRunning(true);
+    setWhatsappOnboardingSteps(defaultOnboardingSteps());
+    setWhatsappOnboardingComplete(false);
+    try {
+      const raw = await fetchWhatsappCredsForOnboarding(settingsHospitalId);
+      const creds = extractGraphCredsFromCredsApi(raw);
+      if (!creds) {
+        showError(
+          "WhatsApp",
+          "Could not read phone_number_id, waba_id, or access_token from your server's creds response. Check the API payload shape.",
+        );
+        return;
+      }
+      const pin =
+        import.meta.env.VITE_WHATSAPP_REGISTER_PIN?.trim() || "123456";
+      await runWhatsappGraphOnboarding({
+        hospitalId: settingsHospitalId,
+        phoneNumberId: creds.phoneNumberId,
+        wabaId: creds.wabaId,
+        accessToken: creds.accessToken,
+        pin,
+        onStepUpdate: setWhatsappOnboardingSteps,
+        onStepError: (label, msg) =>
+          showError("WhatsApp onboarding", `${label}: ${msg}`),
+      });
+      const refreshed = await getWhatsappOnboardingStatus(settingsHospitalId);
+      if (refreshed) {
+        setWhatsappOnboardingSteps(
+          stepsFromOnboardingFlags(
+            refreshed.registrationPhone,
+            refreshed.subscribeApp,
+            refreshed.verifyRegistration,
+          ),
+        );
+        const complete = isOnboardingFullyComplete(refreshed);
+        setWhatsappOnboardingComplete(complete);
+        if (complete) {
+          showSuccess(
+            "WhatsApp",
+            "All onboarding steps completed. WhatsApp is connected.",
+          );
+        }
+      }
+    } finally {
+      setWhatsappOnboardingRunning(false);
+    }
+  };
 
   const [notifications, setNotifications] = useState({
     newAppointment: true,
@@ -981,14 +1148,23 @@ export const Settings = (): JSX.Element => {
                 : "lg:col-span-1 flex flex-col gap-6"
             }
           >
-            {(activeTab === "integrations" ||
-              activeTab === "personal" ||
-              activeTab === "hospital") && (
+            {activeTab === "integrations" && (
               <div className="bg-white rounded-[10px] p-6 flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
-                    WhatsApp Integration
-                  </h3>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <svg
+                      className="w-5 h-5 shrink-0 text-[#25D366]"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      xmlns="http://www.w3.org/2000/svg"
+                      aria-hidden
+                    >
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.98a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                    </svg>
+                    <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
+                      WhatsApp Integration
+                    </h3>
+                  </div>
                   <input
                     type="checkbox"
                     checked={integrations.whatsapp}
@@ -998,7 +1174,7 @@ export const Settings = (): JSX.Element => {
                         whatsapp: e.target.checked,
                       })
                     }
-                    className="w-11 h-6 rounded-full cursor-pointer"
+                    className="w-11 h-6 rounded-full cursor-pointer shrink-0"
                   />
                 </div>
                 <p className="font-title-4r font-[number:var(--title-4r-font-weight)] text-x-70 text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
@@ -1006,6 +1182,91 @@ export const Settings = (): JSX.Element => {
                   patient communication, prescription sharing, and follow-up
                   reminders.
                 </p>
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    {whatsappCredsLoading ? (
+                      <p className="font-title-5r font-[number:var(--title-5r-font-weight)] text-x-70 text-[length:var(--title-5r-font-size)] tracking-[var(--title-5r-letter-spacing)] leading-[var(--title-5r-line-height)] [font-style:var(--title-5r-font-style)]">
+                        Checking WhatsApp connection…
+                      </p>
+                    ) : whatsappCredsLinked && whatsappOnboardingComplete ? (
+                      <p className="font-title-4r font-[number:var(--title-4r-font-weight)] text-[#00955C] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
+                        WhatsApp connected — all Graph onboarding steps finished
+                        successfully.
+                      </p>
+                    ) : whatsappCredsLinked ? (
+                      <Button
+                        type="button"
+                        onClick={() => void handleWhatsappStartOnboarding()}
+                        disabled={whatsappOnboardingRunning}
+                        className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px] w-fit font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] text-white disabled:opacity-60"
+                      >
+                        {whatsappOnboardingRunning
+                          ? "Onboarding…"
+                          : "Start onboarding"}
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          type="button"
+                          onClick={handleWhatsAppConnect}
+                          disabled={!integrations.whatsapp}
+                          className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px] w-fit font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] text-white"
+                        >
+                          Connect WhatsApp
+                        </Button>
+                        {!integrations.whatsapp && (
+                          <p className="font-title-5r font-[number:var(--title-5r-font-weight)] text-x-70 text-[length:var(--title-5r-font-size)] tracking-[var(--title-5r-letter-spacing)] leading-[var(--title-5r-line-height)] [font-style:var(--title-5r-font-style)]">
+                            Turn on the integration above to connect.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {whatsappCredsLinked && !whatsappOnboardingComplete && (
+                    <ol className="flex flex-col gap-2 pl-0 list-none border border-[#dedee1] rounded-[10px] p-4 bg-grey-light/30">
+                      {whatsappOnboardingSteps.map((step) => (
+                        <li
+                          key={step.id}
+                          className="flex items-start gap-3 font-title-5r text-[length:var(--title-5r-font-size)] text-black"
+                        >
+                          <span className="shrink-0 mt-0.5" aria-hidden>
+                            {step.status === "running" && (
+                              <Loader2 className="w-5 h-5 text-primary-2 animate-spin" />
+                            )}
+                            {step.status === "success" && (
+                              <CheckCircle2
+                                className="w-5 h-5 text-[#00955C]"
+                                aria-hidden
+                              />
+                            )}
+                            {step.status === "failed" && (
+                              <XCircle
+                                className="w-5 h-5 text-[#dc2626]"
+                                aria-hidden
+                              />
+                            )}
+                            {step.status === "idle" && (
+                              <Circle className="w-5 h-5 text-x-70" aria-hidden />
+                            )}
+                          </span>
+                          <span className="flex flex-col gap-0.5 min-w-0">
+                            <span>{step.label}</span>
+                            {step.status === "failed" && step.errorMessage && (
+                              <span className="text-[#dc2626] text-xs break-words">
+                                {step.errorMessage}
+                              </span>
+                            )}
+                            {step.httpStatus != null && (
+                              <span className="text-x-70 text-xs">
+                                HTTP {step.httpStatus}
+                              </span>
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
               </div>
             )}
 

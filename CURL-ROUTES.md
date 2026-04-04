@@ -62,7 +62,7 @@ curl -X GET "http://localhost:3000/api/health"
 ### Register
 
 - **Roles:** Anyone can register. `role` is optional; one of: `user`, `doctor`, `hospital_admin`. Defaults to `user`. **Admin and moderator cannot self-register** (403); they must be created by an existing admin.
-- **Hospital roles (doctor, hospital_admin):** These roles are **defined at sign-up** by providing **`hospitalId`** or **`hospital`** (required). You can send either `hospitalId` (string) or `hospital` (string id or object with `_id`). The user is linked to that hospital and will **only see data from that hospital**—never overall data. The API enforces this on all hospital-scoped routes. Response includes `linkedHospital` (the hospital document) and a message that the user will only see data for this hospital. The value must be a valid MongoDB ObjectId and the hospital must exist in the DB. Role `user` should not send hospital.
+- **Hospital roles (doctor, hospital_admin):** These roles are **defined at sign-up** by providing **`hospitalId`** or **`hospital`** (required). You can send either `hospitalId` (string) or `hospital` (string id or object with `_id`). The user is linked to that hospital and will **only see data from that hospital**—never overall data. The API enforces this on all hospital-scoped routes. Response includes `linkedHospital` (the hospital document) and a message that the user will only see data for this hospital. The value must be a valid hospital id and the hospital must exist in the database. Role `user` should not send hospital.
 
 ```bash
 # Basic user (no hospital)
@@ -497,7 +497,7 @@ curl -X GET "http://localhost:3000/api/prescriptions/PRESCRIPTION_ID" \
 
 ### Create prescription (doctor, hospital_admin, admin)
 
-Body: `patient` (ObjectId), `appointment` (ObjectId), `patientName`, `appointmentDate` (ISO 8601), `followUp` (e.g. `{ "value": 7, "unit": "Days" }`), `medicines` (array). Optional: `status` (Draft | Sent | Completed, default Draft). Appointment must belong to the given patient. Medicine items: `name`, `dosage` (`value`, `unit`: mg | ml | g | tablet | capsule), `duration` (`value`, `unit`: Days | Weeks | Months), `intake` (Before | After), `time` (optional: `breakfast`, `lunch`, `dinner` booleans), `notes` (optional).
+Body: `patient` (id), `appointment` (id), `patientName`, `appointmentDate` (ISO 8601), `followUp` (e.g. `{ "value": 7, "unit": "Days" }`), `medicines` (array). Optional: `status` (Draft | Sent | Completed, default Draft). Appointment must belong to the given patient. Medicine items: `name`, `dosage` (`value`, `unit`: mg | ml | g | tablet | capsule), `duration` (`value`, `unit`: Days | Weeks | Months), `intake` (Before | After), `time` (optional: `breakfast`, `lunch`, `dinner` booleans), `notes` (optional).
 
 ```bash
 curl -X POST "http://localhost:3000/api/prescriptions" \
