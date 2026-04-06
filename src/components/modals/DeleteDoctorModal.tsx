@@ -1,39 +1,34 @@
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import { Button } from "../ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "../ui/dialog";
-import { usePatient } from "../../contexts/PatientProvider";
-import { PatientData } from "./AddPatientModal";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import type { Doctor } from "../../types/doctor.type";
 
-interface DeletePatientModalProps {
+interface DeleteDoctorModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onDelete: () => void;
-  patient: (PatientData & { _id?: string }) | null;
-  patientName: string;
+  onClose: () => void;
+  doctor: Doctor | null;
+  onConfirm: () => Promise<void>;
 }
 
-export const DeletePatientModal = ({
+export const DeleteDoctorModal = ({
   open,
   onOpenChange,
-  onDelete,
-  patient,
-  patientName,
-}: DeletePatientModalProps): JSX.Element => {
-  const { handleDeletePatient } = usePatient();
-  const handleDelete = () => {
-    onDelete();
-    handleDeletePatient(patient?._id || "");
-    onOpenChange(false);
+  onClose,
+  doctor,
+  onConfirm,
+}: DeleteDoctorModalProps): JSX.Element => {
+  const handleConfirm = async () => {
+    try {
+      await onConfirm();
+      onOpenChange(false);
+    } catch {
+      /* toast from DoctorProvider */
+    }
   };
 
-  const handleClose = () => {
-    onOpenChange(false);
-  };
+  const name = doctor?.fullName ?? "this doctor";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg p-0 border-none overflow-hidden gap-0">
@@ -42,29 +37,28 @@ export const DeletePatientModal = ({
             <AlertTriangle className="w-4 h-4 text-black" />
           </div>
           <DialogTitle className="text-sm font-semibold text-gray-700">
-            Delete patient
+            Remove doctor
           </DialogTitle>
         </DialogHeader>
         <div className="px-[25px] py-[25px] space-y-4">
           <p className="text-[14px] leading-relaxed text-gray-600">
-            You&apos;re deleting{" "}
-            <strong className="text-black">{patientName}</strong>&apos;s profile
-            from the hospital database. This action will remove all associated
-            appointments, prescriptions, and medical history permanently.
+            <strong className="text-black">{name}</strong> will be removed from
+            your doctors list. This cannot be undone. Please confirm to proceed.
           </p>
           <div className="flex justify-end gap-[20px] pt-4">
             <Button
               variant="ghost"
               className="w-[86px] text-gray-500 text-xs h-9 px-6 bg-[#F5F5F5] text-[14px]"
-              onClick={handleClose}
+              onClick={onClose}
             >
-              Close
+              {/* <X className="w-4 h-4 mr-1" /> */} Close
             </Button>
             <Button
               className="bg-red-600 hover:bg-red-700 text-white text-xs h-9 px-6 text-[14px]"
-              onClick={handleDelete}
+              onClick={() => void handleConfirm()}
             >
-              Delete patient
+              {/* <X className="w-4 h-4 mr-1" /> */}
+              Remove doctor
             </Button>
           </div>
         </div>

@@ -7,6 +7,9 @@ export type CreateDoctorPayload = {
   status: "Off Duty" | "On Duty" | "On Break" | "On Leave";
 };
 
+/** PATCH body — all fields optional. */
+export type UpdateDoctorPayload = Partial<CreateDoctorPayload>;
+
 export type Doctor = {
   _id: string;
   fullName: string;

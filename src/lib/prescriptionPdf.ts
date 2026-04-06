@@ -50,7 +50,6 @@ export function downloadPrescriptionPdf(rx: Prescription): void {
       `${rx.followUp.value} ${rx.followUp.unit}`,
     );
   }
-  addField("Status", rx.status ?? "—");
 
   nextLine(4);
   doc.setFont("helvetica", "bold");

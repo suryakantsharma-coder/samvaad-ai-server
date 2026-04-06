@@ -14,8 +14,6 @@ import {
   UserIcon,
   BuildingIcon,
   ClockIcon,
-  EyeIcon,
-  EyeOffIcon,
   Trash2Icon,
   UploadIcon,
   BellIcon,
@@ -30,11 +28,7 @@ import { useAuth } from "../../contexts/AuthProvider";
 import { useHospital } from "../../contexts/HospitalProvider";
 import { showSuccess, showError, showWarning } from "../../lib/toast";
 import { connectWhatsAppEmbeddedSignup } from "../../lib/whatsappConnect";
-import {
-  createUserAsAdmin,
-  getHospitalUsers,
-  updateUserRole,
-} from "../../data/auth";
+import { getHospitalUsers, updateCurrentUserProfile } from "../../data/auth";
 import {
   fetchWhatsappCredsForOnboarding,
   getWhatsappOnboardingStatus,
@@ -49,15 +43,27 @@ import {
   type WhatsappOnboardingStepState,
 } from "../../lib/whatsappGraphOnboarding";
 import type { User } from "../../types/auth.type";
+import { ChangePasswordModal } from "../../components/modals";
 
-const BASE_SETTINGS_TABS = [
-  { id: "personal", label: "Personal", icon: UserIcon },
-  { id: "hospital", label: "Hospital", icon: BuildingIcon },
-  { id: "integrations", label: "Integrations & Notifications", icon: BellIcon },
-] as const;
+/** Split stored phone (e.g. "+91 9876543210" or "9876543210") for the personal form. */
+function splitPhoneForForm(raw: string | undefined | null): {
+  countryCode: string;
+  national: string;
+} {
+  if (raw == null || String(raw).trim() === "") {
+    return { countryCode: "+91", national: "" };
+  }
+  const p = String(raw).trim();
+  const m = p.match(/^(\+\d{1,4})\s*(.*)$/);
+  if (m) {
+    const rest = m[2].replace(/\s/g, "").trim();
+    return { countryCode: m[1], national: rest };
+  }
+  return { countryCode: "+91", national: p.replace(/\D/g, "") };
+}
 
 export const Settings = (): JSX.Element => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const {
     currentHospital,
     currentHospitalLoading,
@@ -66,25 +72,47 @@ export const Settings = (): JSX.Element => {
     updateHospitalById,
   } = useHospital();
   const isHospitalAdmin = user?.role === "hospital_admin";
+  /** Hospital + Integrations & Notifications (and notification sidebar on Personal). */
+  const canManageHospitalIntegrations =
+    user?.role === "admin" || user?.role === "hospital_admin";
 
   const settingsTabs = useMemo(() => {
     const tabs: Array<{ id: string; label: string; icon: typeof UserIcon }> = [
-      ...BASE_SETTINGS_TABS,
+      { id: "personal", label: "Personal", icon: UserIcon },
     ];
+    if (canManageHospitalIntegrations) {
+      tabs.push(
+        { id: "hospital", label: "Hospital", icon: BuildingIcon },
+        {
+          id: "integrations",
+          label: "Integrations & Notifications",
+          icon: BellIcon,
+        },
+      );
+    }
     if (isHospitalAdmin) {
       tabs.push({ id: "auth", label: "Auth", icon: ShieldCheckIcon });
     }
     return tabs;
-  }, [isHospitalAdmin]);
+  }, [canManageHospitalIntegrations, isHospitalAdmin]);
 
   const [activeTab, setActiveTab] = useState<string>("personal");
-  const [showPassword, setShowPassword] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   useEffect(() => {
     if (!isHospitalAdmin && activeTab === "auth") {
       setActiveTab("personal");
     }
   }, [isHospitalAdmin, activeTab]);
+
+  useEffect(() => {
+    if (
+      !canManageHospitalIntegrations &&
+      (activeTab === "hospital" || activeTab === "integrations")
+    ) {
+      setActiveTab("personal");
+    }
+  }, [canManageHospitalIntegrations, activeTab]);
 
   useEffect(() => {
     if (activeTab === "auth" && isHospitalAdmin) {
@@ -151,7 +179,6 @@ export const Settings = (): JSX.Element => {
     fullName: "",
     phone: "",
     countryCode: "+91",
-    password: "••••••••",
     email: "",
     hospitalName: "",
     address: "",
@@ -167,14 +194,22 @@ export const Settings = (): JSX.Element => {
   });
 
   useEffect(() => {
-    if (user) {
-      setFormData((prev) => ({
+    if (!user) return;
+    const rawPhone = user.phoneNumber ?? user.phone;
+    setFormData((prev) => {
+      const next = {
         ...prev,
         fullName: user.name ?? prev.fullName,
         email: user.email ?? prev.email,
-      }));
-    }
-  }, [user?.name, user?.email]);
+      };
+      if (rawPhone != null && String(rawPhone).trim() !== "") {
+        const { countryCode, national } = splitPhoneForForm(String(rawPhone));
+        next.countryCode = countryCode;
+        next.phone = national;
+      }
+      return next;
+    });
+  }, [user?._id, user?.name, user?.email, user?.phoneNumber, user?.phone]);
 
   // Fetch hospital when viewing hospital tab and user has a linked hospital
   useEffect(() => {
@@ -206,6 +241,7 @@ export const Settings = (): JSX.Element => {
   const [hospitalSaveError, setHospitalSaveError] = useState<string | null>(
     null,
   );
+  const [personalSaveLoading, setPersonalSaveLoading] = useState(false);
 
   const [integrations, setIntegrations] = useState({
     whatsapp: true,
@@ -366,8 +402,39 @@ export const Settings = (): JSX.Element => {
     appointmentRescheduled: true,
   });
 
-  const handleSavePersonal = () => {
-    console.log("Saving personal information:", formData);
+  const handleSavePersonal = async () => {
+    setPersonalSaveLoading(true);
+    try {
+      const payload: Parameters<typeof updateCurrentUserProfile>[0] = {
+        name: formData.fullName.trim(),
+        email: formData.email.trim(),
+      };
+      const phoneDigits = formData.phone.replace(/\D/g, "");
+      if (phoneDigits) {
+        payload.phoneNumber = phoneDigits;
+      }
+      const hasChange =
+        Boolean(payload.name) ||
+        Boolean(payload.email) ||
+        Boolean(payload.phoneNumber);
+      if (!hasChange) {
+        showWarning(
+          "Warning",
+          "Update your name, email, or phone, or use Change password.",
+        );
+        return;
+      }
+      await updateCurrentUserProfile(payload);
+      await refreshUser();
+      showSuccess("Success!", "Your profile was updated.");
+    } catch (err) {
+      showError(
+        "Error",
+        err instanceof Error ? err.message : "Failed to update profile",
+      );
+    } finally {
+      setPersonalSaveLoading(false);
+    }
   };
 
   const handleSaveHospital = async () => {
@@ -482,7 +549,9 @@ export const Settings = (): JSX.Element => {
           Settings
         </h1>
         <p className="opacity-90 font-title-3l leading-[20px] mt-[5px] font-[number:var(--title-3l-font-weight)] text-black text-[length:var(--title-3l-font-size)] tracking-[var(--title-3l-letter-spacing)] leading-[var(--title-3l-line-height)] [font-style:var(--title-3l-font-style)] max-w-prose">
-          Manage hospital details, integrations, and AI automation settings.
+          {canManageHospitalIntegrations
+            ? "Manage hospital details, integrations, and notification settings."
+            : "Manage your profile and account preferences."}
         </p>
       </header>
 
@@ -515,7 +584,9 @@ export const Settings = (): JSX.Element => {
             className={
               activeTab === "auth"
                 ? "lg:col-span-3 flex flex-col gap-6"
-                : "lg:col-span-2 flex flex-col gap-6"
+                : canManageHospitalIntegrations
+                  ? "lg:col-span-2 flex flex-col gap-6"
+                  : "lg:col-span-3 flex flex-col gap-6"
             }
           >
             {activeTab === "personal" && (
@@ -570,37 +641,25 @@ export const Settings = (): JSX.Element => {
                         className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
                       />
                     </div>
+                  </div>
 
-                    <div className="flex flex-col gap-2">
-                      <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3 px-1 rounded-[10px] border border-[#dedee1] bg-grey-light/30">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
                         Password
-                      </label>
-                      <div className="relative">
-                        <Input
-                          type={showPassword ? "text" : "password"}
-                          value={formData.password}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              password: e.target.value,
-                            })
-                          }
-                          className="h-[44px] px-4 py-2 pr-12 bg-white border border-[#dedee1] rounded-[10px]"
-                        />
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 hover:bg-transparent"
-                        >
-                          {showPassword ? (
-                            <EyeOffIcon className="w-5 h-5 text-x-70" />
-                          ) : (
-                            <EyeIcon className="w-5 h-5 text-x-70" />
-                          )}
-                        </Button>
-                      </div>
+                      </span>
+                      <span className="font-title-5r text-x-70 text-sm">
+                        Change your password in a separate step.
+                      </span>
                     </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setChangePasswordOpen(true)}
+                      className="h-[44px] px-5 rounded-[10px] border-[#dedee1] bg-white hover:bg-grey-light shrink-0"
+                    >
+                      Change password
+                    </Button>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
@@ -652,10 +711,11 @@ export const Settings = (): JSX.Element => {
 
                   <div className="flex justify-end">
                     <Button
-                      onClick={handleSavePersonal}
+                      onClick={() => void handleSavePersonal()}
+                      disabled={personalSaveLoading}
                       className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
                     >
-                      Save
+                      {personalSaveLoading ? "Saving…" : "Save"}
                     </Button>
                   </div>
                 </div>
@@ -1140,7 +1200,7 @@ export const Settings = (): JSX.Element => {
           </div>
         )}
 
-        {activeTab !== "auth" && (
+        {activeTab !== "auth" && canManageHospitalIntegrations && (
           <div
             className={
               activeTab === "integrations"
@@ -1404,6 +1464,11 @@ export const Settings = (): JSX.Element => {
           </div>
         </div> */}
       </div>
+
+      <ChangePasswordModal
+        open={changePasswordOpen}
+        onOpenChange={setChangePasswordOpen}
+      />
     </div>
   );
 };

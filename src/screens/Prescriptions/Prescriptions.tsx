@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { showSuccess, showError } from "../../lib/toast";
-import { NewPrescriptionModal } from "../../components/modals";
+import {
+  DeletePrescriptionModal,
+  NewPrescriptionModal,
+  PrescriptionViewModal,
+} from "../../components/modals";
 import type { NewPrescriptionPayload } from "../../components/modals/NewPrescriptionModal";
 import { usePrescription } from "../../contexts/PrescriptionProvider";
 import type {
@@ -45,15 +48,19 @@ function mapModalPayloadToCreate(
 }
 
 export const Prescriptions = (): JSX.Element => {
-  const navigate = useNavigate();
   const [showNewPrescriptionModal, setShowNewPrescriptionModal] =
     useState(false);
   const [editingPrescription, setEditingPrescription] =
+    useState<Prescription | null>(null);
+  const [viewingPrescription, setViewingPrescription] =
+    useState<Prescription | null>(null);
+  const [prescriptionPendingDelete, setPrescriptionPendingDelete] =
     useState<Prescription | null>(null);
   const {
     handleCreatePrescription,
     handleUpdatePrescription,
     handleGetPrescriptions,
+    handleDeletePrescription: deletePrescriptionById,
     limit,
   } = usePrescription();
 
@@ -112,13 +119,30 @@ export const Prescriptions = (): JSX.Element => {
         onUpdate={handleUpdatePrescriptionSubmit}
         initialPrescription={editingPrescription}
       />
+      <DeletePrescriptionModal
+        open={prescriptionPendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPrescriptionPendingDelete(null);
+        }}
+        onClose={() => setPrescriptionPendingDelete(null)}
+        prescription={prescriptionPendingDelete}
+        onConfirm={async () => {
+          if (!prescriptionPendingDelete) return;
+          await deletePrescriptionById(prescriptionPendingDelete._id);
+        }}
+      />
+      <PrescriptionViewModal
+        open={viewingPrescription !== null}
+        onOpenChange={(open) => {
+          if (!open) setViewingPrescription(null);
+        }}
+        prescription={viewingPrescription}
+      />
       <PrescriptionListSection
         onEditPrescription={(p) => setEditingPrescription(p)}
-        onDeletePrescription={() => {}}
+        onDeletePrescription={(p) => setPrescriptionPendingDelete(p)}
         onMarkAsDonePrescription={() => {}}
-        onViewRecord={(p) =>
-          navigate(`/prescriptions/patient/${p.patient}`)
-        }
+        onViewRecord={(p) => setViewingPrescription(p)}
       />
     </div>
   );

@@ -6,45 +6,87 @@ import {
   AddDoctorModal,
   type DoctorData,
 } from "../../components/modals/AddDoctorModal";
+import { DeleteDoctorModal } from "../../components/modals/DeleteDoctorModal";
 import { useDoctor } from "../../contexts/DoctorProvider";
+import type { Doctor } from "../../types/doctor.type";
 import { CreateDoctorPayload } from "../../types/doctor.type";
+
+/** Same separator as `DoctorListSection` uses when splitting availability lines. */
+const AVAILABILITY_LINE_SEP = "&#x2F;n";
+
+function doctorDataToPayload(doctor: DoctorData): CreateDoctorPayload {
+  const timing = `${doctor.morningStart} - ${doctor.morningEnd}${AVAILABILITY_LINE_SEP}${doctor.eveningStart} - ${doctor.eveningEnd}`;
+  return {
+    fullName: doctor.name,
+    phoneNumber: `${doctor.countryCode} ${doctor.phone}`.trim(),
+    designation: doctor.designation,
+    availability: timing,
+    status: doctor.status,
+    email: doctor.email,
+  };
+}
 
 export const Doctors = (): JSX.Element => {
   const [showAddModal, setShowAddModal] = useState(false);
-  const { handleAddDoctor } = useDoctor();
+  const [editingDoctor, setEditingDoctor] = useState<Doctor | null>(null);
+  const [doctorPendingDelete, setDoctorPendingDelete] = useState<Doctor | null>(
+    null,
+  );
+  const { handleAddDoctor, handleUpdateDoctor, handleDeleteDoctor } =
+    useDoctor();
+
+  const doctorModalOpen = showAddModal || editingDoctor !== null;
+
+  const handleCloseDoctorModal = (open: boolean) => {
+    if (!open) {
+      setShowAddModal(false);
+      setEditingDoctor(null);
+    }
+  };
 
   const handleSaveDoctor = (doctor: DoctorData) => {
-    console.log("Saving doctor:", doctor);
+    void handleAddDoctor(doctorDataToPayload(doctor));
+  };
 
-    const timing =
-      doctor.morningStart +
-      " - " +
-      doctor.morningEnd +
-      "/n" +
-      doctor.eveningStart +
-      " - " +
-      doctor.eveningEnd;
-
-    const doctorPayload: CreateDoctorPayload = {
-      fullName: doctor.name,
-      phoneNumber: doctor.countryCode + " " + doctor.phone,
-      designation: doctor.designation,
-      availability: timing,
-      status: doctor.status,
-      email: doctor.email,
-    };
-    handleAddDoctor(doctorPayload);
+  const handleUpdateDoctorSubmit = async (
+    doctorId: string,
+    doctor: DoctorData,
+  ) => {
+    await handleUpdateDoctor(doctorId, doctorDataToPayload(doctor));
+    setEditingDoctor(null);
   };
 
   return (
     <div className="bg-app-background w-full min-h-screen flex flex-col gap-[25px] p-4 md:p-6">
       <PatientSearchSection />
-      <DoctorHeaderSection onAddDoctor={() => setShowAddModal(true)} />
-      <DoctorListSection />
+      <DoctorHeaderSection
+        onAddDoctor={() => {
+          setEditingDoctor(null);
+          setShowAddModal(true);
+        }}
+      />
+      <DoctorListSection
+        onEditDoctor={(d) => setEditingDoctor(d)}
+        onRemoveDoctor={(d) => setDoctorPendingDelete(d)}
+      />
       <AddDoctorModal
-        open={showAddModal}
-        onOpenChange={setShowAddModal}
+        open={doctorModalOpen}
+        onOpenChange={handleCloseDoctorModal}
         onSave={handleSaveDoctor}
+        initialDoctor={editingDoctor}
+        onUpdate={handleUpdateDoctorSubmit}
+      />
+      <DeleteDoctorModal
+        open={doctorPendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setDoctorPendingDelete(null);
+        }}
+        onClose={() => setDoctorPendingDelete(null)}
+        doctor={doctorPendingDelete}
+        onConfirm={async () => {
+          if (!doctorPendingDelete) return;
+          await handleDeleteDoctor(doctorPendingDelete._id);
+        }}
       />
     </div>
   );

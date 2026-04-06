@@ -96,11 +96,8 @@ export const NewAppointmentModal = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchDoctorQuery, setSearchDoctorQuery] = useState("");
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
-  const {
-    handleSearchPatients,
-    searchedPatients,
-    resetSearchedPatients,
-  } = usePatient();
+  const { handleSearchPatients, searchedPatients, resetSearchedPatients } =
+    usePatient();
   const [selectedPatient, setSelectedPatient] = useState<Patients | null>(null);
   const navigate = useNavigate();
 
@@ -695,7 +692,7 @@ export const CancelAppointmentModal = ({
               className="w-[86px] text-gray-500 text-xs h-9 px-6 bg-[#F5F5F5] text-[14px]"
               onClick={onClose}
             >
-              <X className="w-4 h-4 mr-1" /> Close
+              {/* <X className="w-4 h-4 mr-1" /> */} Close
             </Button>
             <Button
               className="bg-red-600 hover:bg-red-700 text-white text-xs h-9 px-6 text-[14px]"
@@ -703,7 +700,7 @@ export const CancelAppointmentModal = ({
                 handleCancel();
               }}
             >
-              <X className="w-4 h-4 mr-1" />
+              {/* <X className="w-4 h-4 mr-1" /> */}
               Cancel Appointment
             </Button>
           </div>

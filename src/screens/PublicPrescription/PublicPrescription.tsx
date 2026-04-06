@@ -130,10 +130,6 @@ export const PublicPrescription = (): JSX.Element => {
                     </dd>
                   </div>
                 )}
-                <div>
-                  <dt className="font-title-4m text-x-70">Status</dt>
-                  <dd className="font-title-4r mt-0.5">{prescription.status}</dd>
-                </div>
               </dl>
 
               <div>

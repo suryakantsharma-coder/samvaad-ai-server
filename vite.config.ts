@@ -5,7 +5,8 @@ import { defineConfig } from "vite";
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: "./",
+  /** Root-absolute `/assets/...` so deep links (e.g. /public/prescriptions/:id) still load JS. `./` breaks those routes. */
+  base: "/",
   css: {
     postcss: {
       plugins: [tailwind()],

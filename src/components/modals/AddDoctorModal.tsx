@@ -1,5 +1,6 @@
 import { BriefcaseIcon, CircleCheckIcon, MailIcon, XIcon } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import type { Doctor } from "../../types/doctor.type";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
@@ -10,12 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-
-interface AddDoctorModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSave: (doctor: DoctorData) => void;
-}
 
 export interface DoctorData {
   name: string;
@@ -39,36 +34,127 @@ export interface DoctorData {
   status: "Off Duty" | "On Duty" | "On Break" | "On Leave";
 }
 
+const DEFAULT_FORM: DoctorData = {
+  name: "",
+  phone: "",
+  email: "",
+  countryCode: "+91",
+  workingDays: {
+    mon: true,
+    tue: true,
+    wed: true,
+    thu: true,
+    fri: true,
+    sat: true,
+    sun: false,
+  },
+  designation: "",
+  morningStart: "10:00 AM",
+  morningEnd: "1:00 PM",
+  eveningStart: "2:00 PM",
+  eveningEnd: "6:00 PM",
+  status: "On Duty",
+};
+
+function parsePhoneForForm(phoneNumber: string): {
+  countryCode: string;
+  phone: string;
+} {
+  const p = phoneNumber.trim();
+  const m = p.match(/^(\+\d{1,4})\s+(.*)$/);
+  if (m) return { countryCode: m[1], phone: m[2].trim() };
+  return { countryCode: "+91", phone: p };
+}
+
+function parseAvailabilityForForm(av: string): {
+  morningStart: string;
+  morningEnd: string;
+  eveningStart: string;
+  eveningEnd: string;
+} {
+  const raw = av.trim();
+  const chunks = raw.includes("&#x2F;n")
+    ? raw.split("&#x2F;n").map((s) => s.trim())
+    : raw.split("/n").map((s) => s.trim());
+  let morningStart = "10:00 AM",
+    morningEnd = "1:00 PM",
+    eveningStart = "2:00 PM",
+    eveningEnd = "6:00 PM";
+  if (chunks[0]) {
+    const hm = chunks[0].match(/^(.+?)\s*-\s*(.+)$/);
+    if (hm) {
+      morningStart = hm[1].trim();
+      morningEnd = hm[2].trim();
+    }
+  }
+  if (chunks[1]) {
+    const hm = chunks[1].match(/^(.+?)\s*-\s*(.+)$/);
+    if (hm) {
+      eveningStart = hm[1].trim();
+      eveningEnd = hm[2].trim();
+    }
+  }
+  return { morningStart, morningEnd, eveningStart, eveningEnd };
+}
+
+function doctorToFormData(d: Doctor): DoctorData {
+  const { countryCode, phone } = parsePhoneForForm(d.phoneNumber);
+  const times = parseAvailabilityForForm(d.availability);
+  const st = d.status as DoctorData["status"];
+  const status = ["Off Duty", "On Duty", "On Break", "On Leave"].includes(st)
+    ? st
+    : "On Duty";
+  return {
+    name: d.fullName,
+    phone,
+    email: d.email,
+    countryCode,
+    workingDays: { ...DEFAULT_FORM.workingDays },
+    designation: d.designation,
+    ...times,
+    status,
+  };
+}
+
+interface AddDoctorModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (doctor: DoctorData) => void;
+  initialDoctor?: Doctor | null;
+  onUpdate?: (doctorId: string, doctor: DoctorData) => Promise<void>;
+}
+
 export const AddDoctorModal = ({
   open,
   onOpenChange,
   onSave,
+  initialDoctor = null,
+  onUpdate,
 }: AddDoctorModalProps): JSX.Element => {
-  const [formData, setFormData] = useState<DoctorData>({
-    name: "",
-    phone: "",
-    email: "",
-    countryCode: "+91",
-    workingDays: {
-      mon: true,
-      tue: true,
-      wed: true,
-      thu: true,
-      fri: true,
-      sat: true,
-      sun: false,
-    },
-    designation: "",
-    morningStart: "10:00 AM",
-    morningEnd: "1:00 PM",
-    eveningStart: "2:00 AM",
-    eveningEnd: "6:00 PM",
-    status: "On Duty",
-  });
+  const [formData, setFormData] = useState<DoctorData>(DEFAULT_FORM);
 
-  const handleSubmit = () => {
+  useEffect(() => {
+    if (!open) return;
+    if (initialDoctor) {
+      setFormData(doctorToFormData(initialDoctor));
+    } else {
+      setFormData(DEFAULT_FORM);
+    }
+  }, [open, initialDoctor?._id]);
+
+  const handleSubmit = async () => {
+    if (initialDoctor && onUpdate) {
+      try {
+        await onUpdate(initialDoctor._id, formData);
+        setFormData(DEFAULT_FORM);
+        onOpenChange(false);
+      } catch {
+        /* toast from provider */
+      }
+      return;
+    }
     onSave(formData);
-    resetForm();
+    setFormData(DEFAULT_FORM);
     onOpenChange(false);
   };
 
@@ -78,27 +164,7 @@ export const AddDoctorModal = ({
   };
 
   const resetForm = () => {
-    setFormData({
-      name: "",
-      phone: "",
-      email: "",
-      countryCode: "+91",
-      workingDays: {
-        mon: true,
-        tue: true,
-        wed: true,
-        thu: true,
-        fri: true,
-        sat: true,
-        sun: false,
-      },
-      designation: "",
-      morningStart: "10:00 AM",
-      morningEnd: "1:00 PM",
-      eveningStart: "2:00 AM",
-      eveningEnd: "6:00 PM",
-      status: "On Duty",
-    });
+    setFormData(DEFAULT_FORM);
   };
 
   const toggleWorkingDay = (day: keyof typeof formData.workingDays) => {
@@ -123,7 +189,7 @@ export const AddDoctorModal = ({
         <div className="flex items-center gap-[10px] px-5 py-4 bg-grey-light sticky top-0 z-10">
           <BriefcaseIcon className="w-6 h-6 bg-white rounded-[50px] p-[4px]" />
           <DialogTitle className="font-title-3m text-[18px] leading-[23px] font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
-            Add Doctors
+            {initialDoctor ? "Edit doctor" : "Add Doctors"}
           </DialogTitle>
           <Button
             variant="ghost"
@@ -380,12 +446,12 @@ export const AddDoctorModal = ({
               </span>
             </Button>
             <Button
-              onClick={handleSubmit}
+              onClick={() => void handleSubmit()}
               className="inline-flex items-center gap-[5px] px-[15px] py-1.5 bg-primary-2 hover:bg-primary-2/90 rounded-[6px] h-[44px]"
             >
               <CircleCheckIcon className="w-5 h-5" />
               <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-white text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
-                Save
+                {initialDoctor ? "Update" : "Save"}
               </span>
             </Button>
           </div>

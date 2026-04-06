@@ -1,10 +1,5 @@
-import {
-  ChevronDownIcon,
-  CircleCheckIcon,
-  UserIcon,
-  XIcon,
-} from "lucide-react";
-import React, { useState } from "react";
+import { ChevronDownIcon, UserIcon, X } from "lucide-react";
+import { useState } from "react";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
@@ -72,15 +67,27 @@ export const AddPatientModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[600px] w-[90vw] p-0 gap-0 rounded-[10px]">
-        <div className="flex items-center gap-[10px] px-5 py-4 bg-grey-light">
-          <UserIcon className="w-6 h-6 bg-white rounded-[50px] p-[4px]" />
-          <DialogTitle className="font-title-3m text-[18px] leading-[23px] font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
-            Add Patient
-          </DialogTitle>
-        </div>
+      <DialogContent className="max-w-[600px] w-[90vw] p-0 gap-0 rounded-[10px] border border-[#dedee1] overflow-hidden [&>button]:hidden max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex flex-row items-center justify-between gap-2 px-5 py-4 border-b border-[#dedee1] bg-grey-light rounded-t-[10px]">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center p-[2px] rounded-[50px] bg-white border border-[#dedee1]">
+              <UserIcon className="w-4 h-4 text-black" />
+            </div>
+            <DialogTitle className="font-title-3m text-sm font-semibold text-gray-700">
+              Add Patient
+            </DialogTitle>
+          </div>
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="rounded-sm opacity-70 hover:opacity-100 p-1 shrink-0"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5 text-gray-600" />
+          </button>
+        </DialogHeader>
 
-        <div className="px-5 py-5 flex flex-col gap-[15px]">
+        <div className="px-5 py-5 flex flex-col gap-[15px] overflow-y-auto">
           <div className="flex flex-col gap-2">
             <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
               Patient Name<span className="text-[#ff0004]">*</span>
@@ -227,13 +234,13 @@ export const AddPatientModal = ({
             </div>
           </div>
 
+          {/* Previous footer (rounded pills + title typography) — restore if needed:
           <div className="flex justify-end gap-[15px]">
             <Button
               onClick={handleCancel}
               variant="ghost"
               className="inline-flex items-center gap-[5px] px-[15px] py-1.5 bg-grey-light hover:bg-grey-light/80 rounded-[6px] h-[44px]"
             >
-              <XIcon className="w-5 h-5" />
               <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
                 Cancel
               </span>
@@ -246,6 +253,22 @@ export const AddPatientModal = ({
               <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-white text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
                 Save
               </span>
+            </Button>
+          </div>
+          */}
+          <div className="flex justify-end gap-[20px] pt-4">
+            <Button
+              onClick={handleCancel}
+              variant="ghost"
+              className="text-gray-500 text-xs h-9 px-6 bg-[#F5F5F5] hover:bg-[#F5F5F5]/90 text-[14px]"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              className="bg-primary-2 hover:bg-primary-2/90 text-white text-xs h-9 px-6 text-[14px]"
+            >
+              Save
             </Button>
           </div>
         </div>

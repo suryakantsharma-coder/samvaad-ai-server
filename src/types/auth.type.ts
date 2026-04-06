@@ -4,6 +4,10 @@ export type User = {
   email: string;
   name: string;
   role: string;
+  /** National or E.164-style number from API (GET/PATCH /api/auth/me). */
+  phoneNumber?: string;
+  /** Some responses may use `phone` instead of `phoneNumber`. */
+  phone?: string;
   createdAt: string;
   updatedAt: string;
 };

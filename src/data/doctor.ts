@@ -1,10 +1,29 @@
-import { CreateDoctorPayload } from "../types/doctor.type";
+import {
+  CreateDoctorPayload,
+  UpdateDoctorPayload,
+} from "../types/doctor.type";
 import { authFetch } from "./api";
 
 export const addDoctor = async (doctor: CreateDoctorPayload) => {
   return authFetch("/api/doctors", {
     method: "POST",
     body: doctor as object,
+  });
+};
+
+export const updateDoctor = async (
+  doctorId: string,
+  payload: UpdateDoctorPayload,
+) => {
+  return authFetch(`/api/doctors/${doctorId}`, {
+    method: "PATCH",
+    body: payload as object,
+  });
+};
+
+export const deleteDoctor = async (doctorId: string) => {
+  return authFetch(`/api/doctors/${doctorId}`, {
+    method: "DELETE",
   });
 };
 

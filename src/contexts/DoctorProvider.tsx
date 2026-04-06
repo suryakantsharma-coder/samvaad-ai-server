@@ -2,8 +2,18 @@
 
 import { createContext, useContext, useState } from "react";
 import { showSuccess, showError } from "../lib/toast";
-import { CreateDoctorPayload, Doctor } from "../types/doctor.type";
-import { getDoctors, addDoctor, searchDoctors } from "../data/doctor";
+import {
+  CreateDoctorPayload,
+  Doctor,
+  UpdateDoctorPayload,
+} from "../types/doctor.type";
+import {
+  getDoctors,
+  addDoctor,
+  searchDoctors,
+  updateDoctor,
+  deleteDoctor,
+} from "../data/doctor";
 
 export const DoctorContext = createContext<{
   doctors: Doctor[];
@@ -13,6 +23,11 @@ export const DoctorContext = createContext<{
   limit: number;
   getDoctorsData: () => Promise<void>;
   handleAddDoctor: (doctor: CreateDoctorPayload) => Promise<void>;
+  handleUpdateDoctor: (
+    doctorId: string,
+    payload: UpdateDoctorPayload,
+  ) => Promise<void>;
+  handleDeleteDoctor: (doctorId: string) => Promise<void>;
   searchDoctorsByName: (q: string) => Promise<void>;
   searchedDoctors: Doctor[] | null;
   resetSearchedDoctors: () => void;
@@ -24,6 +39,8 @@ export const DoctorContext = createContext<{
   limit: 20,
   getDoctorsData: () => Promise.resolve(),
   handleAddDoctor: () => Promise.resolve(),
+  handleUpdateDoctor: () => Promise.resolve(),
+  handleDeleteDoctor: () => Promise.resolve(),
   searchDoctorsByName: () => Promise.resolve(),
   searchedDoctors: null,
   resetSearchedDoctors: () => {},
@@ -58,7 +75,12 @@ export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(true);
       setError(null);
       const response = await addDoctor(doctor);
-      setDoctors([...doctors, response.data.doctor]);
+      const created = response.data?.doctor;
+      if (created) {
+        setDoctors((prev) => [...prev, created as Doctor]);
+      } else {
+        await getDoctorsData();
+      }
       showSuccess("Success!", "Doctor added successfully.");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to add doctor";
@@ -92,6 +114,45 @@ export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
     setSearchedDoctors(null);
   };
 
+  const handleUpdateDoctor = async (
+    doctorId: string,
+    payload: UpdateDoctorPayload,
+  ) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await updateDoctor(doctorId, payload);
+      await getDoctorsData();
+      showSuccess("Success!", "Doctor updated successfully.");
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to update doctor";
+      setError(msg);
+      showError("Error", msg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteDoctor = async (doctorId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await deleteDoctor(doctorId);
+      await getDoctorsData();
+      showSuccess("Success!", "Doctor removed successfully.");
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to remove doctor";
+      setError(msg);
+      showError("Error", msg);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <DoctorContext.Provider
       value={{
@@ -102,6 +163,8 @@ export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
         limit,
         getDoctorsData,
         handleAddDoctor,
+        handleUpdateDoctor,
+        handleDeleteDoctor,
         searchDoctorsByName,
         searchedDoctors,
         resetSearchedDoctors,

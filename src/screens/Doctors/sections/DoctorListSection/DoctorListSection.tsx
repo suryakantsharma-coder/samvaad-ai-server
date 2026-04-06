@@ -38,107 +38,8 @@ import {
 import { ListError } from "../../../../components/ui/list-error";
 import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
 import { useDoctor } from "../../../../contexts/DoctorProvider";
+import type { Doctor } from "../../../../types/doctor.type";
 
-const doctorsData = [
-  {
-    name: "Dr. Olivia Turner",
-    id: "MD-2024-156789",
-    avatar: "/ellipse-1.png",
-    phone: "+91 3456728902",
-    email: "oliviaturner@hospital.com",
-    designation: "Cardiologist",
-    availability: "9 AM–5 PM",
-    status: "On Duty",
-    statusColor: "bg-[#d0f5e6] text-[#00c896]",
-    utilization: 55,
-  },
-  {
-    name: "Dr. Liam Brooks",
-    id: "MD-2024-156789",
-    avatar: "/ellipse-1.png",
-    phone: "+91 3456728902",
-    email: "liambrooke@hospital.com",
-    designation: "General Physician",
-    availability: "9 AM–5 PM",
-    status: "On Break",
-    statusColor: "bg-[#fff5e6] text-[#ff9800]",
-    utilization: 95,
-  },
-  {
-    name: "Dr. Emily Cooper",
-    id: "MD-2024-156789",
-    avatar: "/ellipse-1.png",
-    phone: "+91 3456728902",
-    email: "emilycooper@hospital.com",
-    designation: "Pediatrician",
-    availability: "9 AM–5 PM",
-    status: "On Duty",
-    statusColor: "bg-[#d0f5e6] text-[#00c896]",
-    utilization: 85,
-  },
-  {
-    name: "Dr. Ethan Miller",
-    id: "MD-2024-156789",
-    avatar: "/ellipse-1.png",
-    phone: "+91 3456728902",
-    email: "ethanmiller@hospital.com",
-    designation: "Dermatologist",
-    availability: "9 AM–5 PM",
-    status: "Off Duty",
-    statusColor: "bg-[#ffe9e9] text-[#ff0004]",
-    utilization: 85,
-  },
-  {
-    name: "Dr. Daniel Reed",
-    id: "MD-2024-156789",
-    avatar: "/ellipse-1.png",
-    phone: "+91 3456728902",
-    email: "danielreed@hospital.com",
-    designation: "Neurologist",
-    availability: "9 AM–5 PM",
-    status: "On Leave",
-    statusColor: "bg-[#e6e6e6] text-[#757575]",
-    utilization: 85,
-  },
-  {
-    name: "Dr. Ava Johnson",
-    id: "MD-2024-156789",
-    avatar: "/ellipse-1.png",
-    phone: "+91 3456728902",
-    email: "avajohnson@hospital.com",
-    designation: "Gynecologist",
-    availability: "9 AM–5 PM",
-    status: "On Duty",
-    statusColor: "bg-[#d0f5e6] text-[#00c896]",
-    utilization: 85,
-  },
-  {
-    name: "Dr. James Parker",
-    id: "MD-2024-156789",
-    avatar: "/ellipse-1.png",
-    phone: "+91 3456728902",
-    email: "jamesparker@hospital.com",
-    designation: "Psychiatrist",
-    availability: "9 AM–5 PM",
-    status: "On Leave",
-    statusColor: "bg-[#e6e6e6] text-[#757575]",
-    utilization: 85,
-  },
-  {
-    name: "Dr. Noah Carter",
-    id: "MD-2024-156789",
-    avatar: "/ellipse-1.png",
-    phone: "+91 3456728902",
-    email: "noahcarter@hospital.com",
-    designation: "Cardiologist",
-    availability: "9 AM–5 PM",
-    status: "On Duty",
-    statusColor: "bg-[#d0f5e6] text-[#00c896]",
-    utilization: 85,
-  },
-];
-
-// create status color map make it function
 const getStatusColor = (status: string) => {
   switch (status) {
     case "On Duty":
@@ -148,6 +49,8 @@ const getStatusColor = (status: string) => {
     case "Off Duty":
       return "bg-[#ffe9e9] text-[#ff0004]";
     case "On Leave":
+      return "bg-[#e6e6e6] text-[#757575]";
+    default:
       return "bg-[#e6e6e6] text-[#757575]";
   }
 };
@@ -160,7 +63,13 @@ const STATUS_OPTIONS = [
   { value: "On Leave", label: "On Leave" },
 ] as const;
 
-export const DoctorListSection = (): JSX.Element => {
+export const DoctorListSection = ({
+  onEditDoctor,
+  onRemoveDoctor,
+}: {
+  onEditDoctor?: (doctor: Doctor) => void;
+  onRemoveDoctor?: (doctor: Doctor) => void;
+}): JSX.Element => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const {
@@ -310,9 +219,9 @@ export const DoctorListSection = (): JSX.Element => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {listToShow.map((doctor, index) => (
+            {listToShow.map((doctor) => (
               <TableRow
-                key={index}
+                key={doctor._id}
                 className="border-b border-[#dedee1] hover:bg-grey-light/50"
               >
                 <TableCell className="p-[0px]">
@@ -396,10 +305,17 @@ export const DoctorListSection = (): JSX.Element => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem>View Profile</DropdownMenuItem>
-                      <DropdownMenuItem>Edit Details</DropdownMenuItem>
-                      <DropdownMenuItem>View Schedule</DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600">
+                      <DropdownMenuItem disabled>View Profile</DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => onEditDoctor?.(doctor)}
+                      >
+                        Edit Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem disabled>View Schedule</DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-red-600 focus:text-red-600"
+                        onClick={() => onRemoveDoctor?.(doctor)}
+                      >
                         Remove Doctor
                       </DropdownMenuItem>
                     </DropdownMenuContent>

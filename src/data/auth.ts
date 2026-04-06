@@ -97,6 +97,49 @@ export const getUserProfile = async () => {
   throw new Error(data.message ?? "Failed to get profile");
 };
 
+export type UpdateProfilePayload = {
+  name?: string;
+  email?: string;
+  /** Digits or formatted as accepted by API (e.g. `9876543210`). */
+  phoneNumber?: string;
+  /** New password — requires `currentPassword` when provided. */
+  password?: string;
+  currentPassword?: string;
+};
+
+/** Update the logged-in user via PATCH /api/auth/me (partial body). */
+export const updateCurrentUserProfile = async (
+  payload: UpdateProfilePayload,
+) => {
+  const body: Record<string, string> = {};
+  if (payload.name != null && payload.name !== "") body.name = payload.name;
+  if (payload.email != null && payload.email !== "") body.email = payload.email;
+  if (payload.phoneNumber != null && payload.phoneNumber !== "") {
+    body.phoneNumber = payload.phoneNumber;
+  }
+  if (payload.password != null && payload.password !== "") {
+    body.password = payload.password;
+    if (payload.currentPassword != null && payload.currentPassword !== "") {
+      body.currentPassword = payload.currentPassword;
+    }
+  }
+  const data = (await authFetch("/api/auth/me", {
+    method: "PATCH",
+    body,
+  })) as {
+    success?: boolean;
+    message?: string;
+    error?: string;
+    data?: { user?: unknown };
+  };
+  if (data.success === true || data.data?.user != null) {
+    return data;
+  }
+  throw new Error(
+    String(data.message ?? data.error ?? "Failed to update profile"),
+  );
+};
+
 /**
  * Create a new user (for hospital_admin). Uses Bearer token.
  */

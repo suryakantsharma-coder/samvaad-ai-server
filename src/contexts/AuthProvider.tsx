@@ -26,6 +26,7 @@ export const AuthContext = createContext<{
     hospitalId: string,
   ) => Promise<void>;
   user: User | null;
+  refreshUser: () => Promise<void>;
   hospitalUsers: User[] | null;
   handleGetHospitalUsers: (hospitalId: string) => Promise<void>;
   handleChangeUserRole: (
@@ -41,6 +42,7 @@ export const AuthContext = createContext<{
   handleLogout: async () => {},
   handleRegister: async () => {},
   user: null,
+  refreshUser: async () => {},
   hospitalUsers: [],
   handleGetHospitalUsers: async (hospitalId: string) => {},
   handleChangeUserRole: async (
@@ -64,6 +66,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       handleUserProfile(token);
     }
   }, []);
+
+  const refreshUser = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    const data = await getUserProfile();
+    // @ts-expect-error API returns nested user
+    const nextUser = data.data?.user as User | undefined;
+    if (nextUser) {
+      setUser(nextUser);
+      localStorage.setItem("user", JSON.stringify(nextUser));
+    }
+  };
 
   const handleUserProfile = async (token: string) => {
     try {
@@ -155,6 +169,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         handleLogout,
         handleRegister,
         user,
+        refreshUser,
         hospitalUsers,
         handleGetHospitalUsers,
         handleChangeUserRole,
