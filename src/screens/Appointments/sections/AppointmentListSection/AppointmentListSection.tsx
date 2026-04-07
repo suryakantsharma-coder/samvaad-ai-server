@@ -38,6 +38,7 @@ import { ListError } from "../../../../components/ui/list-error";
 import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
 import { Pagination } from "../../../../components/ui/pagination";
 import { useAppointments } from "../../../../contexts/AppointmentProvider";
+import { formatTime12h } from "../../../../lib/dateTimeDisplay";
 import { Appointments } from "../../../../types/appointment.type";
 
 // create a status color map function
@@ -350,9 +351,7 @@ export const AppointmentListSection = ({
                           ).toLocaleDateString()}
                         </span>
                         <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
-                          {new Date(
-                            appointment.appointmentDateTime,
-                          ).toLocaleTimeString()}
+                          {formatTime12h(appointment.appointmentDateTime)}
                         </span>
                       </div>
                     </TableCell>

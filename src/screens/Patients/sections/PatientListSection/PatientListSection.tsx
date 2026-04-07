@@ -38,6 +38,7 @@ import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
 import { Pagination } from "../../../../components/ui/pagination";
 import { PatientData } from "../../../../components/modals/AddPatientModal";
 import { usePatient } from "../../../../contexts/PatientProvider";
+import { formatTime12h } from "../../../../lib/dateTimeDisplay";
 import { useNavigate } from "react-router-dom";
 
 const filterTabIds = ["all", "today", "tomorrow"] as const;
@@ -469,10 +470,9 @@ export const PatientListSection = ({
                     <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
                       {patient.appointments?.length &&
                       patient.appointments?.length > 0
-                        ? new Date(
+                        ? formatTime12h(
                             patient.appointments[0]?.appointmentDateTime,
-                          ).toLocaleTimeString() ||
-                          "No appointment date and time"
+                          ) || "No appointment date and time"
                         : "No appointment date and time"}
                     </span>
                   </div>

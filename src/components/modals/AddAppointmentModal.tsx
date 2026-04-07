@@ -10,6 +10,7 @@ import {
   Search,
   Trash2Icon,
 } from "lucide-react";
+import { formatDateTime12h, formatHmClock12h } from "../../lib/dateTimeDisplay";
 import { showWarning } from "../../lib/toast";
 
 import { Button } from "../../components/ui/button";
@@ -656,7 +657,9 @@ export const MarkAsDoneModal = ({
             <strong className="text-black">{data?.doctor.fullName}</strong>{" "}
             scheduled on{" "}
             <strong className="text-black">
-              {new Date(data?.appointmentDateTime).toLocaleDateString()}
+              {data?.appointmentDateTime
+                ? formatDateTime12h(data.appointmentDateTime)
+                : "—"}
             </strong>{" "}
             as completed. Please confirm to proceed.
           </p>
@@ -720,7 +723,9 @@ export const CancelAppointmentModal = ({
             <strong className="text-black">{data?.doctorName}</strong> scheduled
             on{" "}
             <strong className="text-black">
-              {data?.appointmentDate} at {data?.appointmentTime}
+              {data?.appointmentDateTime
+                ? formatDateTime12h(data.appointmentDateTime)
+                : `${data?.appointmentDate ?? "—"} at ${formatHmClock12h(data?.appointmentTime) || data?.appointmentTime || "—"}`}
             </strong>{" "}
             will be canceled. Please confirm to proceed.
           </p>

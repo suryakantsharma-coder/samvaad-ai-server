@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { formatTime12h } from "../../lib/dateTimeDisplay";
 import { getAppointments } from "../../data/appointment";
 import { Appointments } from "../../types/appointment.type";
 import type {
@@ -401,13 +402,7 @@ export const NewPrescriptionModal = ({
                   {patientAppointments.map((apt) => (
                     <SelectItem key={apt._id} value={apt._id}>
                       {new Date(apt.appointmentDateTime).toLocaleDateString()} •{" "}
-                      {new Date(apt.appointmentDateTime).toLocaleTimeString(
-                        [],
-                        {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        },
-                      )}{" "}
+                      {formatTime12h(apt.appointmentDateTime)}{" "}
                       •{" "}
                       {typeof apt.doctor === "object" && apt.doctor !== null
                         ? apt.doctor.fullName ?? "—"

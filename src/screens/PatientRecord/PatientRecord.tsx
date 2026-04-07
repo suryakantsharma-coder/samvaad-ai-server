@@ -19,6 +19,7 @@ import type {
 } from "../../types/appointment.type";
 import type { PatientHistoryResponse } from "../../types/appointment.type";
 import type { Patients } from "../../types/patient.type";
+import { formatTime12h } from "../../lib/dateTimeDisplay";
 import { PatientSearchSection } from "../Patients/sections/PatientSearchSection";
 import { NewPrescriptionModal } from "../../components/modals";
 import type { NewPrescriptionPayload } from "../../components/modals/NewPrescriptionModal";
@@ -30,14 +31,6 @@ function formatAppointmentDate(d: string) {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  });
-}
-
-function formatAppointmentTime(d: string) {
-  return new Date(d).toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
   });
 }
 
@@ -288,7 +281,7 @@ export const PatientRecord = (): JSX.Element => {
                         <div className="flex justify-between items-center gap-2">
                           <p className="font-title-4m text-[#333333]">
                             {formatAppointmentDate(apt.appointmentDateTime)} |{" "}
-                            {formatAppointmentTime(apt.appointmentDateTime)}
+                            {formatTime12h(apt.appointmentDateTime)}
                           </p>
                           <span className="inline-flex items-center gap-[5px] px-[10px] py-[6px] rounded-full bg-[#DFFFF3] text-[#00955C] font-title-4r text-xs">
                             {apt.type === "Hospital" ? (

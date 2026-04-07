@@ -3,21 +3,10 @@ import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { PrescriptionHospitalDoctorInfo } from "../prescription/PrescriptionHospitalDoctorInfo";
 import { PrescriptionMedicinesSection } from "../prescription/PrescriptionMedicinesSection";
+import { formatDateTime12h } from "../../lib/dateTimeDisplay";
 import { downloadPrescriptionReportPdf } from "../../lib/prescriptionPdf";
 import { getDiagnosis } from "../../lib/prescriptionMeta";
 import type { Prescription } from "../../types/prescription.type";
-
-function formatDate(iso: string | undefined): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString(undefined, {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
-  } catch {
-    return iso;
-  }
-}
 
 interface PrescriptionViewModalProps {
   open: boolean;
@@ -72,7 +61,7 @@ export const PrescriptionViewModal = ({
                 <div>
                   <dt className="font-title-4m text-x-70">Appointment date</dt>
                   <dd className="font-title-4r mt-0.5">
-                    {formatDate(prescription.appointmentDate)}
+                    {formatDateTime12h(prescription.appointmentDate)}
                   </dd>
                 </div>
                 {prescription.followUp && (
