@@ -85,11 +85,13 @@ export const PrescriptionListSection = ({
   onDeletePrescription,
   onMarkAsDonePrescription,
   onViewRecord,
+  onPrescriptionReport,
 }: {
   onEditPrescription: (prescription: Prescription) => void;
   onDeletePrescription: (prescription: Prescription) => void;
   onMarkAsDonePrescription: (prescription: Prescription) => void;
   onViewRecord?: (prescription: Prescription) => void;
+  onPrescriptionReport?: (prescription: Prescription) => void;
 }): JSX.Element => {
   const [searchQuery, setSearchQuery] = useState("");
   const {
@@ -260,6 +262,13 @@ export const PrescriptionListSection = ({
                               onClick={() => onViewRecord(prescription)}
                             >
                               View record
+                            </DropdownMenuItem>
+                          )}
+                          {onPrescriptionReport && (
+                            <DropdownMenuItem
+                              onClick={() => onPrescriptionReport(prescription)}
+                            >
+                              Prescription report
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem

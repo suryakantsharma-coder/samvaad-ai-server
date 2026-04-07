@@ -73,6 +73,40 @@ const WhatsAppCheckbox = ({ label }: { label: string }) => (
   </div>
 );
 
+/** Local calendar date (YYYY-MM-DD) + HH:mm → ISO string for API */
+function combineAppointmentDateTime(dateStr: string, timeHHmm: string): string {
+  if (!dateStr?.trim() || !timeHHmm?.trim()) return "";
+  const [y, mo, d] = dateStr.split("-").map((x) => parseInt(x, 10));
+  const [hh, mm] = timeHHmm.split(":").map((x) => parseInt(x, 10));
+  if ([y, mo, d, hh, mm].some((n) => Number.isNaN(n))) return "";
+  return new Date(y, mo - 1, d, hh, mm ?? 0, 0, 0).toISOString();
+}
+
+const APPOINTMENT_TIME_SLOTS: { value: string; label: string }[] = (() => {
+  const slots: { value: string; label: string }[] = [];
+  for (let hour = 9; hour <= 17; hour++) {
+    for (const minute of [0, 30]) {
+      if (hour === 17 && minute > 0) break;
+      const d = new Date(2000, 0, 1, hour, minute);
+      const label = d.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+      const value = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+      slots.push({ value, label });
+    }
+  }
+  return slots;
+})();
+
+function normalizePatientGender(g: string | undefined): string {
+  const key = (g ?? "").trim().toLowerCase();
+  if (key === "female") return "Female";
+  if (key === "other") return "Other";
+  return "Male";
+}
+
 // 1. New Appointment Modal
 export const NewAppointmentModal = ({
   open,
@@ -89,7 +123,7 @@ export const NewAppointmentModal = ({
     reason: "",
     appointmentDateTime: "",
     timeSlot: "",
-    type: "Hospital",
+    type: "hospital",
   });
   const { searchDoctorsByName, searchedDoctors, resetSearchedDoctors } =
     useDoctor();
@@ -118,14 +152,14 @@ export const NewAppointmentModal = ({
 
   useEffect(() => {
     if (selectedPatient !== null) {
-      setFormData({
-        ...formData,
+      setFormData((prev) => ({
+        ...prev,
         patient: selectedPatient._id,
         age: selectedPatient.age,
-        gender: selectedPatient.gender,
+        gender: normalizePatientGender(selectedPatient.gender),
         phone: selectedPatient.phoneNumber,
         reason: selectedPatient.reason,
-      });
+      }));
     }
   }, [selectedPatient]);
 
@@ -233,14 +267,15 @@ export const NewAppointmentModal = ({
                 required
               >
                 <SelectTrigger className="h-9">
-                  <div className="flex items-center gap-2">
-                    <UserIcon className="w-4 h-4 text-gray-400" />{" "}
-                    <SelectValue placeholder="Male" />
+                  <div className="flex w-full min-w-0 items-center gap-2">
+                    <UserIcon className="h-4 w-4 shrink-0 text-gray-400" />
+                    <SelectValue placeholder="Select gender" />
                   </div>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="male">Male</SelectItem>
-                  <SelectItem value="female">Female</SelectItem>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -379,7 +414,7 @@ export const NewAppointmentModal = ({
                 Time Slot <span className="text-red-500">*</span>
               </label>
               <Select
-                value={formData.timeSlot}
+                value={formData.timeSlot || undefined}
                 onValueChange={(value) =>
                   setFormData({ ...formData, timeSlot: value })
                 }
@@ -389,7 +424,11 @@ export const NewAppointmentModal = ({
                   <SelectValue placeholder="Select time" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="9am">09:00 AM</SelectItem>
+                  {APPOINTMENT_TIME_SLOTS.map(({ value, label }) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -431,32 +470,38 @@ export const NewAppointmentModal = ({
             <Button
               className="bg-[#0D9488] hover:bg-[#0B7A6F] text-white text-xs h-9 px-4"
               onClick={async () => {
-                if (
-                  (formData.type,
-                  formData.reason,
+                const appointmentIso = combineAppointmentDateTime(
                   formData.appointmentDateTime,
-                  !selectedDoctor?._id || !selectedPatient?._id)
+                  formData.timeSlot,
+                );
+                if (
+                  !selectedDoctor?._id ||
+                  !selectedPatient?._id ||
+                  !formData.reason?.trim() ||
+                  !formData.appointmentDateTime ||
+                  !formData.timeSlot ||
+                  !formData.type ||
+                  !appointmentIso
                 ) {
                   showWarning("Warning", "Please fill all the fields.");
                   return;
-                } else {
-                  const payload: AppointmentPayload = {
-                    patient: selectedPatient?._id || "",
-                    doctor: selectedDoctor?._id || "",
-                    status: "Upcoming",
-                    type: formData.type,
-                    reason: formData.reason,
-                    appointmentDateTime: formData.appointmentDateTime,
-                  };
-
-                  await handleCreateAppointment(payload);
-                  onSave({
-                    patientName: selectedPatient?.fullName || "",
-                    doctorName: selectedDoctor?.fullName || "",
-                    appointmentDate: formData.appointmentDateTime,
-                    appointmentTime: formData.timeSlot,
-                  });
                 }
+                const payload: AppointmentPayload = {
+                  patient: selectedPatient._id,
+                  doctor: selectedDoctor._id,
+                  status: "Upcoming",
+                  type: formData.type,
+                  reason: formData.reason.trim(),
+                  appointmentDateTime: appointmentIso,
+                };
+
+                await handleCreateAppointment(payload);
+                onSave({
+                  patientName: selectedPatient?.fullName || "",
+                  doctorName: selectedDoctor?.fullName || "",
+                  appointmentDate: formData.appointmentDateTime,
+                  appointmentTime: formData.timeSlot,
+                });
               }}
             >
               <Save className="w-4 h-4 mr-[2px]" /> Save

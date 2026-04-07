@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { showSuccess, showError } from "../../lib/toast";
+import { downloadPrescriptionReportPdf } from "../../lib/prescriptionPdf";
 import {
   DeletePrescriptionModal,
   NewPrescriptionModal,
@@ -143,6 +144,7 @@ export const Prescriptions = (): JSX.Element => {
         onDeletePrescription={(p) => setPrescriptionPendingDelete(p)}
         onMarkAsDonePrescription={() => {}}
         onViewRecord={(p) => setViewingPrescription(p)}
+        onPrescriptionReport={(p) => downloadPrescriptionReportPdf(p)}
       />
     </div>
   );

@@ -1,7 +1,10 @@
 import { Download } from "lucide-react";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
-import { downloadPrescriptionPdf } from "../../lib/prescriptionPdf";
+import { PrescriptionHospitalDoctorInfo } from "../prescription/PrescriptionHospitalDoctorInfo";
+import { PrescriptionMedicinesSection } from "../prescription/PrescriptionMedicinesSection";
+import { downloadPrescriptionReportPdf } from "../../lib/prescriptionPdf";
+import { getDiagnosis } from "../../lib/prescriptionMeta";
 import type { Prescription } from "../../types/prescription.type";
 
 function formatDate(iso: string | undefined): string {
@@ -28,7 +31,7 @@ export const PrescriptionViewModal = ({
   prescription,
 }: PrescriptionViewModalProps): JSX.Element => {
   const handleDownloadPdf = () => {
-    if (prescription) downloadPrescriptionPdf(prescription);
+    if (prescription) downloadPrescriptionReportPdf(prescription);
   };
 
   return (
@@ -46,6 +49,8 @@ export const PrescriptionViewModal = ({
         <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
           {prescription && (
             <div className="rounded-[10px] border border-[#dedee1] bg-white p-5 flex flex-col gap-5">
+              <PrescriptionHospitalDoctorInfo prescription={prescription} />
+
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="space-y-1 min-w-0">
                   <p className="font-title-4r text-x-70 text-sm">Patient</p>
@@ -78,45 +83,15 @@ export const PrescriptionViewModal = ({
                     </dd>
                   </div>
                 )}
+                <div className="sm:col-span-2">
+                  <dt className="font-title-4m text-x-70">Diagnosis</dt>
+                  <dd className="font-title-4r mt-0.5">
+                    {getDiagnosis(prescription)}
+                  </dd>
+                </div>
               </dl>
 
-              <div>
-                <h2 className="font-title-3m text-base mb-3">Medicines</h2>
-                <ul className="space-y-3">
-                  {(prescription.medicines ?? []).map((m, i) => (
-                    <li
-                      key={`${m.name}-${i}`}
-                      className="rounded-[10px] border border-[#dedee1] p-4 bg-grey-light/20"
-                    >
-                      <p className="font-title-4m text-black">{m.name}</p>
-                      <p className="font-title-4r text-x-70 text-sm mt-1">
-                        {m.dosage?.value} {m.dosage?.unit} · {m.duration?.value}{" "}
-                        {m.duration?.unit} · {m.intake}
-                        {(m.time?.breakfast ||
-                          m.time?.lunch ||
-                          m.time?.dinner) && (
-                          <span>
-                            {" "}
-                            ·{" "}
-                            {[
-                              m.time?.breakfast && "Breakfast",
-                              m.time?.lunch && "Lunch",
-                              m.time?.dinner && "Dinner",
-                            ]
-                              .filter(Boolean)
-                              .join(", ")}
-                          </span>
-                        )}
-                      </p>
-                      {m.notes && (
-                        <p className="font-title-4r text-sm mt-2 text-x-70">
-                          {m.notes}
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <PrescriptionMedicinesSection medicines={prescription.medicines} />
 
               <p className="font-title-5r text-x-70 text-xs pt-2 border-t border-[#dedee1]">
                 Reference ID: {prescription._id}

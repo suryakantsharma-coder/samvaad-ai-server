@@ -164,10 +164,24 @@ export const NewPrescriptionModal = ({
   React.useEffect(() => {
     if (!open) return;
     if (initialPrescription) {
+      const pid =
+        typeof initialPrescription.patient === "string"
+          ? initialPrescription.patient
+          : initialPrescription.patient?._id ?? "";
+      const pfull =
+        typeof initialPrescription.patient === "object" &&
+        initialPrescription.patient
+          ? initialPrescription.patient.fullName
+          : initialPrescription.patientName;
+      const pphone =
+        typeof initialPrescription.patient === "object" &&
+        initialPrescription.patient?.phoneNumber
+          ? initialPrescription.patient.phoneNumber
+          : "";
       setSelectedPatient({
-        _id: initialPrescription.patient,
-        fullName: initialPrescription.patientName,
-        phoneNumber: "",
+        _id: pid,
+        fullName: pfull,
+        phoneNumber: pphone,
         age: 0,
         gender: "Other",
         createdAt: "",
@@ -394,7 +408,11 @@ export const NewPrescriptionModal = ({
                           minute: "2-digit",
                         },
                       )}{" "}
-                      • {apt.doctor?.fullName ?? "—"} • {apt.reason || "—"}
+                      •{" "}
+                      {typeof apt.doctor === "object" && apt.doctor !== null
+                        ? apt.doctor.fullName ?? "—"
+                        : "—"}{" "}
+                      • {apt.reason || "—"}
                     </SelectItem>
                   ))}
                 </SelectContent>

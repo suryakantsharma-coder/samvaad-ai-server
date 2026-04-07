@@ -1,95 +1,158 @@
 import { jsPDF } from "jspdf";
 import type { Prescription } from "../types/prescription.type";
+import {
+  decodeHtmlEntities,
+  buildMedicineFrequencyLine,
+  formatHospitalAddress,
+  formatHospitalPhone,
+  getDiagnosis,
+  getDoctor,
+  getHospital,
+  getPatientDisplayName,
+} from "./prescriptionMeta";
 
-function formatDate(iso: string | undefined): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
-}
-
-export function downloadPrescriptionPdf(rx: Prescription): void {
+/**
+ * Formal prescription layout: hospital header, patient & diagnosis, medications, physician block.
+ * Uses populated `hospital`, `patient`, `appointment`, and medicine `frequency` when present.
+ */
+export function downloadPrescriptionReportPdf(rx: Prescription): void {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const margin = 16;
+  const pageW = 210;
+  const pageH = 297;
+  const margin = 14;
+  const innerW = pageW - margin * 2;
   let y = margin;
-  const line = 6;
-  const pageBottom = 280;
 
-  const nextLine = (h = line) => {
-    y += h;
-    if (y > pageBottom) {
+  const drawPageFrame = () => {
+    doc.setFillColor(252, 250, 245);
+    doc.rect(0, 0, pageW, pageH, "F");
+    doc.setDrawColor(40, 100, 200);
+    doc.setLineWidth(0.45);
+    doc.rect(margin, margin, innerW, pageH - margin * 2, "S");
+  };
+
+  const ensureSpace = (neededMm: number) => {
+    if (y + neededMm > pageH - margin - 10) {
       doc.addPage();
       y = margin;
+      drawPageFrame();
     }
   };
 
-  doc.setFontSize(16);
+  drawPageFrame();
+
+  const hospital = getHospital(rx);
+  const doctor = getDoctor(rx);
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
-  doc.text("Prescription", margin, y);
-  nextLine(10);
+  doc.text(hospital?.name ?? "Prescription", margin + 2, y + 6);
+  y += 10;
 
-  doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const addrLines = hospital
+    ? doc.splitTextToSize(formatHospitalAddress(hospital), innerW - 4)
+    : ["—"];
+  doc.text(addrLines, margin + 2, y);
+  y += Math.max(6, addrLines.length * 4.5);
 
-  const addField = (label: string, value: string) => {
+  doc.setFontSize(9);
+  doc.text(`Contact: ${hospital ? formatHospitalPhone(hospital) : "—"}`, margin + 2, y);
+  y += 5;
+  if (hospital?.registrationNumber) {
+    doc.text(`Registration: ${hospital.registrationNumber}`, margin + 2, y);
+    y += 5;
+  }
+  y += 3;
+
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.35);
+  doc.line(margin + 2, y, margin + innerW - 2, y);
+  y += 8;
+
+  const addLabelValue = (label: string, value: string) => {
+    ensureSpace(12);
     doc.setFont("helvetica", "bold");
-    doc.text(`${label}:`, margin, y);
+    doc.setFontSize(10);
+    doc.text(`${label}:`, margin + 2, y);
     doc.setFont("helvetica", "normal");
-    const lines = doc.splitTextToSize(value, 180 - margin);
+    const lines = doc.splitTextToSize(value, innerW - 52);
     doc.text(lines, margin + 42, y);
-    nextLine(Math.max(line, lines.length * 4.5));
+    y += Math.max(5, lines.length * 4.5);
   };
 
-  addField("Patient", rx.patientName ?? "—");
-  addField("Appointment date", formatDate(rx.appointmentDate));
-  if (rx.followUp) {
-    addField(
-      "Follow-up",
-      `${rx.followUp.value} ${rx.followUp.unit}`,
-    );
-  }
+  addLabelValue("Patient Name", getPatientDisplayName(rx));
+  addLabelValue("Diagnosis", getDiagnosis(rx));
 
-  nextLine(4);
+  y += 4;
+  ensureSpace(20);
   doc.setFont("helvetica", "bold");
-  doc.text("Medicines", margin, y);
-  nextLine(6);
+  doc.setFontSize(11);
+  doc.text("Medication:", margin + 2, y);
+  y += 7;
   doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
 
   (rx.medicines ?? []).forEach((m, i) => {
-    const header = `${i + 1}. ${m.name}`;
-    doc.setFont("helvetica", "bold");
-    doc.text(header, margin, y);
-    nextLine(5);
-    doc.setFont("helvetica", "normal");
+    ensureSpace(36);
     const dosage = `${m.dosage?.value ?? ""} ${m.dosage?.unit ?? ""}`.trim();
     const duration = `${m.duration?.value ?? ""} ${m.duration?.unit ?? ""}`.trim();
-    const times: string[] = [];
-    if (m.time?.breakfast) times.push("Breakfast");
-    if (m.time?.lunch) times.push("Lunch");
-    if (m.time?.dinner) times.push("Dinner");
-    const detail = [
-      dosage && `Dosage: ${dosage}`,
-      duration && `Duration: ${duration}`,
-      `Intake: ${m.intake ?? "—"}`,
-      times.length > 0 && `Time: ${times.join(", ")}`,
-      m.notes && `Notes: ${m.notes}`,
+    const block = [
+      `${i + 1}. ${m.name}`,
+      `Dosage: ${dosage || "—"}`,
+      `Frequency: ${buildMedicineFrequencyLine(m)}`,
+      `Duration: ${duration || "—"}`,
+      m.notes?.trim() ? `Instructions: ${decodeHtmlEntities(m.notes.trim())}` : null,
     ]
       .filter(Boolean)
-      .join(" · ");
-    const wrapped = doc.splitTextToSize(detail || "—", 180 - margin - 4);
+      .join("\n");
+    const wrapped = doc.splitTextToSize(block, innerW - 6);
     doc.text(wrapped, margin + 4, y);
-    nextLine(Math.max(line, wrapped.length * 4.5) + 2);
+    y += wrapped.length * 4.8 + 4;
   });
 
-  y = Math.min(y + 6, pageBottom - 8);
+  y += 6;
+  ensureSpace(40);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("Physician Signature:", margin + 2, y);
+  y += 6;
+  doc.setDrawColor(60, 60, 60);
+  doc.setLineWidth(0.3);
+  doc.line(margin + 2, y, margin + 75, y);
+  y += 10;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const drName = doctor?.fullName
+    ? `Dr. ${doctor.fullName}`
+    : "—";
+  doc.text(drName, margin + 2, y);
+  y += 6;
+
+  if (doctor?.designation) {
+    doc.text(
+      `Designation: ${decodeHtmlEntities(doctor.designation)}`,
+      margin + 2,
+      y,
+    );
+    y += 5;
+  }
+
+  y += 6;
   doc.setFontSize(8);
-  doc.setTextColor(120);
-  doc.text(`Prescription ID: ${rx._id}`, margin, y, { maxWidth: 180 });
+  doc.setTextColor(100);
+  doc.text(`Prescription ref: ${rx._id}`, margin + 2, Math.min(y, pageH - margin - 4));
 
   const safeName = (rx.patientName || "prescription")
     .replace(/[^\w\s-]/g, "")
     .slice(0, 40);
-  doc.save(`prescription-${safeName}-${rx._id.slice(-8)}.pdf`);
+  doc.save(`prescription-report-${safeName}-${rx._id.slice(-8)}.pdf`);
+}
+
+/** @deprecated Use {@link downloadPrescriptionReportPdf} for the full template; kept for imports. */
+export function downloadPrescriptionPdf(rx: Prescription): void {
+  downloadPrescriptionReportPdf(rx);
 }
