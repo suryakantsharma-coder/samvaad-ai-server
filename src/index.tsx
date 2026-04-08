@@ -106,7 +106,6 @@ function AuthenticatedApp(): JSX.Element {
                   <Route path="/appointments" element={<Appointments />} />
                   <Route path="/settings" element={<Settings />} />
                 </Routes>
-                <ToastContainer position="top-right" limit={3} />
               </PrescriptionProvider>
             </AppointmentProvider>
           </HospitalProvider>
@@ -119,6 +118,7 @@ function AuthenticatedApp(): JSX.Element {
 createRoot(document.getElementById("app") as HTMLElement).render(
   <StrictMode>
     <BrowserRouter>
+      <ToastContainer position="top-right" limit={3} />
       <Routes>
         <Route
           path="/public/prescriptions/:prescriptionId"

@@ -8,7 +8,6 @@ import {
   buildMedicineFrequencyLine,
   formatHospitalAddress,
   formatHospitalPhone,
-  getDiagnosis,
   getDoctor,
   getHospital,
   getPatientAgeForPdf,
@@ -16,6 +15,12 @@ import {
   getPatientGenderForPdf,
 } from "./prescriptionMeta";
 import { resolvePrescriptionDemographicsForPdf } from "./resolvePrescriptionForPdf";
+import { showError } from "./toast";
+
+/** ~4px at 96dpi → mm (extra vertical breathing room in header). */
+const HEADER_EXTRA_V_MM = (4 * 25.4) / 96;
+/** jsPDF default lineHeightFactor is ~1.15; bump so wrapped header lines match taller pitch. */
+const HEADER_LINE_HEIGHT_FACTOR = 1.15 + HEADER_EXTRA_V_MM / 4.1;
 
 /** Brand blue for titles and rules (approx. clinical template). */
 const BLUE: [number, number, number] = [33, 89, 181];
@@ -54,6 +59,7 @@ function formatDoctorNameWithDesignation(
 export async function downloadPrescriptionReportPdf(
   input: Prescription,
 ): Promise<void> {
+  try {
   const rx = await resolvePrescriptionDemographicsForPdf(input);
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageW = 210;
@@ -64,13 +70,6 @@ export async function downloadPrescriptionReportPdf(
 
   const hospital = getHospital(rx);
   const doctor = getDoctor(rx);
-
-  const ensureSpace = (neededMm: number) => {
-    if (y + neededMm > pageH - 22) {
-      doc.addPage();
-      y = 16;
-    }
-  };
 
   const drawBlueRule = (yy: number) => {
     doc.setDrawColor(...BLUE);
@@ -90,7 +89,7 @@ export async function downloadPrescriptionReportPdf(
   doc.setFontSize(17);
   const title = hospital?.name ?? "Medical Prescription";
   doc.text(title, pageW / 2, y, { align: "center" });
-  y += 11;
+  y += 11 + HEADER_EXTRA_V_MM;
 
   // --- Doctor left | Contact right (same 9pt grey tone) ---
   doc.setTextColor(...TEXT_GREY);
@@ -115,19 +114,24 @@ export async function downloadPrescriptionReportPdf(
     rightParts.push(`Email: ${doctor.email.trim()}`);
   const rightText = rightParts.length ? rightParts.join("\n") : "";
 
-  doc.text(leftLines, margin, y);
+  doc.text(leftLines, margin, y, {
+    lineHeightFactor: HEADER_LINE_HEIGHT_FACTOR,
+  });
   if (rightText) {
-    doc.text(doc.splitTextToSize(rightText, rightW), rightX, y);
+    doc.text(doc.splitTextToSize(rightText, rightW), rightX, y, {
+      lineHeightFactor: HEADER_LINE_HEIGHT_FACTOR,
+    });
   }
 
-  const leftH = leftLines.length * 4.1;
+  const headerLinePitch = 4.1 + HEADER_EXTRA_V_MM;
+  const leftH = leftLines.length * headerLinePitch;
   const rightH = rightText
-    ? doc.splitTextToSize(rightText, rightW).length * 4.1
+    ? doc.splitTextToSize(rightText, rightW).length * headerLinePitch
     : 0;
-  y += Math.max(leftH, rightH) + 5;
+  y += Math.max(leftH, rightH) + 5 + HEADER_EXTRA_V_MM;
 
   drawBlueRule(y);
-  y += 7;
+  y += 7 + HEADER_EXTRA_V_MM;
 
   // --- Patient details (no address): consistent 9pt grey labels, black values ---
   doc.setFontSize(9);
@@ -165,18 +169,6 @@ export async function downloadPrescriptionReportPdf(
   drawLightUnderline(margin + 26, y, 45);
   y += 8;
 
-  const dx = getDiagnosis(rx);
-  if (dx && dx !== "—") {
-    doc.setFontSize(8);
-    doc.setTextColor(...TEXT_GREY);
-    doc.text("Diagnosis / notes:", margin, y);
-    doc.setTextColor(0, 0, 0);
-    const dxLines = doc.splitTextToSize(decodeHtmlEntities(dx), contentW - 38);
-    doc.text(dxLines, margin + 38, y);
-    y += dxLines.length * 3.8 + 4;
-    doc.setFontSize(9);
-  }
-
   drawBlueRule(y);
   y += 8;
 
@@ -189,21 +181,20 @@ export async function downloadPrescriptionReportPdf(
 
   const medLeft = margin + 22;
   const medW = pageW - medLeft - margin;
+  /** Space reserved at bottom for signature block + ref (keep meds out of this zone). */
+  const footerReservedMm = 48;
+  const contentBottomY = pageH - footerReservedMm;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(0, 0, 0);
 
   let medY = y + 12;
   (rx.medicines ?? []).forEach((m, i) => {
-    ensureSpace(28);
-    if (medY > pageH - 22) {
-      doc.addPage();
-      medY = 16;
-    }
     const dosage = `${m.dosage?.value ?? ""} ${m.dosage?.unit ?? ""}`.trim();
     const duration = `${m.duration?.value ?? ""} ${m.duration?.unit ?? ""}`.trim();
+    const medName = String(m?.name ?? "—").trim() || "—";
     const block = [
-      `${i + 1}. ${m.name}`,
+      `${i + 1}. ${medName}`,
       `Dosage: ${dosage || "—"}`,
       `Frequency: ${buildMedicineFrequencyLine(m)}`,
       `Duration: ${duration || "—"}`,
@@ -214,8 +205,13 @@ export async function downloadPrescriptionReportPdf(
       .filter(Boolean)
       .join("\n");
     const wrapped = doc.splitTextToSize(block, medW);
+    const blockHeight = wrapped.length * 4.1 + 3;
+    if (medY + blockHeight > contentBottomY) {
+      doc.addPage();
+      medY = 16;
+    }
     doc.text(wrapped, medLeft, medY);
-    medY += wrapped.length * 4.1 + 3;
+    medY += blockHeight;
   });
 
   if (!(rx.medicines ?? []).length) {
@@ -224,36 +220,65 @@ export async function downloadPrescriptionReportPdf(
     medY += 6;
   }
 
-  y = medY + 8;
-  ensureSpace(35);
-  drawBlueRule(y);
-  y += 10;
+  // --- Footer: fixed layout from bottom (label + line align; name; ref) ---
+  const refBaseline = pageH - 9;
+  const nameLineHeight = 4.15;
 
-  // --- Footer: Doctor's signature ---
-  doc.setTextColor(...TEXT_GREY);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text("Doctor's Signature:", margin, y);
-  drawLightUnderline(margin + 42, y, 75);
-  y += 10;
-
-  doc.setTextColor(0, 0, 0);
   const drSignName = formatDoctorNameWithDesignation(doctor);
+  const signLines = drSignName
+    ? doc.splitTextToSize(drSignName, contentW)
+    : [];
+
+  /** Last line of name sits ~5mm above ref baseline. */
+  const nameFirstBaseline =
+    signLines.length > 0
+      ? refBaseline - 5 - (signLines.length - 1) * nameLineHeight
+      : refBaseline - 5;
+
+  const labelStr = "Doctor's Signature:";
+  const labelY = nameFirstBaseline - 8;
+
+  const footerRuleY = labelY - 6;
+  drawBlueRule(footerRuleY);
+
+  doc.setFontSize(9);
+  doc.setTextColor(...TEXT_GREY);
+  doc.text(labelStr, margin, labelY);
+  const labelW = doc.getTextWidth(labelStr);
+  doc.setDrawColor(...LINE_GREY);
+  doc.setLineWidth(0.25);
+  doc.line(margin + labelW + 2, labelY + 0.9, pageW - margin, labelY + 0.9);
+
   if (drSignName) {
+    doc.setTextColor(0, 0, 0);
     doc.setFontSize(9);
-    const signLines = doc.splitTextToSize(drSignName, contentW);
-    doc.text(signLines, margin, y);
-    y += signLines.length * 4.1;
+    doc.text(signLines, margin, nameFirstBaseline);
   }
 
   doc.setFontSize(7);
   doc.setTextColor(130);
-  doc.text(`Prescription ref: ${rx._id}`, margin, Math.min(y + 4, pageH - 10));
+  doc.text(`Prescription ref: ${rx._id}`, pageW - margin, refBaseline, {
+    align: "right",
+    maxWidth: 100,
+  });
 
-  const safeName = (rx.patientName || "prescription")
-    .replace(/[^\w\s-]/g, "")
-    .slice(0, 40);
-  doc.save(`prescription-report-${safeName}-${rx._id.slice(-8)}.pdf`);
+  const idSuffix =
+    rx._id && typeof rx._id === "string" && rx._id.length >= 8
+      ? rx._id.slice(-8)
+      : "export";
+  const rawName = (rx.patientName || "prescription").trim() || "prescription";
+  const safeName = rawName.replace(/[^\w\s-]/g, "").trim() || "prescription";
+  doc.save(`prescription-report-${safeName}-${idSuffix}.pdf`);
+  } catch (err) {
+    console.error("Prescription PDF generation failed:", err);
+    const detail =
+      err instanceof Error ? err.message : "Unexpected error while building PDF.";
+    showError(
+      "Download failed",
+      `${detail} If your disk is full, free space and try again.`,
+    );
+  }
 }
 
 export function downloadPrescriptionPdf(rx: Prescription): void {
