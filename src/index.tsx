@@ -22,6 +22,7 @@ import { Payment } from "./screens/Payment";
 import { HospitalProvider } from "./contexts/HospitalProvider";
 import { PrescriptionProvider } from "./contexts/PrescriptionProvider";
 import { PublicPrescription } from "./screens/PublicPrescription";
+import { PublicTelecaller } from "./screens/PublicTelecaller";
 import { ensureWhatsAppEmbeddedSignupListener } from "./lib/whatsappConnect";
 
 declare global {
@@ -123,6 +124,7 @@ createRoot(document.getElementById("app") as HTMLElement).render(
           path="/public/prescriptions/:prescriptionId"
           element={<PublicPrescription />}
         />
+        <Route path="/telecaller/:patientId" element={<PublicTelecaller />} />
         <Route path="*" element={<AuthenticatedApp />} />
       </Routes>
     </BrowserRouter>

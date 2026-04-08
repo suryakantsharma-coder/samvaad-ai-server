@@ -4,7 +4,6 @@ import type {
   PrescriptionDoctorInfo,
   PrescriptionHospital,
   PrescriptionMedicine,
-  PrescriptionPatientInfo,
 } from "../types/prescription.type";
 
 export function decodeHtmlEntities(s: string): string {
@@ -12,12 +11,6 @@ export function decodeHtmlEntities(s: string): string {
   const ta = document.createElement("textarea");
   ta.innerHTML = s;
   return ta.value;
-}
-
-function isPatientInfo(
-  p: Prescription["patient"],
-): p is PrescriptionPatientInfo {
-  return typeof p === "object" && p !== null && "fullName" in p;
 }
 
 export function isAppointmentDetail(
@@ -33,8 +26,71 @@ export function getHospital(
 }
 
 export function getPatientDisplayName(rx: Prescription): string {
-  if (isPatientInfo(rx.patient)) return rx.patient.fullName;
-  return rx.patientName ?? "—";
+  if (typeof rx.patient === "object" && rx.patient !== null) {
+    const o = rx.patient as Record<string, unknown>;
+    const fromFull =
+      typeof o.fullName === "string" ? o.fullName.trim() : "";
+    const fromName = typeof o.name === "string" ? o.name.trim() : "";
+    if (fromFull) return fromFull;
+    if (fromName) return fromName;
+  }
+  return rx.patientName?.trim() || "—";
+}
+
+type LooseDemographics = { age?: unknown; gender?: unknown };
+
+function readAgeFromRecord(o: Record<string, unknown>): string | null {
+  const v = o.age ?? o.Age;
+  if (v == null) return null;
+  if (typeof v === "number" && !Number.isNaN(v)) return String(v);
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v.trim());
+    if (!Number.isNaN(n)) return String(n);
+  }
+  return null;
+}
+
+function readGenderFromRecord(o: Record<string, unknown>): string | null {
+  const v = o.gender ?? o.Gender;
+  if (typeof v === "string" && v.trim()) return v.trim();
+  return null;
+}
+
+/** Age for PDF: nested `patient` object (any shape), `patientAge`, or loose `age` */
+export function getPatientAgeForPdf(rx: Prescription): string {
+  if (typeof rx.patient === "object" && rx.patient !== null) {
+    const fromNested = readAgeFromRecord(rx.patient as Record<string, unknown>);
+    if (fromNested) return fromNested;
+  }
+  if (rx.patientAge != null && !Number.isNaN(Number(rx.patientAge))) {
+    return String(Number(rx.patientAge));
+  }
+  const loose = rx as Prescription & LooseDemographics;
+  if (typeof loose.age === "number" && !Number.isNaN(loose.age)) {
+    return String(loose.age);
+  }
+  if (typeof loose.age === "string" && loose.age.trim() !== "") {
+    const n = Number(loose.age.trim());
+    if (!Number.isNaN(n)) return String(n);
+  }
+  return "—";
+}
+
+/** Gender for PDF: nested `patient`, `patientGender`, or loose `gender` */
+export function getPatientGenderForPdf(rx: Prescription): string {
+  if (typeof rx.patient === "object" && rx.patient !== null) {
+    const fromNested = readGenderFromRecord(
+      rx.patient as Record<string, unknown>,
+    );
+    if (fromNested) return fromNested;
+  }
+  const root = rx.patientGender?.trim();
+  if (root) return root;
+  const loose = rx as Prescription & LooseDemographics;
+  if (typeof loose.gender === "string" && loose.gender.trim()) {
+    return loose.gender.trim();
+  }
+  return "—";
 }
 
 export function getDiagnosis(rx: Prescription): string {
@@ -59,11 +115,28 @@ export function formatHospitalAddress(h: PrescriptionHospital): string {
   return parts.join("\n") || "—";
 }
 
+/** Minimum digits required to show a phone line (avoids lone +91 / empty). */
+const MIN_PHONE_DIGITS = 7;
+
+function digitCount(...chunks: (string | undefined)[]): number {
+  return chunks.filter(Boolean).join("").replace(/\D/g, "").length;
+}
+
+/** True when the string has enough digits to display as a phone number. */
+export function hasMeaningfulPhoneDigits(
+  raw: string | undefined | null,
+): boolean {
+  return digitCount(raw) >= MIN_PHONE_DIGITS;
+}
+
+/** Formatted hospital contact, or empty string when no usable number (no "—", no lone country code). */
 export function formatHospitalPhone(h: PrescriptionHospital): string {
   const cc = h.phoneCountryCode?.trim() ?? "";
   const num = h.phoneNumber?.trim() ?? "";
+  if (digitCount(cc, num) < MIN_PHONE_DIGITS) return "";
   if (cc && num) return `${cc} ${num}`;
-  return num || "—";
+  if (num) return num;
+  return "";
 }
 
 export function buildMedicineFrequencyLine(m: PrescriptionMedicine): string {

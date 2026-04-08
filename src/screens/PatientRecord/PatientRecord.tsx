@@ -1,14 +1,12 @@
 import {
   ArrowLeft,
-  Building2,
   Calendar,
   Eye,
   FileText,
   RefreshCw,
   User,
-  Video,
-  PhoneCallIcon,
 } from "lucide-react";
+import { AppointmentTypeIcon } from "../../components/appointments/AppointmentTypeIcon";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { getPatientHistory } from "../../data/history";
@@ -283,13 +281,12 @@ export const PatientRecord = (): JSX.Element => {
                             {formatAppointmentDate(apt.appointmentDateTime)} |{" "}
                             {formatTime12h(apt.appointmentDateTime)}
                           </p>
-                          <span className="inline-flex items-center gap-[5px] px-[10px] py-[6px] rounded-full bg-[#DFFFF3] text-[#00955C] font-title-4r text-xs">
-                            {apt.type === "Hospital" ? (
-                              <Building2 className="h-3.5 w-3.5" />
-                            ) : (
-                              <PhoneCallIcon className="h-3.5 w-3.5" />
-                            )}
-                            {apt.type || "Hospital"}
+                          <span className="inline-flex items-center gap-[5px] px-[10px] py-[6px] rounded-full bg-[#DFFFF3] text-[#00955C] font-title-4r text-xs capitalize">
+                            <AppointmentTypeIcon
+                              type={apt.type}
+                              className="h-3.5 w-3.5 shrink-0"
+                            />
+                            {apt.type || "—"}
                           </span>
                         </div>
 
@@ -298,14 +295,6 @@ export const PatientRecord = (): JSX.Element => {
                             Reason: {apt.reason || "—"}
                           </p>
                           <div className="w-[28%] flex items-center justify-end gap-2">
-                            {/* <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary-2 text-white font-title-4r text-xs">
-                              {apt.type === "Hospital" ? (
-                                <Building2 className="h-3.5 w-3.5" />
-                              ) : (
-                                <Video className="h-3.5 w-3.5" />
-                              )}
-                              {apt.type || "Hospital"}
-                            </span> */}
                             <button
                               type="button"
                               className="inline-flex items-center gap-1.5 h-8 rounded-[6px] text-[14px] text-[#333333] hover:text-primary-2 hover:bg-primary-2/10 cursor-pointer transition-colors focus:outline-none"

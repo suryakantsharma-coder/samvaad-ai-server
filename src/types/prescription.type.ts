@@ -21,6 +21,9 @@ export interface PrescriptionPatientInfo {
   patientId?: string;
   fullName: string;
   phoneNumber?: string;
+  /** When API populates patient on prescription detail */
+  age?: number;
+  gender?: string;
 }
 
 /** Populated doctor on appointment / medicine */
@@ -94,6 +97,9 @@ export interface Prescription {
   updatedAt?: string;
   hospital?: PrescriptionHospital;
   notes?: string;
+  /** When API sends demographics at prescription root (PDF falls back if patient is an id) */
+  patientAge?: number;
+  patientGender?: string;
 }
 
 export interface CreatePrescriptionPayload {

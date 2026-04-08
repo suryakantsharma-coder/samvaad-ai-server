@@ -8,11 +8,13 @@ export interface AppointmentListParams {
   page: number;
   limit: number;
   filter?: "all" | "today" | "tomorrow";
+  sortOrder?: "asc" | "desc";
   fromDate?: string;
   toDate?: string;
   doctorId?: string;
   patientId?: string;
   status?: string;
+  type?: string;
 }
 
 export const getAppointments = async (params: AppointmentListParams) => {
@@ -22,11 +24,13 @@ export const getAppointments = async (params: AppointmentListParams) => {
   if (params.filter && params.filter !== "all") {
     search.set("filter", params.filter);
   }
+  if (params.sortOrder) search.set("sortOrder", params.sortOrder);
   if (params.fromDate) search.set("fromDate", params.fromDate);
   if (params.toDate) search.set("toDate", params.toDate);
   if (params.doctorId) search.set("doctorId", params.doctorId);
   if (params.patientId) search.set("patientId", params.patientId);
   if (params.status) search.set("status", params.status);
+  if (params.type) search.set("type", params.type);
 
   return authFetch(`/api/appointments?${search.toString()}`, {
     method: "GET",

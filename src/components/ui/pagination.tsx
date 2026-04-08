@@ -13,9 +13,7 @@ export const Pagination = ({
   totalPages,
   onPageChange,
   disabled = false,
-}: PaginationProps): JSX.Element | null => {
-  if (totalPages <= 1) return null;
-
+}: PaginationProps): JSX.Element => {
   const canPrev = currentPage > 1;
   const canNext = currentPage < totalPages;
 

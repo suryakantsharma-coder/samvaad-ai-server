@@ -1,10 +1,9 @@
 import {
-  Filter as FilterIcon,
-  Phone as PhoneIcon,
+  PhoneCall as PhoneCallIcon,
   Search as SearchIcon,
-  Video as VideoIcon,
   MoreVertical as ThreeDotsVerticalIcon,
 } from "lucide-react";
+import { AppointmentTypeIcon } from "../../../../components/appointments/AppointmentTypeIcon";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "../../../../components/ui/badge";
 import { Button } from "../../../../components/ui/button";
@@ -55,6 +54,21 @@ const statusColorMap = (status: string) => {
   }
 };
 
+function getMeetingUrl(appointment: Appointments): string | null {
+  const record = appointment as Appointments & Record<string, unknown>;
+  const candidates = [
+    record.videoUrl,
+    record.meetUrl,
+    record.zoomUrl,
+    record.meetingUrl,
+    record.joinUrl,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim()) return c.trim();
+  }
+  return null;
+}
+
 export const AppointmentListSection = ({
   onCancelAppointment,
   onRescheduleAppointment,
@@ -65,10 +79,20 @@ export const AppointmentListSection = ({
   onMarkAsDoneAppointment: (appointment: Appointments) => void;
 }): JSX.Element => {
   const [activeTab, setActiveTab] = useState<"all" | "today" | "tomorrow">(
-    "all",
+    "today",
   );
   const [statusFilter, setStatusFilter] = useState<
     "all" | "today" | "upcoming" | "completed" | "cancelled"
+  >("upcoming");
+  const [typeFilter, setTypeFilter] = useState<
+    | "all"
+    | "checkup"
+    | "consultation"
+    | "emergency"
+    | "other"
+    | "hospital"
+    | "zoom"
+    | "video_call"
   >("all");
   const [searchQuery, setSearchQuery] = useState("");
   const {
@@ -100,11 +124,15 @@ export const AppointmentListSection = ({
       statusFilter === "all"
         ? undefined
         : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1);
+    const typeForApi = typeFilter === "all" ? undefined : typeFilter;
+    const sortOrderForApi = activeTab === "all" ? "desc" : undefined;
     handleGetAppointments(1, limit, {
       filter: activeTab,
+      sortOrder: sortOrderForApi,
       status: statusForApi,
+      type: typeForApi,
     });
-  }, [activeTab, statusFilter]);
+  }, [activeTab, statusFilter, typeFilter]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -127,21 +155,27 @@ export const AppointmentListSection = ({
 
   const filteredAppointments = useMemo(() => {
     return (appointments ?? []).filter((appointment: Appointments) => {
-      if (statusFilter === "all") {
-        return true;
-      }
-      return appointment.status.toLowerCase() === statusFilter.toLowerCase();
+      const statusMatch =
+        statusFilter === "all" ||
+        appointment.status.toLowerCase() === statusFilter.toLowerCase();
+      const typeMatch =
+        typeFilter === "all" ||
+        appointment.type.toLowerCase() === typeFilter.toLowerCase();
+      return statusMatch && typeMatch;
     });
-  }, [appointments, statusFilter]);
+  }, [appointments, statusFilter, typeFilter]);
 
   const filteredSearchedAppointments = useMemo(() => {
     return (searchedAppointments ?? []).filter((appointment: Appointments) => {
-      if (statusFilter === "all") {
-        return true;
-      }
-      return appointment.status.toLowerCase() === statusFilter.toLowerCase();
+      const statusMatch =
+        statusFilter === "all" ||
+        appointment.status.toLowerCase() === statusFilter.toLowerCase();
+      const typeMatch =
+        typeFilter === "all" ||
+        appointment.type.toLowerCase() === typeFilter.toLowerCase();
+      return statusMatch && typeMatch;
     });
-  }, [searchedAppointments, statusFilter]);
+  }, [searchedAppointments, statusFilter, typeFilter]);
 
   const listToShow = useMemo(() => {
     if (searchQuery.trim() === "") {
@@ -150,7 +184,8 @@ export const AppointmentListSection = ({
     return filteredSearchedAppointments;
   }, [filteredAppointments, filteredSearchedAppointments, searchQuery]);
 
-  const showLoading = loading;
+  // During debounced search, keep table visible and avoid full-page loader flicker.
+  const showLoading = loading && searchQuery.trim() === "";
   const showError = error && !loading;
 
   if (showLoading) {
@@ -213,7 +248,7 @@ export const AppointmentListSection = ({
               }
             }}
           >
-            <SelectTrigger className="flex w-[107px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
+            <SelectTrigger className="flex w-[120px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -225,7 +260,39 @@ export const AppointmentListSection = ({
             </SelectContent>
           </Select>
 
-          <Button
+          <Select
+            value={typeFilter}
+            onValueChange={(value) => {
+              if (
+                value === "all" ||
+                value === "checkup" ||
+                value === "consultation" ||
+                value === "emergency" ||
+                value === "other" ||
+                value === "hospital" ||
+                value === "zoom" ||
+                value === "video_call"
+              ) {
+                setTypeFilter(value);
+              }
+            }}
+          >
+            <SelectTrigger className="flex w-[120px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="checkup">Checkup</SelectItem>
+              <SelectItem value="consultation">Consultation</SelectItem>
+              <SelectItem value="emergency">Emergency</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
+              <SelectItem value="hospital">Hospital</SelectItem>
+              <SelectItem value="zoom">Zoom</SelectItem>
+              <SelectItem value="video_call">Video Call</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* <Button
             variant="ghost"
             className="inline-flex items-center gap-[5px] px-2.5 py-1.5 bg-grey-light rounded-[100px] hover:bg-grey-light"
           >
@@ -233,7 +300,7 @@ export const AppointmentListSection = ({
             <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
               Filter
             </span>
-          </Button>
+          </Button> */}
         </div>
       </div>
 
@@ -293,7 +360,7 @@ export const AppointmentListSection = ({
                     </TableCell>
                     <TableCell className="p-[0px]">
                       <div className="inline-flex items-center gap-[5px]">
-                        <PhoneIcon className="w-4 h-4" />
+                        <PhoneCallIcon className="w-4 h-4" />
                         <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
                           {typeof appointment.patient === "object" &&
                           appointment.patient !== null
@@ -329,16 +396,11 @@ export const AppointmentListSection = ({
                     </TableCell>
                     <TableCell className="p-[0px]">
                       <div className="inline-flex items-center gap-2.5 px-[20px] py-[16px]">
-                        {appointment.type === "Hospital" ? (
-                          <img
-                            src="/pill.svg"
-                            alt="Hospital"
-                            className="w-4 h-4"
-                          />
-                        ) : (
-                          <VideoIcon className="w-4 h-4" />
-                        )}
-                        <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                        <AppointmentTypeIcon
+                          type={appointment.type}
+                          className="w-4 h-4 shrink-0 text-[#57575f]"
+                        />
+                        <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)] capitalize">
                           {appointment.type}
                         </span>
                       </div>
@@ -367,6 +429,19 @@ export const AppointmentListSection = ({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          {(appointment.type?.toLowerCase() === "zoom" ||
+                            appointment.type?.toLowerCase() === "video_call") && (
+                            <DropdownMenuItem
+                              onClick={() => {
+                                const url = getMeetingUrl(appointment);
+                                if (!url) return;
+                                window.open(url, "_blank", "noopener,noreferrer");
+                              }}
+                              disabled={!getMeetingUrl(appointment)}
+                            >
+                              Join meet
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem
                             onClick={() => onRescheduleAppointment(appointment)}
                           >
@@ -396,9 +471,20 @@ export const AppointmentListSection = ({
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          onPageChange={(page) =>
-            handleGetAppointments(page, limit, { filter: activeTab })
-          }
+          onPageChange={(page) => {
+            const statusForApi =
+              statusFilter === "all"
+                ? undefined
+                : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1);
+            const typeForApi = typeFilter === "all" ? undefined : typeFilter;
+            const sortOrderForApi = activeTab === "all" ? "desc" : undefined;
+            handleGetAppointments(page, limit, {
+              filter: activeTab,
+              sortOrder: sortOrderForApi,
+              status: statusForApi,
+              type: typeForApi,
+            });
+          }}
           disabled={loading}
         />
       )}

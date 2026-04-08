@@ -29,11 +29,13 @@ export interface AppointmentOverall {
 
 interface AppointmentListOptions {
   filter?: "all" | "today" | "tomorrow";
+  sortOrder?: "asc" | "desc";
   fromDate?: string;
   toDate?: string;
   doctorId?: string;
   patientId?: string;
   status?: string;
+  type?: string;
 }
 
 interface AppointmentContextType {
@@ -95,11 +97,13 @@ export const AppointmentProvider = ({
         page,
         limit,
         filter,
+        sortOrder: options?.sortOrder,
         fromDate: options?.fromDate,
         toDate: options?.toDate,
         doctorId: options?.doctorId,
         patientId: options?.patientId,
         status: options?.status,
+        type: options?.type,
       });
       setAppointments(response.data?.appointments ?? []);
       const nextCounts = response.data?.counts;

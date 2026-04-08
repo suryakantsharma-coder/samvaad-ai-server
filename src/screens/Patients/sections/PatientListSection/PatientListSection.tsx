@@ -1,7 +1,7 @@
 import {
   FilterIcon,
   MoreVerticalIcon,
-  PhoneIcon,
+  PhoneCall as PhoneCallIcon,
   SearchIcon,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
@@ -388,7 +388,7 @@ export const PatientListSection = ({
                 </TableCell>
                 <TableCell className="p-[0px]">
                   <div className="inline-flex items-center gap-[5px] px-[20px] py-[15px]">
-                    <PhoneIcon className="w-4 h-4" />
+                    <PhoneCallIcon className="w-4 h-4" />
                     <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
                       {patient.phoneNumber}
                     </span>

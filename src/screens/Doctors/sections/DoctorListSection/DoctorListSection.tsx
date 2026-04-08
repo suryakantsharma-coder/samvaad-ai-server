@@ -2,7 +2,7 @@ import {
   Filter as FilterIcon,
   Mail as MailIcon,
   MoreVertical as MoreVerticalIcon,
-  Phone as PhoneIcon,
+  PhoneCall as PhoneCallIcon,
   Search as SearchIcon,
 } from "lucide-react";
 import React, { useState, useEffect } from "react";
@@ -250,7 +250,7 @@ export const DoctorListSection = ({
                 </TableCell>
                 <TableCell className="p-[0px]">
                   <div className="inline-flex items-center gap-[5px] px-[20px] py-[16px]">
-                    <PhoneIcon className="w-4 h-4" />
+                    <PhoneCallIcon className="w-4 h-4" />
                     <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
                       {doctor.phoneNumber}
                     </span>

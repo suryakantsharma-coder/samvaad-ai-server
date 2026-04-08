@@ -94,6 +94,7 @@ export const PrescriptionListSection = ({
   onPrescriptionReport?: (prescription: Prescription) => void;
 }): JSX.Element => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchPage, setSearchPage] = useState(1);
   const {
     prescriptions,
     searchedPrescriptions,
@@ -107,10 +108,12 @@ export const PrescriptionListSection = ({
     resetSearchedPrescriptions,
   } = usePrescription();
 
-  const listToShow =
-    searchQuery.trim() === ""
-      ? prescriptions
-      : searchedPrescriptions ?? [];
+  const isSearching = searchQuery.trim() !== "";
+  const listToShow = isSearching ? searchedPrescriptions ?? [] : prescriptions;
+  const searchTotalPages = Math.max(1, Math.ceil(listToShow.length / limit));
+  const pagedSearchList = isSearching
+    ? listToShow.slice((searchPage - 1) * limit, searchPage * limit)
+    : listToShow;
 
   useEffect(() => {
     handleGetPrescriptions(1, limit);
@@ -119,8 +122,10 @@ export const PrescriptionListSection = ({
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchQuery.trim()) {
+        setSearchPage(1);
         handleSearchPrescriptions(searchQuery);
       } else {
+        setSearchPage(1);
         resetSearchedPrescriptions();
       }
     }, 300);
@@ -201,7 +206,7 @@ export const PrescriptionListSection = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {listToShow.map((prescription) => (
+                {pagedSearchList.map((prescription) => (
                   <TableRow
                     key={prescription._id}
                     className="border-b border-[#dedee1] hover:bg-grey-light/50"
@@ -300,14 +305,14 @@ export const PrescriptionListSection = ({
           </div>
         </div>
       </div>
-      {searchQuery.trim() === "" && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={(page) => handleGetPrescriptions(page, limit)}
-          disabled={loading}
-        />
-      )}
+      <Pagination
+        currentPage={isSearching ? searchPage : currentPage}
+        totalPages={isSearching ? searchTotalPages : totalPages}
+        onPageChange={(page) =>
+          isSearching ? setSearchPage(page) : handleGetPrescriptions(page, limit)
+        }
+        disabled={loading}
+      />
     </section>
   );
 };

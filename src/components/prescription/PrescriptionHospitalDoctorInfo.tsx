@@ -1,10 +1,11 @@
-import { Building2, Mail, Phone, Stethoscope } from "lucide-react";
+import { Building2, Mail, PhoneCall, Stethoscope } from "lucide-react";
 import {
   decodeHtmlEntities,
   getDoctor,
   getHospital,
   formatHospitalAddress,
   formatHospitalPhone,
+  hasMeaningfulPhoneDigits,
 } from "../../lib/prescriptionMeta";
 import type { Prescription } from "../../types/prescription.type";
 
@@ -20,6 +21,7 @@ export const PrescriptionHospitalDoctorInfo = ({
 }: PrescriptionHospitalDoctorInfoProps): JSX.Element | null => {
   const hospital = getHospital(prescription);
   const doctor = getDoctor(prescription);
+  const hospitalPhone = hospital ? formatHospitalPhone(hospital) : "";
 
   if (!hospital && !doctor) return null;
 
@@ -37,18 +39,22 @@ export const PrescriptionHospitalDoctorInfo = ({
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-              <span className="inline-flex items-center gap-1.5 font-title-4r text-black">
-                <Phone className="h-3.5 w-3.5 text-x-70 shrink-0" />
-                {formatHospitalPhone(hospital)}
-              </span>
-              {hospital.email ? (
-                <span className="inline-flex items-center gap-1.5 font-title-4r text-black min-w-0">
-                  <Mail className="h-3.5 w-3.5 text-x-70 shrink-0" />
-                  <span className="truncate">{hospital.email}</span>
-                </span>
-              ) : null}
-            </div>
+            {hospitalPhone || hospital.email ? (
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                {hospitalPhone ? (
+                  <span className="inline-flex items-center gap-1.5 font-title-4r text-black">
+                    <PhoneCall className="h-3.5 w-3.5 text-x-70 shrink-0" />
+                    {hospitalPhone}
+                  </span>
+                ) : null}
+                {hospital.email ? (
+                  <span className="inline-flex items-center gap-1.5 font-title-4r text-black min-w-0">
+                    <Mail className="h-3.5 w-3.5 text-x-70 shrink-0" />
+                    <span className="truncate">{hospital.email}</span>
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
             {hospital.registrationNumber ? (
               <p className="font-title-4r text-x-70 text-xs">
                 Registration: {hospital.registrationNumber}
@@ -77,20 +83,22 @@ export const PrescriptionHospitalDoctorInfo = ({
                   {decodeHtmlEntities(doctor.designation)}
                 </p>
               ) : null}
-              <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm pt-1">
-                {doctor.phoneNumber ? (
-                  <span className="inline-flex items-center gap-1 font-title-4r text-black">
-                    <Phone className="h-3.5 w-3.5 text-x-70" />
-                    {decodeHtmlEntities(doctor.phoneNumber)}
-                  </span>
-                ) : null}
-                {doctor.email ? (
-                  <span className="inline-flex items-center gap-1 font-title-4r text-black min-w-0">
-                    <Mail className="h-3.5 w-3.5 text-x-70 shrink-0" />
-                    <span className="truncate">{doctor.email}</span>
-                  </span>
-                ) : null}
-              </div>
+              {hasMeaningfulPhoneDigits(doctor.phoneNumber) || doctor.email ? (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm pt-1">
+                  {hasMeaningfulPhoneDigits(doctor.phoneNumber) ? (
+                    <span className="inline-flex items-center gap-1 font-title-4r text-black">
+                      <PhoneCall className="h-3.5 w-3.5 text-x-70" />
+                      {decodeHtmlEntities(doctor.phoneNumber ?? "")}
+                    </span>
+                  ) : null}
+                  {doctor.email ? (
+                    <span className="inline-flex items-center gap-1 font-title-4r text-black min-w-0">
+                      <Mail className="h-3.5 w-3.5 text-x-70 shrink-0" />
+                      <span className="truncate">{doctor.email}</span>
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
