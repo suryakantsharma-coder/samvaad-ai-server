@@ -17,6 +17,9 @@ import {
 import { resolvePrescriptionDemographicsForPdf } from "./resolvePrescriptionForPdf";
 import { showError } from "./toast";
 
+/** ~10px at 96dpi → mm (extra space above doctor signature vs blue rule). */
+const SIGNATURE_RULE_TOP_EXTRA_MM = (10 * 25.4) / 96;
+
 /** ~4px at 96dpi → mm (extra vertical breathing room in header). */
 const HEADER_EXTRA_V_MM = (4 * 25.4) / 96;
 /** jsPDF default lineHeightFactor is ~1.15; bump so wrapped header lines match taller pitch. */
@@ -182,7 +185,7 @@ export async function downloadPrescriptionReportPdf(
   const medLeft = margin + 22;
   const medW = pageW - medLeft - margin;
   /** Space reserved at bottom for signature block + ref (keep meds out of this zone). */
-  const footerReservedMm = 48;
+  const footerReservedMm = 48 + SIGNATURE_RULE_TOP_EXTRA_MM;
   const contentBottomY = pageH - footerReservedMm;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
@@ -239,7 +242,8 @@ export async function downloadPrescriptionReportPdf(
   const labelStr = "Doctor's Signature:";
   const labelY = nameFirstBaseline - 8;
 
-  const footerRuleY = labelY - 6;
+  /** Distance from blue rule down to signature label baseline (~6mm + ~10px). */
+  const footerRuleY = labelY - (6 + SIGNATURE_RULE_TOP_EXTRA_MM);
   drawBlueRule(footerRuleY);
 
   doc.setFontSize(9);
