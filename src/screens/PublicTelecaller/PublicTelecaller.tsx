@@ -26,6 +26,7 @@ type DoctorLite = {
   fullName: string;
   designation?: string;
   availability?: string;
+  email?: string;
 };
 
 declare global {
@@ -86,6 +87,22 @@ function buildTimeSlotsFromAvailability(availability?: string): string[] {
 /** Send appointment datetime explicitly in IST offset. */
 function toIstDateTime(date: string, time: string): string {
   return `${date}T${time}:00+05:30`;
+}
+
+/** Display "HH:MM" (24h) as "h:mm AM/PM" for the time select. */
+function formatTimeHhMmTo12Hour(hhmm: string): string {
+  const m = hhmm.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return hhmm;
+  const h24 = Number(m[1]);
+  const minutes = m[2];
+  if (Number.isNaN(h24) || h24 < 0 || h24 > 23) return hhmm;
+  const period = h24 >= 12 ? "PM" : "AM";
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${minutes} ${period}`;
+}
+
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 async function ensureRazorpayLoaded(): Promise<boolean> {
@@ -265,6 +282,7 @@ export const PublicTelecaller = (): JSX.Element => {
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
   const [visitReason, setVisitReason] = useState("");
+  const [email, setEmail] = useState("");
   const [failureToast, setFailureToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -319,6 +337,7 @@ export const PublicTelecaller = (): JSX.Element => {
               typeof x.designation === "string" ? x.designation : undefined,
             availability:
               typeof x.availability === "string" ? x.availability : undefined,
+            email: typeof x.email === "string" ? x.email : undefined,
           }))
           .filter((x) => x._id && x.fullName);
         setDoctors(mapped);
@@ -333,10 +352,12 @@ export const PublicTelecaller = (): JSX.Element => {
 
   useEffect(() => {
     if (!details) return;
-    if (!visitReason.trim()) {
-      const reason = details.lastAppointment?.reason?.trim();
-      if (reason) setVisitReason(reason);
-    }
+    const reason = details.lastAppointment?.reason?.trim();
+    if (reason) setVisitReason(reason);
+  }, [details?.patient?._id]);
+
+  useEffect(() => {
+    if (!details) return;
     if (!selectedDoctorId) {
       const lastDoctorId = details.lastAppointment?.doctorId?.trim();
       if (lastDoctorId) {
@@ -359,7 +380,7 @@ export const PublicTelecaller = (): JSX.Element => {
         setSelectedDoctorId(doctors[0]._id);
       }
     }
-  }, [details, doctors, selectedDoctorId, visitReason]);
+  }, [details, doctors, selectedDoctorId]);
 
   const availableTimes = useMemo(
     () => buildTimeSlotsFromAvailability(selectedDoctor?.availability),
@@ -367,6 +388,8 @@ export const PublicTelecaller = (): JSX.Element => {
   );
 
   const amountLabel = useMemo(() => `₹${TELECALLER_AMOUNT_INR}`, []);
+  const normalizedEmail = email.trim().toLowerCase();
+  const hasValidEmail = isValidEmail(normalizedEmail);
 
   useEffect(() => {
     if (!failureToast) return;
@@ -383,6 +406,14 @@ export const PublicTelecaller = (): JSX.Element => {
     }
     if (!visitReason.trim()) {
       setError("Please enter reason for visit before payment.");
+      return;
+    }
+    if (!normalizedEmail) {
+      setError("Email ID is required before payment.");
+      return;
+    }
+    if (!hasValidEmail) {
+      setError("Please enter a valid email ID before payment.");
       return;
     }
     setError(null);
@@ -402,6 +433,8 @@ export const PublicTelecaller = (): JSX.Element => {
           patient: details.patient._id,
           doctor: selectedDoctorId,
           reason: visitReason.trim(),
+          patientEmail: normalizedEmail,
+          docotrEmail: selectedDoctor?.email ?? "",
           appointmentDateTime: toIstDateTime(selectedDate, selectedTime),
           hospitalId: details.hospitalId ?? details.hospital?._id ?? "",
           videoUrl: details.appointmentId
@@ -427,10 +460,14 @@ export const PublicTelecaller = (): JSX.Element => {
         prefill: {
           name: details.patient.fullName,
           contact: details.patient.phoneNumber,
+          email: normalizedEmail,
         },
         notes: {
           patientId: details.patient._id,
           patientName: details.patient.fullName,
+          patientEmail: normalizedEmail,
+          docotrEmail: selectedDoctor?.email ?? "",
+          reason: visitReason.trim(),
           bookingType: "telecaller",
         },
         theme: { color: "#0ea5e9" },
@@ -556,12 +593,52 @@ export const PublicTelecaller = (): JSX.Element => {
                 </div>
 
                 <div className="rounded-[10px] border border-[#dedee1] p-4 space-y-2">
-                  <label className="font-title-4m text-x-70 text-sm">
+                  <label
+                    htmlFor="patient-email"
+                    className="font-title-4m text-x-70 text-sm"
+                  >
+                    Email ID <span className="text-[#dc2626]">*</span>
+                  </label>
+                  <input
+                    id="patient-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter email ID"
+                    className="h-10 w-full rounded-[8px] border border-[#dedee1] px-3 text-sm bg-white"
+                  />
+                  <p className="font-title-5r text-[#b45309]">
+                    This email is very crucial because it is required to join
+                    the meeting.
+                  </p>
+                  {email.trim() && !hasValidEmail && (
+                    <p className="font-title-5r text-[#dc2626]">
+                      Please enter a valid email ID.
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-[10px] border border-[#dedee1] p-4 space-y-2">
+                  <label
+                    htmlFor="visit-reason"
+                    className="font-title-4m text-x-70 text-sm"
+                  >
                     Disease / Reason for visit
                   </label>
-                  <div className="w-full rounded-[8px] border border-[#dedee1] px-3 py-2 text-sm bg-[#f8fafc] text-black/90 min-h-12">
-                    {visitReason || "—"}
-                  </div>
+                  <textarea
+                    id="visit-reason"
+                    value={visitReason}
+                    onChange={(e) => setVisitReason(e.target.value)}
+                    onBlur={() => {
+                      if (!details) return;
+                      if (visitReason.trim()) return;
+                      const reason = details.lastAppointment?.reason?.trim();
+                      if (reason) setVisitReason(reason);
+                    }}
+                    placeholder="Enter disease or reason for visit"
+                    rows={3}
+                    className="w-full rounded-[8px] border border-[#dedee1] px-3 py-2 text-sm bg-white text-black/90 resize-y"
+                  />
                 </div>
 
                 <div className="rounded-[10px] border border-[#dedee1] p-4 flex items-center justify-between gap-4">
@@ -590,14 +667,14 @@ export const PublicTelecaller = (): JSX.Element => {
                         value={selectedTime}
                         onChange={(e) => setSelectedTime(e.target.value)}
                         disabled={!selectedDoctorId}
-                        className="h-10 min-w-[130px] rounded-[8px] border border-[#dedee1] px-3 text-sm bg-white disabled:opacity-60"
+                        className="h-10 min-w-[150px] rounded-[8px] border border-[#dedee1] px-3 text-sm bg-white disabled:opacity-60"
                       >
                         <option value="">
                           {selectedDoctorId ? "Select time" : "Pick doctor first"}
                         </option>
                         {availableTimes.map((slot) => (
                           <option key={slot} value={slot}>
-                            {slot}
+                            {formatTimeHhMmTo12Hour(slot)}
                           </option>
                         ))}
                       </select>
@@ -618,7 +695,8 @@ export const PublicTelecaller = (): JSX.Element => {
                         !selectedDoctorId ||
                         !selectedDate ||
                         !selectedTime ||
-                        !visitReason.trim()
+                        !visitReason.trim() ||
+                        !hasValidEmail
                       }
                     >
                       {paying ? (

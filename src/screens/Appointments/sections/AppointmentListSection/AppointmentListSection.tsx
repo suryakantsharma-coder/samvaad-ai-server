@@ -58,6 +58,7 @@ function getMeetingUrl(appointment: Appointments): string | null {
   const record = appointment as Appointments & Record<string, unknown>;
   const candidates = [
     record.videoUrl,
+    record.video_url,
     record.meetUrl,
     record.zoomUrl,
     record.meetingUrl,
@@ -67,6 +68,15 @@ function getMeetingUrl(appointment: Appointments): string | null {
     if (typeof c === "string" && c.trim()) return c.trim();
   }
   return null;
+}
+
+function normalizeAppointmentType(type: string): string {
+  return type.trim().toLowerCase().replace(/_/g, "-");
+}
+
+function isTeleCallerType(type: string | undefined | null): boolean {
+  const t = normalizeAppointmentType(type ?? "");
+  return t === "tele-caller" || t === "telecaller";
 }
 
 export const AppointmentListSection = ({
@@ -93,6 +103,7 @@ export const AppointmentListSection = ({
     | "hospital"
     | "zoom"
     | "video_call"
+    | "tele-caller"
   >("all");
   const [searchQuery, setSearchQuery] = useState("");
   const {
@@ -160,7 +171,8 @@ export const AppointmentListSection = ({
         appointment.status.toLowerCase() === statusFilter.toLowerCase();
       const typeMatch =
         typeFilter === "all" ||
-        appointment.type.toLowerCase() === typeFilter.toLowerCase();
+        normalizeAppointmentType(appointment.type) ===
+          normalizeAppointmentType(typeFilter);
       return statusMatch && typeMatch;
     });
   }, [appointments, statusFilter, typeFilter]);
@@ -172,7 +184,8 @@ export const AppointmentListSection = ({
         appointment.status.toLowerCase() === statusFilter.toLowerCase();
       const typeMatch =
         typeFilter === "all" ||
-        appointment.type.toLowerCase() === typeFilter.toLowerCase();
+        normalizeAppointmentType(appointment.type) ===
+          normalizeAppointmentType(typeFilter);
       return statusMatch && typeMatch;
     });
   }, [searchedAppointments, statusFilter, typeFilter]);
@@ -277,13 +290,14 @@ export const AppointmentListSection = ({
                 value === "other" ||
                 value === "hospital" ||
                 value === "zoom" ||
-                value === "video_call"
+                value === "video_call" ||
+                value === "tele-caller"
               ) {
                 setTypeFilter(value);
               }
             }}
           >
-            <SelectTrigger className="flex w-[120px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
+            <SelectTrigger className="flex min-w-[120px] max-w-[160px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
@@ -295,6 +309,7 @@ export const AppointmentListSection = ({
               <SelectItem value="hospital">Hospital</SelectItem>
               <SelectItem value="zoom">Zoom</SelectItem>
               <SelectItem value="video_call">Video Call</SelectItem>
+              <SelectItem value="tele-caller">Tele-caller</SelectItem>
             </SelectContent>
           </Select>
 
@@ -456,6 +471,18 @@ export const AppointmentListSection = ({
                                 disabled={!getMeetingUrl(appointment)}
                               >
                                 Join meet
+                              </DropdownMenuItem>
+                            )}
+                            {isTeleCallerType(appointment.type) && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  const url = getMeetingUrl(appointment);
+                                  if (!url) return;
+                                  window.open(url, "_blank", "noopener,noreferrer");
+                                }}
+                                disabled={!getMeetingUrl(appointment)}
+                              >
+                                Join call
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuItem
