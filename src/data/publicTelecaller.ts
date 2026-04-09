@@ -1,6 +1,5 @@
 import { API_BASE_URL } from "../config";
 import type { PublicTelecallerPayload } from "../types/telecaller.type";
-import { authFetch } from "./api";
 
 type Dict = Record<string, unknown>;
 
@@ -52,24 +51,33 @@ function parseHospital(node: unknown): PublicTelecallerPayload["hospital"] {
   };
 }
 
+type DoctorRow = NonNullable<PublicTelecallerPayload["doctors"]>[number];
+
+function parseOneDoctor(node: unknown): DoctorRow | null {
+  const d = asDict(node);
+  if (!d) return null;
+  const _id = getString(d._id) ?? getString(d.id) ?? getString(d.doctorId);
+  const fullName =
+    getString(d.fullName) ?? getString(d.name) ?? getString(d.doctorName);
+  if (!_id || !fullName) return null;
+  return {
+    _id,
+    fullName,
+    designation: getString(d.designation),
+    availability: getString(d.availability) ?? getString(d.workingHours),
+    email: getString(d.email),
+  };
+}
+
 function parseDoctors(node: unknown): PublicTelecallerPayload["doctors"] {
-  if (!Array.isArray(node)) return undefined;
-  const doctors = node
-    .map((item) => {
-      const d = asDict(item);
-      if (!d) return null;
-      const _id = getString(d._id) ?? getString(d.id);
-      const fullName = getString(d.fullName) ?? getString(d.name);
-      if (!_id || !fullName) return null;
-      return {
-        _id,
-        fullName,
-        designation: getString(d.designation),
-        availability: getString(d.availability),
-      };
-    })
-    .filter(Boolean) as NonNullable<PublicTelecallerPayload["doctors"]>;
-  return doctors.length ? doctors : undefined;
+  if (Array.isArray(node)) {
+    const doctors = node
+      .map((item) => parseOneDoctor(item))
+      .filter(Boolean) as NonNullable<PublicTelecallerPayload["doctors"]>;
+    return doctors.length ? doctors : undefined;
+  }
+  const one = parseOneDoctor(node);
+  return one ? [one] : undefined;
 }
 
 function parseLastAppointment(
@@ -102,17 +110,31 @@ export async function fetchPublicTelecallerDetails(
   if (!id) return null;
 
   try {
-    const raw = (await authFetch(
-      `${API_BASE_URL}/api/tele-caller/patients/${encodeURIComponent(id)}`,
-      { method: "GET" },
-    )) as unknown;
+    const url = `${API_BASE_URL}/api/tele-caller/patients/${encodeURIComponent(id)}`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+    const raw = (await response.json().catch(() => null)) as unknown;
+    if (!response.ok) return null;
     const root = asDict(raw);
     if (!root || root.success === false) return null;
     const data = asDict(root.data) ?? root;
     const patient = parsePatient(data.patient ?? data.patientDetails ?? data);
     if (!patient) return null;
     const hospital = parseHospital(data.hospital ?? data.hospitalDetails);
-    const doctors = parseDoctors(data.doctors ?? data.availableDoctors);
+    const doctorsFromList = parseDoctors(
+      data.doctors ?? data.availableDoctors ?? data.hospitalDoctors,
+    );
+    const doctorsFromSingle = parseOneDoctor(
+      data.doctor ?? data.assignedDoctor ?? data.doctorDetails,
+    );
+    const doctors =
+      doctorsFromList?.length ?
+        doctorsFromList
+      : doctorsFromSingle ?
+        [doctorsFromSingle]
+      : undefined;
     const appointmentNode = asDict(
       data.appointment ??
         data.latestAppointment ??

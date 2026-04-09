@@ -32,5 +32,6 @@ export interface PublicTelecallerPayload {
     fullName: string;
     designation?: string;
     availability?: string;
+    email?: string;
   }>;
 }

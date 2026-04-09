@@ -321,6 +321,12 @@ export const PublicTelecaller = (): JSX.Element => {
   }, [patientId]);
 
   useEffect(() => {
+    setSelectedDoctorId("");
+    setSelectedDate("");
+    setSelectedTime("");
+  }, [patientId]);
+
+  useEffect(() => {
     // Fallback: load doctors from secured doctor list if tele-caller payload didn't include doctors.
     if (doctors.length > 0) return;
     if (!localStorage.getItem("token")) return;
@@ -345,9 +351,21 @@ export const PublicTelecaller = (): JSX.Element => {
       .catch(() => undefined);
   }, [doctors.length]);
 
+  /** Doctors from API, or a single synthetic row from last visit so public (logged-out) booking still works. */
+  const doctorsForUi = useMemo((): DoctorLite[] => {
+    if (doctors.length > 0) return doctors;
+    const la = details?.lastAppointment;
+    const id = la?.doctorId?.trim();
+    const name = la?.doctorName?.trim();
+    if (id && name) {
+      return [{ _id: id, fullName: name }];
+    }
+    return [];
+  }, [doctors, details?.lastAppointment?.doctorId, details?.lastAppointment?.doctorName]);
+
   const selectedDoctor = useMemo(
-    () => doctors.find((d) => d._id === selectedDoctorId),
-    [doctors, selectedDoctorId],
+    () => doctorsForUi.find((d) => d._id === selectedDoctorId),
+    [doctorsForUi, selectedDoctorId],
   );
 
   useEffect(() => {
@@ -357,11 +375,18 @@ export const PublicTelecaller = (): JSX.Element => {
   }, [details?.patient?._id]);
 
   useEffect(() => {
+    if (selectedDoctorId && !doctorsForUi.some((d) => d._id === selectedDoctorId)) {
+      setSelectedDoctorId("");
+      setSelectedTime("");
+    }
+  }, [doctorsForUi, selectedDoctorId]);
+
+  useEffect(() => {
     if (!details) return;
     if (!selectedDoctorId) {
       const lastDoctorId = details.lastAppointment?.doctorId?.trim();
       if (lastDoctorId) {
-        const byId = doctors.find((d) => d._id === lastDoctorId);
+        const byId = doctorsForUi.find((d) => d._id === lastDoctorId);
         if (byId) {
           setSelectedDoctorId(byId._id);
           return;
@@ -370,22 +395,31 @@ export const PublicTelecaller = (): JSX.Element => {
       const lastDoctorName = details.lastAppointment?.doctorName?.trim();
       if (lastDoctorName) {
         const lowered = lastDoctorName.toLowerCase();
-        const byName = doctors.find((d) => d.fullName.toLowerCase() === lowered);
+        const byName = doctorsForUi.find(
+          (d) => d.fullName.toLowerCase() === lowered,
+        );
         if (byName) {
           setSelectedDoctorId(byName._id);
           return;
         }
       }
-      if (doctors.length > 0) {
-        setSelectedDoctorId(doctors[0]._id);
+      if (doctorsForUi.length > 0) {
+        setSelectedDoctorId(doctorsForUi[0]._id);
       }
     }
-  }, [details, doctors, selectedDoctorId]);
+  }, [details, doctorsForUi, selectedDoctorId]);
 
   const availableTimes = useMemo(
     () => buildTimeSlotsFromAvailability(selectedDoctor?.availability),
     [selectedDoctor?.availability],
   );
+
+  useEffect(() => {
+    if (!selectedTime) return;
+    if (!availableTimes.includes(selectedTime)) {
+      setSelectedTime("");
+    }
+  }, [availableTimes, selectedTime]);
 
   const amountLabel = useMemo(() => `₹${TELECALLER_AMOUNT_INR}`, []);
   const normalizedEmail = email.trim().toLowerCase();
@@ -652,11 +686,27 @@ export const PublicTelecaller = (): JSX.Element => {
                   </div>
                   <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className="h-10 min-w-[180px] rounded-[8px] border border-[#dedee1] px-3 text-sm bg-[#f8fafc] text-black/90 flex items-center">
-                        {selectedDoctor
-                          ? `${selectedDoctor.fullName}${selectedDoctor.designation ? ` (${selectedDoctor.designation})` : ""}`
-                          : "Doctor not available"}
-                      </div>
+                      <select
+                        value={selectedDoctorId}
+                        onChange={(e) => {
+                          setSelectedDoctorId(e.target.value);
+                          setSelectedTime("");
+                        }}
+                        disabled={doctorsForUi.length === 0}
+                        className="h-10 min-w-[180px] max-w-[260px] rounded-[8px] border border-[#dedee1] px-3 text-sm bg-white text-black/90 disabled:opacity-60"
+                      >
+                        <option value="">
+                          {doctorsForUi.length === 0
+                            ? "No doctor available"
+                            : "Select doctor"}
+                        </option>
+                        {doctorsForUi.map((d) => (
+                          <option key={d._id} value={d._id}>
+                            {d.fullName}
+                            {d.designation ? ` (${d.designation})` : ""}
+                          </option>
+                        ))}
+                      </select>
                       <input
                         type="date"
                         value={selectedDate}
