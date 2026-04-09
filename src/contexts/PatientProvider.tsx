@@ -138,7 +138,7 @@ export const PatientProvider = ({
         setSearchedPatients([]);
         return;
       }
-      const response = await searchPatients(q.trim(), 1, 20);
+      const response = await searchPatients(q.trim(), 1, 10);
       setSearchedPatients(response.data?.patients ?? []);
     } catch (error) {
       setError(error as string);

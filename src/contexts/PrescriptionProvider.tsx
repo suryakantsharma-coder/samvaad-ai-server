@@ -61,7 +61,7 @@ export const PrescriptionProvider = ({
   const [error, setError] = useState<string | null>(null);
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const [limit, setLimit] = useState(10);
   const [currentStatusFilter, setCurrentStatusFilter] =
     useState<PrescriptionStatusFilter | null>(null);
 
@@ -104,7 +104,7 @@ export const PrescriptionProvider = ({
       }
       setLoading(true);
       setError(null);
-      const response = await searchPrescriptions(q.trim(), 1, 20);
+      const response = await searchPrescriptions(q.trim(), 1, 10);
       const list = response.data?.prescriptions ?? [];
       setSearchedPrescriptions(Array.isArray(list) ? list : []);
     } catch (err) {

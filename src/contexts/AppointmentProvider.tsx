@@ -141,7 +141,7 @@ export const AppointmentProvider = ({
         return;
       }
       setLoading(true);
-      const response = await searchAppointments(q.trim(), 1, 20);
+      const response = await searchAppointments(q.trim(), 1, 10);
       setSearchedAppointments((response.data?.appointments ?? []) as Appointments[]);
     } catch (error) {
       setError(error as string);

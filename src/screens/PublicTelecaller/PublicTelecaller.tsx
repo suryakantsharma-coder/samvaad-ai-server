@@ -265,6 +265,7 @@ export const PublicTelecaller = (): JSX.Element => {
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
   const [visitReason, setVisitReason] = useState("");
+  const [failureToast, setFailureToast] = useState<string | null>(null);
 
   useEffect(() => {
     const id = patientId?.trim();
@@ -329,6 +330,37 @@ export const PublicTelecaller = (): JSX.Element => {
     () => doctors.find((d) => d._id === selectedDoctorId),
     [doctors, selectedDoctorId],
   );
+
+  useEffect(() => {
+    if (!details) return;
+    if (!visitReason.trim()) {
+      const reason = details.lastAppointment?.reason?.trim();
+      if (reason) setVisitReason(reason);
+    }
+    if (!selectedDoctorId) {
+      const lastDoctorId = details.lastAppointment?.doctorId?.trim();
+      if (lastDoctorId) {
+        const byId = doctors.find((d) => d._id === lastDoctorId);
+        if (byId) {
+          setSelectedDoctorId(byId._id);
+          return;
+        }
+      }
+      const lastDoctorName = details.lastAppointment?.doctorName?.trim();
+      if (lastDoctorName) {
+        const lowered = lastDoctorName.toLowerCase();
+        const byName = doctors.find((d) => d.fullName.toLowerCase() === lowered);
+        if (byName) {
+          setSelectedDoctorId(byName._id);
+          return;
+        }
+      }
+      if (doctors.length > 0) {
+        setSelectedDoctorId(doctors[0]._id);
+      }
+    }
+  }, [details, doctors, selectedDoctorId, visitReason]);
+
   const availableTimes = useMemo(
     () => buildTimeSlotsFromAvailability(selectedDoctor?.availability),
     [selectedDoctor?.availability],
@@ -336,11 +368,17 @@ export const PublicTelecaller = (): JSX.Element => {
 
   const amountLabel = useMemo(() => `₹${TELECALLER_AMOUNT_INR}`, []);
 
+  useEffect(() => {
+    if (!failureToast) return;
+    const timer = window.setTimeout(() => setFailureToast(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [failureToast]);
+
   const handlePay = async () => {
     const id = patientId?.trim();
     if (!id || !details) return;
     if (!selectedDoctorId || !selectedDate || !selectedTime) {
-      setError("Please select doctor, date and time before payment.");
+      setError("Doctor, date and time are required before payment.");
       return;
     }
     if (!visitReason.trim()) {
@@ -402,36 +440,40 @@ export const PublicTelecaller = (): JSX.Element => {
           },
         },
         handler: async (response: RazorpaySuccess) => {
-          console.log("Razorpay payment response:", response);
-          await verifyRazorpayPaymentWithBackend(response);
-          const hasToken = !!localStorage.getItem("token");
-          const appointmentId = details.appointmentId;
-          const hospitalId = details.hospitalId ?? details.hospital?._id;
-          const appointmentDateTime = toIstDateTime(selectedDate, selectedTime);
+          try {
+            await verifyRazorpayPaymentWithBackend(response);
+            const hasToken = !!localStorage.getItem("token");
+            const appointmentId = details.appointmentId;
+            const hospitalId = details.hospitalId ?? details.hospital?._id;
+            const appointmentDateTime = toIstDateTime(selectedDate, selectedTime);
 
-          // Post-payment workflow is best-effort for public links.
-          if (hasToken && appointmentId) {
-            await patchAppointmentScheduleAndVideoUrl(
-              appointmentId,
-              appointmentDateTime,
-            ).catch(async () => {
-              await patchAppointmentVideoUrl(appointmentId).catch(
-                () => undefined,
-              );
-            });
+            // Post-payment workflow is best-effort for public links.
+            if (hasToken && appointmentId) {
+              await patchAppointmentScheduleAndVideoUrl(
+                appointmentId,
+                appointmentDateTime,
+              ).catch(async () => {
+                await patchAppointmentVideoUrl(appointmentId).catch(
+                  () => undefined,
+                );
+              });
+            }
+            if (hasToken && appointmentId && hospitalId) {
+              await saveTelecallerTransaction({
+                patientId: id,
+                appointmentId,
+                hospitalId,
+                payment: response,
+              }).catch(() => undefined);
+            }
+            setSuccessMessage(
+              "Payment completed. Our team will contact you shortly.",
+            );
+          } catch {
+            setFailureToast("Payment failed. Please retry.");
+          } finally {
+            setPaying(false);
           }
-          if (hasToken && appointmentId && hospitalId) {
-            await saveTelecallerTransaction({
-              patientId: id,
-              appointmentId,
-              hospitalId,
-              payment: response,
-            }).catch(() => undefined);
-          }
-          setSuccessMessage(
-            "Payment successful. Our telecaller will contact you shortly.",
-          );
-          setPaying(false);
         },
       };
 
@@ -441,6 +483,7 @@ export const PublicTelecaller = (): JSX.Element => {
       setError(
         e instanceof Error ? e.message : "Payment initialization failed.",
       );
+      setFailureToast("Payment failed. Please retry.");
       setPaying(false);
     }
   };
@@ -448,167 +491,160 @@ export const PublicTelecaller = (): JSX.Element => {
   return (
     <div className="bg-app-background w-full min-h-screen flex flex-col gap-6 p-4 md:p-6 text-black">
       <div className="max-w-2xl w-full mx-auto">
-        <div className="rounded-[12px] border border-[#dedee1] bg-white p-6 md:p-8 space-y-5">
-          <div className="space-y-1">
-            <h1 className="text-[30px] leading-[34px] font-medium [font-family:'Archivo',Helvetica]">
-              Telecaller Appointment
+        {successMessage ? (
+          <div className="rounded-[12px] border border-[#86efac] bg-[#f0fdf4] p-8 md:p-10 text-center space-y-4">
+            <div className="mx-auto w-12 h-12 rounded-full bg-[#dcfce7] text-[#166534] flex items-center justify-center">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <h1 className="text-[30px] leading-[34px] font-medium [font-family:'Archivo',Helvetica] text-[#166534]">
+              Payment Successful
             </h1>
-            <p className="font-title-4r text-x-70 text-sm">
-              Confirm details and proceed with secure payment.
+            <p className="font-title-4r text-base text-[#166534]">
+              {successMessage}
             </p>
           </div>
-
-          {loading && (
-            <div className="flex items-center gap-2 text-x-70 font-title-4r">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Loading details...
+        ) : (
+          <div className="rounded-[12px] border border-[#dedee1] bg-white p-6 md:p-8 space-y-5">
+            <div className="space-y-1">
+              <h1 className="text-[30px] leading-[34px] font-medium [font-family:'Archivo',Helvetica]">
+                Telecaller Appointment
+              </h1>
+              <p className="font-title-4r text-x-70 text-sm">
+                Confirm details and proceed with secure payment.
+              </p>
             </div>
-          )}
 
-          {!loading && error && (
-            <div className="rounded-[10px] border border-[#fecaca] bg-[#fff1f2] p-3 text-sm text-[#9f1239]">
-              {error}
-            </div>
-          )}
-
-          {!loading && details && (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div className="rounded-[10px] border border-[#dedee1] p-3 space-y-1">
-                  <p className="font-title-4m text-x-70 flex items-center gap-2">
-                    <User className="w-4 h-4" /> Patient
-                  </p>
-                  <p className="font-title-4r text-black">
-                    {details.patient.fullName}
-                  </p>
-                  <p className="font-title-5r text-x-70">
-                    {details.patient.age ?? "—"} yrs •{" "}
-                    {details.patient.gender ?? "—"}
-                  </p>
-                </div>
-                <div className="rounded-[10px] border border-[#dedee1] p-3 space-y-1">
-                  <p className="font-title-4m text-x-70 flex items-center gap-2">
-                    <Building2 className="w-4 h-4" /> Hospital
-                  </p>
-                  <p className="font-title-4r text-black">
-                    {details.hospital?.name ?? "—"}
-                  </p>
-                  <p className="font-title-5r text-x-70">
-                    {displayHospitalAddress(details.hospital)}
-                  </p>
-                </div>
+            {loading && (
+              <div className="flex items-center gap-2 text-x-70 font-title-4r">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Loading details...
               </div>
+            )}
 
-              <div className="rounded-[10px] border border-[#dedee1] p-4 space-y-2">
-                <label
-                  htmlFor="visit-reason"
-                  className="font-title-4m text-x-70 text-sm"
-                >
-                  Disease / Reason for visit
-                </label>
-                <textarea
-                  id="visit-reason"
-                  value={visitReason}
-                  onChange={(e) => setVisitReason(e.target.value)}
-                  placeholder="Type symptoms or reason for consultation..."
-                  rows={3}
-                  className="w-full rounded-[8px] border border-[#dedee1] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary-2/20"
-                />
+            {!loading && error && (
+              <div className="rounded-[10px] border border-[#fecaca] bg-[#fff1f2] p-3 text-sm text-[#9f1239]">
+                {error}
               </div>
+            )}
 
-              <div className="rounded-[10px] border border-[#dedee1] p-4 flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-title-4m text-x-70 text-sm">
-                    Booking Amount
-                  </p>
-                  <p className="text-[26px] leading-[30px] font-semibold">
-                    {amountLabel}
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <select
-                      value={selectedDoctorId}
-                      onChange={(e) => {
-                        setSelectedDoctorId(e.target.value);
-                        setSelectedTime("");
-                      }}
-                      className="h-10 min-w-[180px] rounded-[8px] border border-[#dedee1] px-3 text-sm bg-white"
-                    >
-                      <option value="">Select doctor</option>
-                      {doctors.map((doc) => (
-                        <option key={doc._id} value={doc._id}>
-                          {doc.fullName}
-                          {doc.designation ? ` (${doc.designation})` : ""}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="date"
-                      value={selectedDate}
-                      onChange={(e) => setSelectedDate(e.target.value)}
-                      className="h-10 rounded-[8px] border border-[#dedee1] px-3 text-sm"
-                    />
-                    <select
-                      value={selectedTime}
-                      onChange={(e) => setSelectedTime(e.target.value)}
-                      disabled={!selectedDoctorId}
-                      className="h-10 min-w-[130px] rounded-[8px] border border-[#dedee1] px-3 text-sm bg-white disabled:opacity-60"
-                    >
-                      <option value="">
-                        {selectedDoctorId ? "Select time" : "Pick doctor first"}
-                      </option>
-                      {availableTimes.map((slot) => (
-                        <option key={slot} value={slot}>
-                          {slot}
-                        </option>
-                      ))}
-                    </select>
-                    {/* Hidden input preserves native value semantics for potential browser autofill */}
-                    <input
-                      type="time"
-                      value={selectedTime}
-                      readOnly
-                      className="hidden"
-                    />
+            {!loading && details && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-[10px] border border-[#dedee1] p-3 space-y-1">
+                    <p className="font-title-4m text-x-70 flex items-center gap-2">
+                      <User className="w-4 h-4" /> Patient
+                    </p>
+                    <p className="font-title-4r text-black">
+                      {details.patient.fullName}
+                    </p>
+                    <p className="font-title-5r text-x-70">
+                      {details.patient.age ?? "—"} yrs •{" "}
+                      {details.patient.gender ?? "—"}
+                    </p>
                   </div>
-                  <Button
-                    type="button"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 h-auto rounded-[10px] bg-primary-2 hover:bg-primary-2/90 text-white font-title-4r disabled:opacity-70"
-                    onClick={handlePay}
-                    disabled={
-                      paying ||
-                      !selectedDoctorId ||
-                      !selectedDate ||
-                      !selectedTime ||
-                      !visitReason.trim()
-                    }
-                  >
-                    {paying ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <PhoneCall className="w-4 h-4" />
-                        Pay {amountLabel}
-                      </>
-                    )}
-                  </Button>
+                  <div className="rounded-[10px] border border-[#dedee1] p-3 space-y-1">
+                    <p className="font-title-4m text-x-70 flex items-center gap-2">
+                      <Building2 className="w-4 h-4" /> Hospital
+                    </p>
+                    <p className="font-title-4r text-black">
+                      {details.hospital?.name ?? "—"}
+                    </p>
+                    <p className="font-title-5r text-x-70">
+                      {displayHospitalAddress(details.hospital)}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              {successMessage && (
-                <div className="rounded-[10px] border border-[#86efac] bg-[#f0fdf4] p-3 text-sm text-[#166534] flex items-start gap-2">
-                  <ShieldCheck className="w-4 h-4 mt-0.5" />
-                  <span>{successMessage}</span>
+                <div className="rounded-[10px] border border-[#dedee1] p-4 space-y-2">
+                  <label className="font-title-4m text-x-70 text-sm">
+                    Disease / Reason for visit
+                  </label>
+                  <div className="w-full rounded-[8px] border border-[#dedee1] px-3 py-2 text-sm bg-[#f8fafc] text-black/90 min-h-12">
+                    {visitReason || "—"}
+                  </div>
                 </div>
-              )}
-            </>
-          )}
-        </div>
+
+                <div className="rounded-[10px] border border-[#dedee1] p-4 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-title-4m text-x-70 text-sm">
+                      Booking Amount
+                    </p>
+                    <p className="text-[26px] leading-[30px] font-semibold">
+                      {amountLabel}
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="h-10 min-w-[180px] rounded-[8px] border border-[#dedee1] px-3 text-sm bg-[#f8fafc] text-black/90 flex items-center">
+                        {selectedDoctor
+                          ? `${selectedDoctor.fullName}${selectedDoctor.designation ? ` (${selectedDoctor.designation})` : ""}`
+                          : "Doctor not available"}
+                      </div>
+                      <input
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="h-10 rounded-[8px] border border-[#dedee1] px-3 text-sm"
+                      />
+                      <select
+                        value={selectedTime}
+                        onChange={(e) => setSelectedTime(e.target.value)}
+                        disabled={!selectedDoctorId}
+                        className="h-10 min-w-[130px] rounded-[8px] border border-[#dedee1] px-3 text-sm bg-white disabled:opacity-60"
+                      >
+                        <option value="">
+                          {selectedDoctorId ? "Select time" : "Pick doctor first"}
+                        </option>
+                        {availableTimes.map((slot) => (
+                          <option key={slot} value={slot}>
+                            {slot}
+                          </option>
+                        ))}
+                      </select>
+                      {/* Hidden input preserves native value semantics for potential browser autofill */}
+                      <input
+                        type="time"
+                        value={selectedTime}
+                        readOnly
+                        className="hidden"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 h-auto rounded-[10px] bg-primary-2 hover:bg-primary-2/90 text-white font-title-4r disabled:opacity-70"
+                      onClick={handlePay}
+                      disabled={
+                        paying ||
+                        !selectedDoctorId ||
+                        !selectedDate ||
+                        !selectedTime ||
+                        !visitReason.trim()
+                      }
+                    >
+                      {paying ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <PhoneCall className="w-4 h-4" />
+                          Pay {amountLabel}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
+      {failureToast && (
+        <div className="fixed right-4 top-4 z-50 rounded-[10px] border border-[#fecaca] bg-[#fff1f2] px-4 py-3 text-sm text-[#9f1239] shadow-md">
+          {failureToast}
+        </div>
+      )}
     </div>
   );
 };

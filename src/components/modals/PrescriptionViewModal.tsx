@@ -1,10 +1,13 @@
-import { Download } from "lucide-react";
+import { Download, Printer } from "lucide-react";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { PrescriptionHospitalDoctorInfo } from "../prescription/PrescriptionHospitalDoctorInfo";
 import { PrescriptionMedicinesSection } from "../prescription/PrescriptionMedicinesSection";
 import { formatDateTime12h } from "../../lib/dateTimeDisplay";
-import { downloadPrescriptionReportPdf } from "../../lib/prescriptionPdf";
+import {
+  downloadPrescriptionReportPdf,
+  openPrescriptionReportPdfInNewTab,
+} from "../../lib/prescriptionPdf";
 import { getDiagnosis } from "../../lib/prescriptionMeta";
 import type { Prescription } from "../../types/prescription.type";
 
@@ -21,6 +24,10 @@ export const PrescriptionViewModal = ({
 }: PrescriptionViewModalProps): JSX.Element => {
   const handleDownloadPdf = () => {
     if (prescription) downloadPrescriptionReportPdf(prescription);
+  };
+
+  const handlePrintPdf = () => {
+    if (prescription) void openPrescriptionReportPdfInNewTab(prescription);
   };
 
   return (
@@ -47,14 +54,24 @@ export const PrescriptionViewModal = ({
                     {prescription.patientName}
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  onClick={handleDownloadPdf}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 h-auto rounded-[10px] bg-primary-2 hover:bg-primary-2/90 text-white font-title-4r shrink-0"
-                >
-                  <Download className="w-4 h-4" />
-                  Download PDF
-                </Button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    type="button"
+                    onClick={handlePrintPdf}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 h-auto rounded-[10px] bg-white border border-[#dedee1] hover:bg-grey-light text-black font-title-4r shrink-0"
+                  >
+                    <Printer className="w-4 h-4" />
+                    Print PDF
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleDownloadPdf}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 h-auto rounded-[10px] bg-primary-2 hover:bg-primary-2/90 text-white font-title-4r shrink-0"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download PDF
+                  </Button>
+                </div>
               </div>
 
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">

@@ -72,6 +72,29 @@ function parseDoctors(node: unknown): PublicTelecallerPayload["doctors"] {
   return doctors.length ? doctors : undefined;
 }
 
+function parseLastAppointment(
+  node: unknown,
+): PublicTelecallerPayload["lastAppointment"] {
+  const a = asDict(node);
+  if (!a) return undefined;
+  const doctorNode = asDict(a.doctor);
+  const reason = getString(a.reason) ?? getString(a.visitReason);
+  const doctorId =
+    getString(a.doctorId) ??
+    getString(doctorNode?._id) ??
+    getString(a.doctor);
+  const doctorName =
+    getString(a.doctorName) ??
+    getString(doctorNode?.fullName) ??
+    getString(a.doctorFullName);
+  if (!reason && !doctorId && !doctorName) return undefined;
+  return {
+    reason,
+    doctorId,
+    doctorName,
+  };
+}
+
 export async function fetchPublicTelecallerDetails(
   patientId: string,
 ): Promise<PublicTelecallerPayload | null> {
@@ -90,17 +113,24 @@ export async function fetchPublicTelecallerDetails(
     if (!patient) return null;
     const hospital = parseHospital(data.hospital ?? data.hospitalDetails);
     const doctors = parseDoctors(data.doctors ?? data.availableDoctors);
-    const appointmentNode = asDict(data.appointment ?? data.latestAppointment);
+    const appointmentNode = asDict(
+      data.appointment ??
+        data.latestAppointment ??
+        data.lastAppointment ??
+        data.lastVisit,
+    );
     const appointmentId =
       getString(appointmentNode?._id) ??
       getString(appointmentNode?.appointmentId) ??
       getString(data.appointmentId);
+    const lastAppointment = parseLastAppointment(appointmentNode);
     const hospitalId = getString(data.hospitalId) ?? hospital?._id;
     return {
       patient,
       hospital,
       appointmentId,
       hospitalId,
+      lastAppointment,
       doctors,
     };
   } catch {

@@ -184,6 +184,12 @@ export const AppointmentListSection = ({
     return filteredSearchedAppointments;
   }, [filteredAppointments, filteredSearchedAppointments, searchQuery]);
 
+  const emptyStateMessage = useMemo(() => {
+    if (activeTab === "today") return "No appointment for today";
+    if (activeTab === "tomorrow") return "No appointment for tomorrow";
+    return "No data found";
+  }, [activeTab]);
+
   // During debounced search, keep table visible and avoid full-page loader flicker.
   const showLoading = loading && searchQuery.trim() === "";
   const showError = error && !loading;
@@ -337,131 +343,142 @@ export const AppointmentListSection = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {listToShow.map((appointment: Appointments, index: number) => (
-                  <TableRow
-                    key={index}
-                    className="border-b border-[#dedee1] hover:bg-grey-light/50"
-                  >
-                    <TableCell className="p-[0px]">
-                      {/* <span className="font-title-4l px-[20px] py-[16px] text-black font-medium text-[14px] leading-[19px] font-[number:var(--title-4l-font-weight)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                          {appointment.patient.fullName}
-                        </span> */}
-                      <div className="flex flex-col px-[20px] py-[15px]">
-                        <span className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                          {typeof appointment.patient === "object" &&
-                          appointment.patient !== null
-                            ? (appointment.patient.fullName ?? "—")
-                            : "—"}
-                        </span>
-                        <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
-                          {appointment.appointmentId}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="p-[0px]">
-                      <div className="inline-flex items-center gap-[5px]">
-                        <PhoneCallIcon className="w-4 h-4" />
-                        <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                          {typeof appointment.patient === "object" &&
-                          appointment.patient !== null
-                            ? (appointment.patient.phoneNumber ?? "—")
-                            : "—"}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="p-[0px]">
-                      <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                        {appointment.reason}
-                      </span>
-                    </TableCell>
-                    <TableCell className="p-[0px]">
-                      <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                        {typeof appointment.doctor === "object" &&
-                        appointment.doctor !== null
-                          ? ((appointment.doctor as { fullName?: string })
-                              .fullName ?? "—")
-                          : "—"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="px-[10px] py-[16px]">
-                      <Badge
-                        className={`${statusColorMap(
-                          appointment.status,
-                        )}  rounded-[100px] px-2.5 py-[5px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] hover:${statusColorMap(
-                          appointment.status,
-                        )}`}
-                      >
-                        {appointment.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="p-[0px]">
-                      <div className="inline-flex items-center gap-2.5 px-[20px] py-[16px]">
-                        <AppointmentTypeIcon
-                          type={appointment.type}
-                          className="w-4 h-4 shrink-0 text-[#57575f]"
-                        />
-                        <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)] capitalize">
-                          {appointment.type}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="p-[0px]">
-                      <div className="flex flex-col gap-[3px] px-[20px] py-[16px]">
-                        <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                          {new Date(
-                            appointment.appointmentDateTime,
-                          ).toLocaleDateString()}
-                        </span>
-                        <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
-                          {formatTime12h(appointment.appointmentDateTime)}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 px-[40px] py-[10px]"
-                          >
-                            <ThreeDotsVerticalIcon className="h-6 w-6" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {(appointment.type?.toLowerCase() === "zoom" ||
-                            appointment.type?.toLowerCase() === "video_call") && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                const url = getMeetingUrl(appointment);
-                                if (!url) return;
-                                window.open(url, "_blank", "noopener,noreferrer");
-                              }}
-                              disabled={!getMeetingUrl(appointment)}
-                            >
-                              Join meet
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={() => onRescheduleAppointment(appointment)}
-                          >
-                            Reschedule
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => onMarkAsDoneAppointment(appointment)}
-                          >
-                            Mark as done
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => onCancelAppointment(appointment)}
-                          >
-                            Cancel appointment
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                {listToShow.length === 0 ? (
+                  <TableRow className="border-b border-[#dedee1]">
+                    <TableCell
+                      colSpan={8}
+                      className="px-[20px] py-10 text-center text-x-70 font-title-4r"
+                    >
+                      {emptyStateMessage}
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  listToShow.map((appointment: Appointments, index: number) => (
+                    <TableRow
+                      key={index}
+                      className="border-b border-[#dedee1] hover:bg-grey-light/50"
+                    >
+                      <TableCell className="p-[0px]">
+                        {/* <span className="font-title-4l px-[20px] py-[16px] text-black font-medium text-[14px] leading-[19px] font-[number:var(--title-4l-font-weight)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                            {appointment.patient.fullName}
+                          </span> */}
+                        <div className="flex flex-col px-[20px] py-[15px]">
+                          <span className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            {typeof appointment.patient === "object" &&
+                            appointment.patient !== null
+                              ? (appointment.patient.fullName ?? "—")
+                              : "—"}
+                          </span>
+                          <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
+                            {appointment.appointmentId}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="p-[0px]">
+                        <div className="inline-flex items-center gap-[5px]">
+                          <PhoneCallIcon className="w-4 h-4" />
+                          <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                            {typeof appointment.patient === "object" &&
+                            appointment.patient !== null
+                              ? (appointment.patient.phoneNumber ?? "—")
+                              : "—"}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="p-[0px]">
+                        <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                          {appointment.reason}
+                        </span>
+                      </TableCell>
+                      <TableCell className="p-[0px]">
+                        <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                          {typeof appointment.doctor === "object" &&
+                          appointment.doctor !== null
+                            ? ((appointment.doctor as { fullName?: string })
+                                .fullName ?? "—")
+                            : "—"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="px-[10px] py-[16px]">
+                        <Badge
+                          className={`${statusColorMap(
+                            appointment.status,
+                          )}  rounded-[100px] px-2.5 py-[5px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] hover:${statusColorMap(
+                            appointment.status,
+                          )}`}
+                        >
+                          {appointment.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="p-[0px]">
+                        <div className="inline-flex items-center gap-2.5 px-[20px] py-[16px]">
+                          <AppointmentTypeIcon
+                            type={appointment.type}
+                            className="w-4 h-4 shrink-0 text-[#57575f]"
+                          />
+                          <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)] capitalize">
+                            {appointment.type}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="p-[0px]">
+                        <div className="flex flex-col gap-[3px] px-[20px] py-[16px]">
+                          <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                            {new Date(
+                              appointment.appointmentDateTime,
+                            ).toLocaleDateString()}
+                          </span>
+                          <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
+                            {formatTime12h(appointment.appointmentDateTime)}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 px-[40px] py-[10px]"
+                            >
+                              <ThreeDotsVerticalIcon className="h-6 w-6" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {(appointment.type?.toLowerCase() === "zoom" ||
+                              appointment.type?.toLowerCase() === "video_call") && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  const url = getMeetingUrl(appointment);
+                                  if (!url) return;
+                                  window.open(url, "_blank", "noopener,noreferrer");
+                                }}
+                                disabled={!getMeetingUrl(appointment)}
+                              >
+                                Join meet
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem
+                              onClick={() => onRescheduleAppointment(appointment)}
+                            >
+                              Reschedule
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => onMarkAsDoneAppointment(appointment)}
+                            >
+                              Mark as done
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => onCancelAppointment(appointment)}
+                            >
+                              Cancel appointment
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

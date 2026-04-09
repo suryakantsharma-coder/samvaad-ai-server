@@ -36,7 +36,7 @@ export const DoctorContext = createContext<{
   loading: false,
   error: null,
   page: 1,
-  limit: 20,
+  limit: 10,
   getDoctorsData: () => Promise.resolve(),
   handleAddDoctor: () => Promise.resolve(),
   handleUpdateDoctor: () => Promise.resolve(),
@@ -52,13 +52,13 @@ export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(20);
+  const [limit, setLimit] = useState(10);
 
   const getDoctorsData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await getDoctors(1, 20);
+      const response = await getDoctors(1, 10);
       setDoctors(response.data.doctors as Doctor[]);
       const page = response.data.pagination;
       setPage(page.page);
@@ -99,7 +99,7 @@ export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
       }
       setLoading(true);
       setError(null);
-      const response = await searchDoctors(q.trim(), 1, 20);
+      const response = await searchDoctors(q.trim(), 1, 10);
       setSearchedDoctors((response.data?.doctors ?? []) as Doctor[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to search doctors");

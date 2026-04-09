@@ -22,6 +22,11 @@ export interface PublicTelecallerPayload {
   hospital?: PublicTelecallerHospital;
   appointmentId?: string;
   hospitalId?: string;
+  lastAppointment?: {
+    reason?: string;
+    doctorId?: string;
+    doctorName?: string;
+  };
   doctors?: Array<{
     _id: string;
     fullName: string;
