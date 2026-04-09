@@ -242,14 +242,14 @@ export const AppointmentListSection = ({
           ))}
         </ToggleGroup>
 
-        <div className="flex flex-wrap items-center gap-[15px]">
-          <div className="flex w-full lg:w-[372px] items-center gap-2.5 px-2 py-2 bg-grey-light rounded-[100px] h-[38px]">
-            <SearchIcon className="w-6 h-6 text-black opacity-70" />
+        <div className="flex w-full min-w-0 flex-nowrap items-center justify-end gap-[15px] overflow-x-auto lg:min-w-0 lg:flex-1">
+          <div className="flex min-w-0 flex-1 max-w-[372px] items-center gap-2.5 px-2 py-2 bg-grey-light rounded-[100px] h-[38px]">
+            <SearchIcon className="w-6 h-6 shrink-0 text-black opacity-70" />
             <Input
               placeholder="Search by patient, status, or reason..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 border-0 bg-transparent opacity-70 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] focus-visible:ring-0 focus-visible:ring-offset-0 p-0"
+              className="min-w-0 flex-1 border-0 bg-transparent opacity-70 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] focus-visible:ring-0 focus-visible:ring-offset-0 p-0"
             />
           </div>
 
@@ -267,7 +267,7 @@ export const AppointmentListSection = ({
               }
             }}
           >
-            <SelectTrigger className="flex w-[120px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
+            <SelectTrigger className="flex h-[38px] w-[120px] shrink-0 items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -297,7 +297,7 @@ export const AppointmentListSection = ({
               }
             }}
           >
-            <SelectTrigger className="flex min-w-[120px] max-w-[160px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
+            <SelectTrigger className="flex h-[38px] min-w-[120px] max-w-[160px] shrink-0 items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
@@ -461,12 +461,17 @@ export const AppointmentListSection = ({
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             {(appointment.type?.toLowerCase() === "zoom" ||
-                              appointment.type?.toLowerCase() === "video_call") && (
+                              appointment.type?.toLowerCase() ===
+                                "video_call") && (
                               <DropdownMenuItem
                                 onClick={() => {
                                   const url = getMeetingUrl(appointment);
                                   if (!url) return;
-                                  window.open(url, "_blank", "noopener,noreferrer");
+                                  window.open(
+                                    url,
+                                    "_blank",
+                                    "noopener,noreferrer",
+                                  );
                                 }}
                                 disabled={!getMeetingUrl(appointment)}
                               >
@@ -478,7 +483,11 @@ export const AppointmentListSection = ({
                                 onClick={() => {
                                   const url = getMeetingUrl(appointment);
                                   if (!url) return;
-                                  window.open(url, "_blank", "noopener,noreferrer");
+                                  window.open(
+                                    url,
+                                    "_blank",
+                                    "noopener,noreferrer",
+                                  );
                                 }}
                                 disabled={!getMeetingUrl(appointment)}
                               >
@@ -486,12 +495,16 @@ export const AppointmentListSection = ({
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuItem
-                              onClick={() => onRescheduleAppointment(appointment)}
+                              onClick={() =>
+                                onRescheduleAppointment(appointment)
+                              }
                             >
                               Reschedule
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => onMarkAsDoneAppointment(appointment)}
+                              onClick={() =>
+                                onMarkAsDoneAppointment(appointment)
+                              }
                             >
                               Mark as done
                             </DropdownMenuItem>

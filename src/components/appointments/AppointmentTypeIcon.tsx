@@ -11,7 +11,7 @@ import {
 
 /**
  * Maps API `type` strings (case-insensitive) to an icon.
- * Matches AddAppointmentModal: checkup, consultation, emergency, other, hospital, zoom, tele-caller.
+ * Matches AddAppointmentModal: checkup, consultation, emergency, other, hospital, zoom, tele-caller (video icon like zoom).
  */
 export function AppointmentTypeIcon({
   type,
@@ -28,11 +28,10 @@ export function AppointmentTypeIcon({
       return <Building2 className={className} aria-hidden {...props} />;
     case "zoom":
     case "video_call":
-      return <Video className={className} aria-hidden {...props} />;
     case "tele-caller":
     case "tele_caller":
     case "telecaller":
-      return <PhoneCall className={className} aria-hidden {...props} />;
+      return <Video className={className} aria-hidden {...props} />;
     case "checkup":
       return <Stethoscope className={className} aria-hidden {...props} />;
     case "consultation":
