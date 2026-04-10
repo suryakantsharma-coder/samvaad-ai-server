@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PatientSearchSection } from "../Patients/sections/PatientSearchSection";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   XCircle,
   Circle,
+  Video,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthProvider";
 import { useHospital } from "../../contexts/HospitalProvider";
@@ -42,6 +43,10 @@ import {
   stepsFromOnboardingFlags,
   type WhatsappOnboardingStepState,
 } from "../../lib/whatsappGraphOnboarding";
+import {
+  fetchGoogleCalendarAuthUrl,
+  fetchGoogleCalendarStatus,
+} from "../../data/googleCalendar";
 import type { User } from "../../types/auth.type";
 import { ChangePasswordModal } from "../../components/modals";
 
@@ -261,6 +266,73 @@ export const Settings = (): JSX.Element => {
   >(() => defaultOnboardingSteps());
   const [whatsappOnboardingRunning, setWhatsappOnboardingRunning] =
     useState(false);
+
+  const [googleMeetCal, setGoogleMeetCal] = useState<{
+    loading: boolean;
+    connected: boolean | null;
+    detail?: string;
+    error: string | null;
+  }>({
+    loading: false,
+    connected: null,
+    error: null,
+  });
+
+  const refreshGoogleCalendarStatus = useCallback(async () => {
+    if (!settingsHospitalId) {
+      setGoogleMeetCal({
+        loading: false,
+        connected: null,
+        error: "No hospital linked to your account.",
+      });
+      return;
+    }
+    setGoogleMeetCal((s) => ({ ...s, loading: true, error: null }));
+    try {
+      const st = await fetchGoogleCalendarStatus(settingsHospitalId);
+      setGoogleMeetCal({
+        loading: false,
+        connected: st.connected,
+        detail: st.detail,
+        error: null,
+      });
+    } catch (e) {
+      setGoogleMeetCal({
+        loading: false,
+        connected: null,
+        error:
+          e instanceof Error ? e.message : "Could not load Google Calendar status.",
+      });
+    }
+  }, [settingsHospitalId]);
+
+  useEffect(() => {
+    if (activeTab !== "integrations" || !settingsHospitalId) return;
+    void refreshGoogleCalendarStatus();
+  }, [activeTab, settingsHospitalId, refreshGoogleCalendarStatus]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      if (activeTab === "integrations" && settingsHospitalId) {
+        void refreshGoogleCalendarStatus();
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [activeTab, settingsHospitalId, refreshGoogleCalendarStatus]);
+
+  const handleGoogleCalendarConnect = async () => {
+    if (!settingsHospitalId || googleMeetCal.connected === true) return;
+    try {
+      const url = await fetchGoogleCalendarAuthUrl(settingsHospitalId);
+      window.location.assign(url);
+    } catch (e) {
+      showError(
+        "Google Calendar",
+        e instanceof Error ? e.message : "Could not start Google sign-in.",
+      );
+    }
+  };
 
   useEffect(() => {
     if (activeTab !== "integrations" || !settingsHospitalId) return;
@@ -1327,6 +1399,116 @@ export const Settings = (): JSX.Element => {
                     </ol>
                   )}
                 </div>
+              </div>
+            )}
+
+            {activeTab === "integrations" && (
+              <div className="bg-white rounded-[10px] p-6 flex flex-col gap-4 border border-[#dedee1] shadow-sm md:col-span-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Video
+                    className="w-5 h-5 shrink-0 text-primary-2"
+                    aria-hidden
+                  />
+                  <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
+                    Tele-caller Google Meet
+                  </h3>
+                </div>
+                <p className="font-title-4r text-x-70 text-[length:var(--title-4r-font-size)] leading-relaxed">
+                  Connect your hospital&apos;s Google account so tele-caller
+                  flows can create Google Meet links from Calendar. Use{" "}
+                  <span className="font-medium text-black">Check status</span>{" "}
+                  to refresh the connection state after signing in.
+                </p>
+
+                {!settingsHospitalId ? (
+                  <p className="font-title-4r text-x-70">
+                    Link your account to a hospital to manage this integration.
+                  </p>
+                ) : (
+                  <>
+                    {googleMeetCal.loading && !googleMeetCal.error ? (
+                      <p className="font-title-4r text-x-70 inline-flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        Checking Google Calendar status…
+                      </p>
+                    ) : null}
+                    {googleMeetCal.error ? (
+                      <p className="font-title-4r text-red-600 text-sm">
+                        {googleMeetCal.error}
+                      </p>
+                    ) : null}
+                    {!googleMeetCal.loading &&
+                    googleMeetCal.connected !== null &&
+                    !googleMeetCal.error ? (
+                      <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-[#dedee1] bg-[#f9fafb] px-4 py-3">
+                        {googleMeetCal.connected ? (
+                          <>
+                            <CheckCircle2
+                              className="w-5 h-5 text-[#00955C] shrink-0"
+                              aria-hidden
+                            />
+                            <span className="font-title-4m text-[#00955C]">
+                              Google Calendar connected — Meet setup enabled
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle
+                              className="w-5 h-5 text-x-70 shrink-0"
+                              aria-hidden
+                            />
+                            <span className="font-title-4m text-x-70">
+                              Not connected — sign in with Google to enable Meet
+                            </span>
+                          </>
+                        )}
+                        {googleMeetCal.detail ? (
+                          <span className="w-full font-title-5r text-x-70 text-sm mt-1">
+                            {googleMeetCal.detail}
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    <div className="flex flex-wrap items-center gap-3 pt-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => void refreshGoogleCalendarStatus()}
+                        disabled={!settingsHospitalId}
+                        className="h-[44px] px-5 rounded-[10px] border-[#dedee1] bg-white hover:bg-grey-light font-title-4r"
+                      >
+                        {googleMeetCal.loading ? (
+                          <span className="inline-flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Checking…
+                          </span>
+                        ) : (
+                          "Check status"
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => void handleGoogleCalendarConnect()}
+                        disabled={
+                          !settingsHospitalId ||
+                          googleMeetCal.connected === true ||
+                          googleMeetCal.loading
+                        }
+                        className="h-[44px] px-6 rounded-[10px] bg-primary-2 hover:bg-primary-2/90 text-white font-title-4r disabled:opacity-60"
+                      >
+                        Connect Google Calendar
+                      </Button>
+                    </div>
+                    {googleMeetCal.connected === true ? (
+                      <p className="font-title-5r text-x-70 text-sm">
+                        Connect is disabled while Calendar is linked. To use a
+                        different account, revoke access in Google Account
+                        settings, then check status and connect again.
+                      </p>
+                    ) : null}
+                  </>
+                )}
               </div>
             )}
 

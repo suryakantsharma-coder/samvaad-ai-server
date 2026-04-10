@@ -1,7 +1,4 @@
 export {
   PaymentListSection,
-  type SubscriptionRow,
-  type PlanType,
-  type PaymentStatus,
-  type RenewalType,
+  type PaymentListSectionProps,
 } from "./PaymentListSection";

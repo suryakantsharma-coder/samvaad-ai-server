@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Avatar,
   AvatarFallback,
@@ -35,7 +35,7 @@ export const PatientSearchSection = (): JSX.Element => {
       icon: "/pill.svg",
       path: "/medicines",
     },
-    { id: "payment", label: "Payment", icon: "/call.svg", path: "/payment" },
+    { id: "payments", label: "Payments", icon: "/call.svg", path: "/payment" },
   ]);
 
   const { handleLogout } = useAuth();
@@ -72,8 +72,8 @@ export const PatientSearchSection = (): JSX.Element => {
           path: "/hospitals",
         },
         {
-          id: "payment",
-          label: "Payment",
+          id: "payments",
+          label: "Payments",
           icon: "/call.svg",
           path: "/payment",
         },
@@ -105,6 +105,12 @@ export const PatientSearchSection = (): JSX.Element => {
           label: "Prescriptions",
           icon: "/pill.svg",
           path: "/prescriptions",
+        },
+        {
+          id: "payments",
+          label: "Payments",
+          icon: "/call.svg",
+          path: "/payment",
         },
       ]);
     }

@@ -1,30 +1,30 @@
 import {
-  Crown,
-  Filter as FilterIcon,
-  Heart,
-  LayoutGrid,
-  List,
-  MoreVertical as MoreVerticalIcon,
-  Search as SearchIcon,
-  Star,
-} from "lucide-react";
-import React, { useState } from "react";
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useNavigate } from "react-router-dom";
+import { MoreVertical as MoreVerticalIcon } from "lucide-react";
 import { Badge } from "../../../../components/ui/badge";
 import { Button } from "../../../../components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../../../../components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../../../../components/ui/dropdown-menu";
-import { Input } from "../../../../components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../../../components/ui/select";
+import { ListError } from "../../../../components/ui/list-error";
+import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
+import { Pagination } from "../../../../components/ui/pagination";
 import {
   Table,
   TableBody,
@@ -33,400 +33,405 @@ import {
   TableHeader,
   TableRow,
 } from "../../../../components/ui/table";
+import { fetchPaymentsPage } from "../../../../data/payments";
+import { showError, showSuccess, showWarning } from "../../../../lib/toast";
+import type { PaymentTableRow } from "../../../../types/payment.type";
 
-export type PlanType = "Premium" | "Standard" | "Basic";
-export type PaymentStatus = "Paid" | "Pending";
-export type RenewalType = "Auto Debit" | "Manually";
+const PAGE_SIZE = 20;
 
-export interface SubscriptionRow {
-  id: string;
-  hospitalName: string;
-  iconBg: string;
-  iconName: string;
-  plan: PlanType;
-  price: string;
-  pricePeriod: "month" | "year";
-  startDate: string;
-  endDate: string;
-  status: PaymentStatus;
-  renewal: RenewalType;
+function statusBadgeClass(status: string): string {
+  const s = status.toLowerCase();
+  if (
+    s === "paid" ||
+    s === "success" ||
+    s === "completed" ||
+    s === "captured"
+  ) {
+    return "bg-[#d0f5e6] text-[#00c896] hover:bg-[#d0f5e6]";
+  }
+  if (s === "pending" || s === "processing" || s === "created") {
+    return "bg-[#fff5e6] text-[#ff9800] hover:bg-[#fff5e6]";
+  }
+  if (
+    s === "failed" ||
+    s === "cancelled" ||
+    s === "canceled" ||
+    s === "refunded"
+  ) {
+    return "bg-[#ffe4e6] text-[#e11d48] hover:bg-[#ffe4e6]";
+  }
+  return "bg-grey-light text-black hover:bg-grey-light";
 }
 
-const subscriptionsDummyData: SubscriptionRow[] = [
-  {
-    id: "1",
-    hospitalName: "CityCare Health Center",
-    iconBg: "bg-sky-100",
-    iconName: "cross",
-    plan: "Premium",
-    price: "4,999",
-    pricePeriod: "month",
-    startDate: "15 Nov, 2025",
-    endDate: "15 Nov, 2026",
-    status: "Paid",
-    renewal: "Auto Debit",
-  },
-  {
-    id: "2",
-    hospitalName: "MedBridge SuperCare",
-    iconBg: "bg-blue-100",
-    iconName: "shield",
-    plan: "Standard",
-    price: "59,999",
-    pricePeriod: "year",
-    startDate: "15 Nov, 2025",
-    endDate: "15 Nov, 2026",
-    status: "Pending",
-    renewal: "Manually",
-  },
-  {
-    id: "3",
-    hospitalName: "HealWell Clinic",
-    iconBg: "bg-emerald-100",
-    iconName: "leaf",
-    plan: "Basic",
-    price: "2,999",
-    pricePeriod: "month",
-    startDate: "15 Nov, 2025",
-    endDate: "15 Nov, 2026",
-    status: "Paid",
-    renewal: "Auto Debit",
-  },
-  {
-    id: "4",
-    hospitalName: "CareFirst Hospital",
-    iconBg: "bg-blue-50",
-    iconName: "heart",
-    plan: "Standard",
-    price: "99,999",
-    pricePeriod: "year",
-    startDate: "15 Nov, 2025",
-    endDate: "15 Nov, 2026",
-    status: "Pending",
-    renewal: "Manually",
-  },
-  {
-    id: "5",
-    hospitalName: "LifeSpring Multispeciality",
-    iconBg: "bg-red-50",
-    iconName: "leaf",
-    plan: "Premium",
-    price: "99,999",
-    pricePeriod: "year",
-    startDate: "15 Nov, 2025",
-    endDate: "15 Nov, 2026",
-    status: "Paid",
-    renewal: "Auto Debit",
-  },
-  {
-    id: "6",
-    hospitalName: "Sunrise Medical Institute",
-    iconBg: "bg-red-100",
-    iconName: "heart",
-    plan: "Basic",
-    price: "59,999",
-    pricePeriod: "year",
-    startDate: "15 Nov, 2025",
-    endDate: "15 Nov, 2026",
-    status: "Pending",
-    renewal: "Manually",
-  },
-  {
-    id: "7",
-    hospitalName: "NovaLife Health Hub",
-    iconBg: "bg-teal-100",
-    iconName: "heart",
-    plan: "Premium",
-    price: "4,999",
-    pricePeriod: "month",
-    startDate: "15 Nov, 2025",
-    endDate: "15 Nov, 2026",
-    status: "Paid",
-    renewal: "Auto Debit",
-  },
-  {
-    id: "8",
-    hospitalName: "CityCare Health Center",
-    iconBg: "bg-sky-100",
-    iconName: "cross",
-    plan: "Premium",
-    price: "4,999",
-    pricePeriod: "month",
-    startDate: "15 Nov, 2025",
-    endDate: "15 Nov, 2026",
-    status: "Paid",
-    renewal: "Auto Debit",
-  },
-];
+function dash(v: string | undefined): string {
+  const t = v?.trim();
+  return t && t.length > 0 ? t : "—";
+}
 
-const HospitalIcon = ({
-  iconBg,
-  iconName,
+function formatPrice(price: string): string {
+  return `₹ ${parseInt(price.replace("₹", "").replace(",", "")) / 100}`;
+}
+
+function DetailBlock({
+  title,
+  children,
 }: {
-  iconBg: string;
-  iconName: string;
-}) => (
-  <div
-    className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${iconBg}`}
-    aria-hidden
-  >
-    {iconName === "cross" && (
-      <span className="text-sky-600 font-bold text-lg leading-none">+</span>
-    )}
-    {iconName === "shield" && (
-      <svg
-        className="w-5 h-5 text-blue-600"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-        />
-      </svg>
-    )}
-    {iconName === "leaf" && (
-      <svg
-        className="w-5 h-5 text-emerald-600"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
-        />
-      </svg>
-    )}
-    {iconName === "heart" && (
-      <svg
-        className="w-5 h-5 text-red-500"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-        />
-      </svg>
-    )}
-  </div>
-);
+  title: string;
+  children: ReactNode;
+}): JSX.Element {
+  return (
+    <section className="rounded-[10px] border border-[#dedee1] bg-[#f9fafb] px-4 py-4 sm:px-5 sm:py-5">
+      <p className="font-title-4m mb-3 text-[11px] font-medium uppercase tracking-[0.06em] text-x-70">
+        {title}
+      </p>
+      {children}
+    </section>
+  );
+}
 
-const planBadgeConfig: Record<
-  PlanType,
-  { className: string; icon: React.ReactNode }
-> = {
-  Premium: {
-    className: "bg-[#d0f5e6] text-[#00c896] hover:bg-[#d0f5e6]",
-    icon: <Crown className="w-4 h-4" />,
-  },
-  Standard: {
-    className: "bg-[#d5eaff] text-[#007cff] hover:bg-[#d5eaff]",
-    icon: <Star className="w-4 h-4" />,
-  },
-  Basic: {
-    className: "bg-[#fff1e0] text-[#ff9000] hover:bg-[#fff1e0]",
-    icon: <Heart className="w-4 h-4" />,
-  },
-};
+function PaymentDetailsDialog({
+  row,
+  open,
+  onOpenChange,
+}: {
+  row: PaymentTableRow | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}): JSX.Element {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[min(90vh,720px)] w-[calc(100vw-1.5rem)] max-w-xl overflow-hidden gap-0 rounded-[12px] border border-[#dedee1] bg-white p-0 shadow-lg sm:w-full">
+        <div className="max-h-[min(90vh,720px)] overflow-y-auto overscroll-contain px-5 pb-6 pt-14 sm:px-8 sm:pb-8 sm:pt-16">
+          <DialogHeader className="space-y-2 border-b border-[#dedee1] pb-5 text-left">
+            <DialogTitle className="[font-family:'Archivo',Helvetica] pr-10 text-xl font-medium leading-snug text-black">
+              Payment details
+            </DialogTitle>
+            <DialogDescription className="font-title-4r text-sm leading-relaxed text-x-70">
+              Full information for this payment, including hospital, patient,
+              doctor, and appointment when available.
+            </DialogDescription>
+          </DialogHeader>
 
-const statusBadgeConfig: Record<
-  PaymentStatus,
-  { className: string }
-> = {
-  Paid: { className: "bg-[#d0f5e6] text-[#00c896] hover:bg-[#d0f5e6]" },
-  Pending: { className: "bg-[#fff5e6] text-[#ff9800] hover:bg-[#fff5e6]" },
-};
+          {row ? (
+            <div className="mt-6 flex flex-col gap-4 text-left">
+              <DetailBlock title="Hospital">
+                <p className="font-title-4r text-[15px] leading-snug text-black">
+                  {dash(row.hospitalName)}
+                </p>
+              </DetailBlock>
 
-export const PaymentListSection = (): JSX.Element => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+              <DetailBlock title="Patient">
+                <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <dt className="font-title-5r text-xs text-x-70">Name</dt>
+                    <dd className="font-title-4r text-sm leading-snug text-black">
+                      {dash(row.patientName)}
+                    </dd>
+                  </div>
+                  <div className="space-y-1">
+                    <dt className="font-title-5r text-xs text-x-70">Phone</dt>
+                    <dd className="font-title-4r text-sm leading-snug text-black">
+                      {dash(row.patientPhone)}
+                    </dd>
+                  </div>
+                </dl>
+              </DetailBlock>
+
+              <DetailBlock title="Doctor">
+                <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <dt className="font-title-5r text-xs text-x-70">Name</dt>
+                    <dd className="font-title-4r text-sm leading-snug text-black">
+                      {dash(row.doctorName)}
+                    </dd>
+                  </div>
+                  <div className="space-y-1">
+                    <dt className="font-title-5r text-xs text-x-70">Email</dt>
+                    <dd className="font-title-4r text-sm leading-snug text-black break-all">
+                      {dash(row.doctorEmail)}
+                    </dd>
+                  </div>
+                </dl>
+              </DetailBlock>
+
+              {/* <DetailBlock title="Appointment">
+                <p className="font-title-4r text-[15px] leading-snug text-black">
+                  {dash(row.appointmentTimeLabel)}
+                </p>
+
+                <p className="font-title-4r text-[15px] leading-snug text-black">
+                  Date {}
+                  Time{new Date(row.appointmentTimeLabel).toLocaleTimeString()}
+                  Time{new Date(row.).toLocaleTimeString()}
+                </p>
+              </DetailBlock> */}
+
+              <DetailBlock title="Payment">
+                <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <dt className="font-title-5r text-xs text-x-70">Amount</dt>
+                    <dd className="font-title-4r text-sm font-medium leading-snug text-black">
+                      {formatPrice(row.priceLabel)}
+                    </dd>
+                  </div>
+                  <div className="space-y-1">
+                    <dt className="font-title-5r text-xs text-x-70">Paid on</dt>
+                    <dd className="font-title-4r text-sm leading-snug text-black">
+                      {row.paymentDateLabel}
+                    </dd>
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <dt className="font-title-5r text-xs text-x-70">Status</dt>
+                    <dd>
+                      <Badge
+                        className={`rounded-[100px] px-2.5 py-[5px] font-title-4r ${statusBadgeClass(row.status)}`}
+                      >
+                        {row.status}
+                      </Badge>
+                    </dd>
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <dt className="font-title-5r text-xs text-x-70">
+                      Payment ID
+                    </dt>
+                    <dd className="rounded-[8px] border border-[#e8e9ec] bg-white px-3 py-2 font-mono text-xs leading-relaxed text-black">
+                      {row.id}
+                    </dd>
+                  </div>
+                  {row.razorpayOrderId ? (
+                    <div className="space-y-1 sm:col-span-2">
+                      <dt className="font-title-5r text-xs text-x-70">
+                        Order ID
+                      </dt>
+                      <dd className="rounded-[8px] border border-[#e8e9ec] bg-white px-3 py-2 font-mono text-xs leading-relaxed text-black break-all">
+                        {row.razorpayOrderId}
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
+              </DetailBlock>
+            </div>
+          ) : null}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+async function copyText(label: string, text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+    showSuccess("Copied", `${label} copied to clipboard.`);
+  } catch {
+    showError("Copy failed", "Could not copy to clipboard.");
+  }
+}
+
+export interface PaymentListSectionProps {
+  hospitalId: string;
+  onRecordsMeta?: (meta: { total: number }) => void;
+}
+
+export const PaymentListSection = ({
+  hospitalId,
+  onRecordsMeta,
+}: PaymentListSectionProps): JSX.Element => {
+  const navigate = useNavigate();
+  const [page, setPage] = useState(1);
+  const [rows, setRows] = useState<PaymentTableRow[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [detailRow, setDetailRow] = useState<PaymentTableRow | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const onRecordsMetaRef = useRef(onRecordsMeta);
+  onRecordsMetaRef.current = onRecordsMeta;
+
+  const openDetails = (row: PaymentTableRow) => {
+    setDetailRow(row);
+    setDetailsOpen(true);
+  };
+
+  const load = useCallback(async () => {
+    if (!hospitalId.trim()) {
+      setLoading(false);
+      setRows([]);
+      setTotalPages(1);
+      onRecordsMetaRef.current?.({ total: 0 });
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const { rows: nextRows, meta } = await fetchPaymentsPage({
+        hospitalId: hospitalId.trim(),
+        page,
+        limit: PAGE_SIZE,
+      });
+      setRows(nextRows);
+      setTotalPages(meta.totalPages);
+      onRecordsMetaRef.current?.({ total: meta.total });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load payments.");
+      setRows([]);
+      setTotalPages(1);
+      onRecordsMetaRef.current?.({ total: 0 });
+    } finally {
+      setLoading(false);
+    }
+  }, [hospitalId, page]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [hospitalId]);
+
+  if (!hospitalId.trim()) {
+    return (
+      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden min-h-[280px]">
+        <ListError message="No hospital is linked to your account. Payments cannot be loaded." />
+      </section>
+    );
+  }
 
   return (
     <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 px-5 md:px-6 pt-5 md:pt-6 pb-[26px]">
-        <div className="flex w-full lg:max-w-[372px] items-center gap-2.5 px-3 py-2 bg-grey-light rounded-[100px] h-[38px]">
-          <SearchIcon className="w-5 h-5 text-black opacity-70 shrink-0" />
-          <Input
-            placeholder="Search by hospital name, plan,..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 border-0 bg-transparent opacity-70 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] focus-visible:ring-0 focus-visible:ring-offset-0 p-0 h-auto min-w-0"
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-[15px]">
-          <Select>
-            <SelectTrigger className="flex w-[107px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button
-            variant="ghost"
-            className="inline-flex items-center gap-[5px] px-2.5 py-1.5 bg-grey-light rounded-[100px] hover:bg-grey-light border-0"
-          >
-            <FilterIcon className="w-6 h-6" />
-            <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
-              Filter
-            </span>
-          </Button>
-
-          <div className="inline-flex items-center p-[2px] bg-grey-light rounded-[100px]">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setViewMode("list")}
-              className={`h-8 w-8 rounded-full shrink-0 ${
-                viewMode === "list"
-                  ? "bg-primary-2 text-white hover:bg-primary-2 hover:text-white"
-                  : "hover:bg-white text-black"
-              }`}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setViewMode("grid")}
-              className={`h-8 w-8 rounded-full shrink-0 ${
-                viewMode === "grid"
-                  ? "bg-primary-2 text-white hover:bg-primary-2 hover:text-white"
-                  : "hover:bg-white text-black"
-              }`}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
+      <PaymentDetailsDialog
+        row={detailRow}
+        open={detailsOpen}
+        onOpenChange={(next) => {
+          setDetailsOpen(next);
+          if (!next) setDetailRow(null);
+        }}
+      />
+      <div className="flex flex-col overflow-x-auto -mx-0 min-h-[200px]">
+        {loading && (
+          <div className="flex justify-center py-16">
+            <LoadingSpinner />
           </div>
-        </div>
-      </div>
-
-      <div className="flex flex-col overflow-x-auto -mx-0">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-grey-dark hover:bg-grey-dark border-0">
-              <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                Hospital Name
-              </TableHead>
-              <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                Plan
-              </TableHead>
-              <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                Price
-              </TableHead>
-              <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                Start Date
-              </TableHead>
-              <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                End Date
-              </TableHead>
-              <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                Status
-              </TableHead>
-              <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                Renewal
-              </TableHead>
-              <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                Action
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {subscriptionsDummyData.map((row) => (
-              <TableRow
-                key={row.id}
-                className="border-b border-[#dedee1] hover:bg-grey-light/50"
-              >
-                <TableCell className="p-[0px]">
-                  <div className="flex items-center gap-[10px] px-[20px] py-[16px]">
-                    <HospitalIcon
-                      iconBg={row.iconBg}
-                      iconName={row.iconName}
-                    />
-                    <span className="font-title-4l text-black font-medium text-[14px] leading-[19px] font-[number:var(--title-4l-font-weight)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                      {row.hospitalName}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <div className="px-[20px] py-[16px]">
-                    <Badge
-                      className={`inline-flex items-center gap-1.5 rounded-[100px] px-2.5 py-[5px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] [font-style:var(--title-4r-font-style)] ${planBadgeConfig[row.plan].className}`}
-                    >
-                      {planBadgeConfig[row.plan].icon}
-                      {row.plan}
-                    </Badge>
-                  </div>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                    ₹{row.price} / {row.pricePeriod === "month" ? "month" : "year"}
-                  </span>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                    {row.startDate}
-                  </span>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                    {row.endDate}
-                  </span>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <div className="px-[20px] py-[16px]">
-                    <Badge
-                      className={`rounded-[100px] px-2.5 py-[5px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] [font-style:var(--title-4r-font-style)] ${statusBadgeConfig[row.status].className}`}
-                    >
-                      {row.status}
-                    </Badge>
-                  </div>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                    {row.renewal}
-                  </span>
-                </TableCell>
-                <TableCell className="px-[20px] py-[16px]">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded-full hover:bg-grey-light"
-                      >
-                        <MoreVerticalIcon className="h-5 w-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>View Details</DropdownMenuItem>
-                      <DropdownMenuItem>Edit Subscription</DropdownMenuItem>
-                      <DropdownMenuItem>Renew</DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600">
-                        Cancel Subscription
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+        )}
+        {!loading && error && <ListError message={error} />}
+        {!loading && !error && (
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-grey-dark hover:bg-grey-dark border-0">
+                <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                  Patient name
+                </TableHead>
+                <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                  Doctor
+                </TableHead>
+                <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                  Price
+                </TableHead>
+                <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                  Payment date
+                </TableHead>
+                <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                  Status
+                </TableHead>
+                <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                  Action
+                </TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {rows.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="px-[20px] py-12 text-center font-title-4r text-x-70"
+                  >
+                    No payments found for this hospital.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    className="border-b border-[#dedee1] hover:bg-grey-light/50"
+                  >
+                    <TableCell className="px-[20px] py-[16px] font-title-4l text-black">
+                      {row.patientName}
+                    </TableCell>
+                    <TableCell className="px-[20px] py-[16px] font-title-4l text-black">
+                      {row.doctorName}
+                    </TableCell>
+                    <TableCell className="px-[20px] py-[16px] font-title-4l text-black">
+                      {formatPrice(row.priceLabel)}
+                    </TableCell>
+                    <TableCell className="px-[20px] py-[16px] font-title-4l text-black">
+                      {row.paymentDateLabel}
+                    </TableCell>
+                    <TableCell className="px-[20px] py-[16px]">
+                      <Badge
+                        className={`rounded-[100px] px-2.5 py-[5px] font-title-4r ${statusBadgeClass(row.status)}`}
+                      >
+                        {row.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="px-[20px] py-[16px]">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full hover:bg-grey-light"
+                            aria-label={`Actions for payment ${row.id}`}
+                          >
+                            <MoreVerticalIcon className="h-5 w-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openDetails(row)}>
+                            View details
+                          </DropdownMenuItem>
+                          {row.patientId ? (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                navigate(
+                                  `/prescriptions/patient/${row.patientId}`,
+                                )
+                              }
+                            >
+                              View patient
+                            </DropdownMenuItem>
+                          ) : null}
+                          <DropdownMenuItem
+                            onClick={() => void copyText("Payment ID", row.id)}
+                          >
+                            Copy payment ID
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              showWarning(
+                                "Download receipt",
+                                "Receipt download is not available for this payment yet.",
+                              )
+                            }
+                          >
+                            Download receipt
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        )}
       </div>
+      {!loading && !error && totalPages > 1 && (
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
+      )}
     </section>
   );
 };
