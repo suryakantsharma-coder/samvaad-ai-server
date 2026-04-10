@@ -26,6 +26,7 @@ export interface PublicTelecallerPayload {
     reason?: string;
     doctorId?: string;
     doctorName?: string;
+    doctorEmail?: string;
   };
   doctors?: Array<{
     _id: string;

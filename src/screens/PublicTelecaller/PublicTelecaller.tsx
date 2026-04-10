@@ -1,8 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Loader2, PhoneCall, Building2, User, ShieldCheck } from "lucide-react";
+import {
+  ChevronDown,
+  Loader2,
+  PhoneCall,
+  Building2,
+  User,
+  ShieldCheck,
+} from "lucide-react";
 import { Button } from "../../components/ui/button";
-import { fetchPublicTelecallerDetails } from "../../data/publicTelecaller";
+import {
+  extractDoctorEmail,
+  fetchPublicTelecallerDetails,
+} from "../../data/publicTelecaller";
 import { API_BASE_URL } from "../../config";
 import { authFetch } from "../../data/api";
 import type { PublicTelecallerPayload } from "../../types/telecaller.type";
@@ -343,7 +353,7 @@ export const PublicTelecaller = (): JSX.Element => {
               typeof x.designation === "string" ? x.designation : undefined,
             availability:
               typeof x.availability === "string" ? x.availability : undefined,
-            email: typeof x.email === "string" ? x.email : undefined,
+            email: extractDoctorEmail(x),
           }))
           .filter((x) => x._id && x.fullName);
         setDoctors(mapped);
@@ -351,17 +361,50 @@ export const PublicTelecaller = (): JSX.Element => {
       .catch(() => undefined);
   }, [doctors.length]);
 
-  /** Doctors from API, or a single synthetic row from last visit so public (logged-out) booking still works. */
+  /**
+   * Doctors from API, or a single synthetic row from last visit so public (logged-out) booking still works.
+   * If the list has no per-doctor email, reuse `lastAppointment.doctorEmail` when the row is the same doctor
+   * (otherwise Razorpay `notes.doctorEmail` stays empty).
+   */
   const doctorsForUi = useMemo((): DoctorLite[] => {
-    if (doctors.length > 0) return doctors;
     const la = details?.lastAppointment;
-    const id = la?.doctorId?.trim();
+    const fallbackEmail = la?.doctorEmail?.trim();
+    const lastId = la?.doctorId?.trim();
+    const lastNameLower = la?.doctorName?.trim().toLowerCase();
+
+    if (doctors.length > 0) {
+      return doctors.map((d) => {
+        const existing = d.email?.trim();
+        if (existing) return d;
+        const sameById = lastId && d._id === lastId;
+        const sameByName =
+          lastNameLower &&
+          d.fullName.trim().toLowerCase() === lastNameLower;
+        if ((sameById || sameByName) && fallbackEmail) {
+          return { ...d, email: fallbackEmail };
+        }
+        return d;
+      });
+    }
+
+    const id = lastId;
     const name = la?.doctorName?.trim();
     if (id && name) {
-      return [{ _id: id, fullName: name }];
+      return [
+        {
+          _id: id,
+          fullName: name,
+          email: fallbackEmail,
+        },
+      ];
     }
     return [];
-  }, [doctors, details?.lastAppointment?.doctorId, details?.lastAppointment?.doctorName]);
+  }, [
+    doctors,
+    details?.lastAppointment?.doctorId,
+    details?.lastAppointment?.doctorName,
+    details?.lastAppointment?.doctorEmail,
+  ]);
 
   const selectedDoctor = useMemo(
     () => doctorsForUi.find((d) => d._id === selectedDoctorId),
@@ -468,7 +511,7 @@ export const PublicTelecaller = (): JSX.Element => {
           doctor: selectedDoctorId,
           reason: visitReason.trim(),
           patientEmail: normalizedEmail,
-          docotrEmail: selectedDoctor?.email ?? "",
+          doctorEmail: selectedDoctor?.email?.trim() ?? "",
           appointmentDateTime: toIstDateTime(selectedDate, selectedTime),
           hospitalId: details.hospitalId ?? details.hospital?._id ?? "",
           videoUrl: details.appointmentId
@@ -500,7 +543,7 @@ export const PublicTelecaller = (): JSX.Element => {
           patientId: details.patient._id,
           patientName: details.patient.fullName,
           patientEmail: normalizedEmail,
-          docotrEmail: selectedDoctor?.email ?? "",
+          doctorEmail: selectedDoctor?.email?.trim() ?? "",
           reason: visitReason.trim(),
           bookingType: "telecaller",
         },
@@ -685,49 +728,60 @@ export const PublicTelecaller = (): JSX.Element => {
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <select
-                        value={selectedDoctorId}
-                        onChange={(e) => {
-                          setSelectedDoctorId(e.target.value);
-                          setSelectedTime("");
-                        }}
-                        disabled={doctorsForUi.length === 0}
-                        className="h-10 min-w-[180px] max-w-[260px] rounded-[8px] border border-[#dedee1] px-3 text-sm bg-white text-black/90 disabled:opacity-60"
-                      >
-                        <option value="">
-                          {doctorsForUi.length === 0
-                            ? "No doctor available"
-                            : "Select doctor"}
-                        </option>
-                        {doctorsForUi.map((d) => (
-                          <option key={d._id} value={d._id}>
-                            {d.fullName}
-                            {d.designation ? ` (${d.designation})` : ""}
-                          </option>
-                        ))}
-                      </select>
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="flex flex-col gap-1 min-w-[180px] max-w-[280px]">
+                        <span className="font-title-4m text-x-70 text-xs leading-none">
+                          Doctor
+                        </span>
+                        <div
+                          className="min-h-10 flex items-center rounded-[8px] border border-[#dedee1] bg-[#f9fafb] px-3 py-2 text-sm text-black/90"
+                          aria-live="polite"
+                        >
+                          {selectedDoctor ? (
+                            <span className="font-title-4r line-clamp-2">
+                              {selectedDoctor.fullName}
+                              {selectedDoctor.designation
+                                ? ` (${selectedDoctor.designation})`
+                                : ""}
+                            </span>
+                          ) : doctorsForUi.length === 0 ? (
+                            <span className="font-title-4r text-x-70">
+                              No doctor available
+                            </span>
+                          ) : (
+                            <span className="font-title-4r text-x-70">—</span>
+                          )}
+                        </div>
+                      </div>
                       <input
                         type="date"
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
                         className="h-10 rounded-[8px] border border-[#dedee1] px-3 text-sm"
                       />
-                      <select
-                        value={selectedTime}
-                        onChange={(e) => setSelectedTime(e.target.value)}
-                        disabled={!selectedDoctorId}
-                        className="h-10 min-w-[150px] rounded-[8px] border border-[#dedee1] px-3 text-sm bg-white disabled:opacity-60"
-                      >
-                        <option value="">
-                          {selectedDoctorId ? "Select time" : "Pick doctor first"}
-                        </option>
-                        {availableTimes.map((slot) => (
-                          <option key={slot} value={slot}>
-                            {formatTimeHhMmTo12Hour(slot)}
+                      <div className="relative min-w-[158px]">
+                        <select
+                          value={selectedTime}
+                          onChange={(e) => setSelectedTime(e.target.value)}
+                          disabled={!selectedDoctorId}
+                          className="h-10 w-full cursor-pointer appearance-none rounded-[8px] border border-[#c5c7ce] bg-white pl-3 pr-10 text-sm text-black/90 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="">
+                            {selectedDoctorId
+                              ? "Select time"
+                              : "Pick doctor first"}
                           </option>
-                        ))}
-                      </select>
+                          {availableTimes.map((slot) => (
+                            <option key={slot} value={slot}>
+                              {formatTimeHhMmTo12Hour(slot)}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown
+                          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]"
+                          aria-hidden
+                        />
+                      </div>
                       {/* Hidden input preserves native value semantics for potential browser autofill */}
                       <input
                         type="time"

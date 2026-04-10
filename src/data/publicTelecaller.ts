@@ -53,6 +53,25 @@ function parseHospital(node: unknown): PublicTelecallerPayload["hospital"] {
 
 type DoctorRow = NonNullable<PublicTelecallerPayload["doctors"]>[number];
 
+/** Many APIs omit `email` or use alternate keys / nested `user`. */
+function pickDoctorEmail(node: Dict | null | undefined): string | undefined {
+  if (!node) return undefined;
+  const user = asDict(node.user);
+  return (
+    getString(node.email) ??
+    getString(node.doctorEmail) ??
+    getString(node.emailId) ??
+    getString(node.primaryEmail) ??
+    getString(node.workEmail) ??
+    getString(user?.email)
+  );
+}
+
+/** Used when mapping secured `/api/doctors` rows so Razorpay notes get the same fields as public payload. */
+export function extractDoctorEmail(node: unknown): string | undefined {
+  return pickDoctorEmail(asDict(node));
+}
+
 function parseOneDoctor(node: unknown): DoctorRow | null {
   const d = asDict(node);
   if (!d) return null;
@@ -65,7 +84,7 @@ function parseOneDoctor(node: unknown): DoctorRow | null {
     fullName,
     designation: getString(d.designation),
     availability: getString(d.availability) ?? getString(d.workingHours),
-    email: getString(d.email),
+    email: pickDoctorEmail(d),
   };
 }
 
@@ -78,6 +97,51 @@ function parseDoctors(node: unknown): PublicTelecallerPayload["doctors"] {
   }
   const one = parseOneDoctor(node);
   return one ? [one] : undefined;
+}
+
+/**
+ * Backend may expose doctor email on the patient payload root (not inside each `doctors[]` row).
+ * Merge when rows are missing `email`, using optional `doctorId` to pick the right row.
+ */
+function enrichDoctorsWithPayloadDoctorEmail(
+  doctors: NonNullable<PublicTelecallerPayload["doctors"]> | undefined,
+  payloadEmail: string | undefined,
+  payloadDoctorId: string | undefined,
+): NonNullable<PublicTelecallerPayload["doctors"]> | undefined {
+  if (!doctors?.length || !payloadEmail?.trim()) return doctors;
+  const email = payloadEmail.trim();
+  const targetId = payloadDoctorId?.trim();
+  return doctors.map((d) => {
+    if (d.email?.trim()) return d;
+    if (targetId) {
+      if (d._id === targetId) return { ...d, email };
+      return d;
+    }
+    if (doctors.length === 1) return { ...d, email };
+    return d;
+  });
+}
+
+function pickDoctorEmailFromPayloadRoot(data: Dict): {
+  email?: string;
+  doctorId?: string;
+} {
+  const email =
+    getString(data.doctorEmail) ??
+    getString(data.assignedDoctorEmail) ??
+    getString(data.primaryDoctorEmail) ??
+    getString(data.doctorsEmail) ??
+    pickDoctorEmail(asDict(data.doctor)) ??
+    pickDoctorEmail(asDict(data.assignedDoctor)) ??
+    pickDoctorEmail(asDict(data.doctorDetails)) ??
+    pickDoctorEmail(asDict(data.selectedDoctor));
+  const doctorId =
+    getString(data.doctorId) ??
+    getString(data.assignedDoctorId) ??
+    getString(data.primaryDoctorId) ??
+    getString(asDict(data.doctor)?._id) ??
+    getString(asDict(data.assignedDoctor)?._id);
+  return { email, doctorId };
 }
 
 function parseLastAppointment(
@@ -95,11 +159,17 @@ function parseLastAppointment(
     getString(a.doctorName) ??
     getString(doctorNode?.fullName) ??
     getString(a.doctorFullName);
+  const doctorEmail =
+    getString(a.doctorEmail) ??
+    pickDoctorEmail(doctorNode) ??
+    pickDoctorEmail(asDict(a.assignedDoctor)) ??
+    pickDoctorEmail(asDict(a.doctorDetails));
   if (!reason && !doctorId && !doctorName) return undefined;
   return {
     reason,
     doctorId,
     doctorName,
+    doctorEmail,
   };
 }
 
@@ -129,12 +199,21 @@ export async function fetchPublicTelecallerDetails(
     const doctorsFromSingle = parseOneDoctor(
       data.doctor ?? data.assignedDoctor ?? data.doctorDetails,
     );
-    const doctors =
+    let doctors =
       doctorsFromList?.length ?
         doctorsFromList
       : doctorsFromSingle ?
         [doctorsFromSingle]
       : undefined;
+
+    const { email: payloadDoctorEmail, doctorId: payloadDoctorId } =
+      pickDoctorEmailFromPayloadRoot(data);
+    doctors = enrichDoctorsWithPayloadDoctorEmail(
+      doctors,
+      payloadDoctorEmail,
+      payloadDoctorId,
+    );
+
     const appointmentNode = asDict(
       data.appointment ??
         data.latestAppointment ??
@@ -145,7 +224,20 @@ export async function fetchPublicTelecallerDetails(
       getString(appointmentNode?._id) ??
       getString(appointmentNode?.appointmentId) ??
       getString(data.appointmentId);
-    const lastAppointment = parseLastAppointment(appointmentNode);
+    let lastAppointment = parseLastAppointment(appointmentNode);
+    if (
+      lastAppointment &&
+      !lastAppointment.doctorEmail?.trim() &&
+      payloadDoctorEmail?.trim()
+    ) {
+      const laId = lastAppointment.doctorId?.trim();
+      if (!payloadDoctorId || !laId || laId === payloadDoctorId) {
+        lastAppointment = {
+          ...lastAppointment,
+          doctorEmail: payloadDoctorEmail.trim(),
+        };
+      }
+    }
     const hospitalId = getString(data.hospitalId) ?? hospital?._id;
     return {
       patient,
