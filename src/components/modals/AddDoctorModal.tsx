@@ -1,4 +1,4 @@
-import { BriefcaseIcon, CircleCheckIcon, MailIcon, XIcon } from "lucide-react";
+import { BriefcaseIcon, CircleCheck, MailIcon, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import type { Doctor } from "../../types/doctor.type";
 import { Button } from "../ui/button";
@@ -11,6 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import {
+  modalFooterCancelClassName,
+  modalFooterPrimaryClassName,
+  modalFooterRowClassName,
+  modalHeaderCloseButtonClassName,
+} from "./modalFooterStyles";
 
 export interface DoctorData {
   name: string;
@@ -119,7 +125,7 @@ function doctorToFormData(d: Doctor): DoctorData {
 interface AddDoctorModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (doctor: DoctorData) => void;
+  onSave: (doctor: DoctorData) => void | Promise<void>;
   initialDoctor?: Doctor | null;
   onUpdate?: (doctorId: string, doctor: DoctorData) => Promise<void>;
 }
@@ -132,6 +138,7 @@ export const AddDoctorModal = ({
   onUpdate,
 }: AddDoctorModalProps): JSX.Element => {
   const [formData, setFormData] = useState<DoctorData>(DEFAULT_FORM);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -143,19 +150,30 @@ export const AddDoctorModal = ({
   }, [open, initialDoctor?._id]);
 
   const handleSubmit = async () => {
+    if (submitting) return;
     if (initialDoctor && onUpdate) {
+      setSubmitting(true);
       try {
         await onUpdate(initialDoctor._id, formData);
         setFormData(DEFAULT_FORM);
         onOpenChange(false);
       } catch {
         /* toast from provider */
+      } finally {
+        setSubmitting(false);
       }
       return;
     }
-    onSave(formData);
-    setFormData(DEFAULT_FORM);
-    onOpenChange(false);
+    setSubmitting(true);
+    try {
+      await Promise.resolve(onSave(formData));
+      setFormData(DEFAULT_FORM);
+      onOpenChange(false);
+    } catch {
+      /* toast from provider */
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleCancel = () => {
@@ -191,13 +209,14 @@ export const AddDoctorModal = ({
           <DialogTitle className="font-title-3m text-[18px] leading-[23px] font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
             {initialDoctor ? "Edit doctor" : "Add Doctors"}
           </DialogTitle>
-          <Button
-            variant="ghost"
-            className="absolute right-4 top-4"
+          <button
+            type="button"
+            className={`absolute right-3 top-3 z-10 ${modalHeaderCloseButtonClassName}`}
             onClick={handleCloseIcon}
+            aria-label="Close"
           >
-            <XIcon className="w-[24px] h-[24px] text-black" />
-          </Button>
+            <X className="h-5 w-5" strokeWidth={2} aria-hidden />
+          </button>
         </div>
 
         <div className="px-5 py-5 flex flex-col gap-4">
@@ -434,25 +453,23 @@ export const AddDoctorModal = ({
             </Select>
           </div>
 
-          <div className="flex justify-end gap-[15px] mt-4">
+          <div className={`${modalFooterRowClassName} mt-4`}>
             <Button
               onClick={handleCancel}
               variant="ghost"
-              className="inline-flex items-center gap-[5px] px-[15px] py-1.5 bg-grey-light hover:bg-grey-light/80 rounded-[6px] h-[44px] "
+              disabled={submitting}
+              className={modalFooterCancelClassName}
+              leadingIcon={<X className="h-4 w-4" />}
             >
-              <XIcon className="w-5 h-5" />
-              <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
-                Cancel
-              </span>
+              Cancel
             </Button>
             <Button
               onClick={() => void handleSubmit()}
-              className="inline-flex items-center gap-[5px] px-[15px] py-1.5 bg-primary-2 hover:bg-primary-2/90 rounded-[6px] h-[44px]"
+              loading={submitting}
+              leadingIcon={<CircleCheck className="h-4 w-4" />}
+              className={modalFooterPrimaryClassName}
             >
-              <CircleCheckIcon className="w-5 h-5" />
-              <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-white text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
-                {initialDoctor ? "Update" : "Save"}
-              </span>
+              {initialDoctor ? "Update" : "Save"}
             </Button>
           </div>
         </div>

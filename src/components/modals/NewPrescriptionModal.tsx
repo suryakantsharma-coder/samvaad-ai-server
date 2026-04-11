@@ -2,8 +2,8 @@ import {
   CalendarIcon,
   ChevronDown,
   ChevronUp,
+  CircleCheck,
   FileText,
-  Send,
   Trash2,
   X,
 } from "lucide-react";
@@ -28,6 +28,12 @@ import type {
 import { Patients } from "../../types/patient.type";
 import { usePatient } from "../../contexts/PatientProvider";
 import type { UpdatePrescriptionPayload } from "../../types/prescription.type";
+import {
+  modalFooterCancelClassName,
+  modalFooterPrimaryClassName,
+  modalFooterRowClassName,
+  modalHeaderCloseButtonClassName,
+} from "./modalFooterStyles";
 
 const INTAKE_OPTIONS = ["Before", "After"];
 
@@ -83,12 +89,12 @@ interface NewPrescriptionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** For create mode */
-  onSave?: (payload: NewPrescriptionPayload) => void;
+  onSave?: (payload: NewPrescriptionPayload) => void | Promise<void>;
   /** For edit mode; called with prescription id and update payload */
   onUpdate?: (
     prescriptionId: string,
     payload: UpdatePrescriptionPayload,
-  ) => void;
+  ) => void | Promise<void>;
   /** When set, modal opens in edit mode with form pre-filled */
   initialPrescription?: Prescription | null;
   /** When set (create mode), pre-select this patient in the dropdown */
@@ -114,6 +120,7 @@ export const NewPrescriptionModal = ({
     Appointments[]
   >([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [appointmentDate, setAppointmentDate] = useState("2025-11-04");
   const [followUpDays, setFollowUpDays] = useState(7);
   const [medicines, setMedicines] = useState<MedicineEntry[]>([]);
@@ -256,7 +263,8 @@ export const NewPrescriptionModal = ({
     };
   }, [selectedPatient?._id]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
+    if (submitting) return;
     if (isEditMode && initialPrescription) {
       const updatePayload: UpdatePrescriptionPayload = {
         patientName:
@@ -283,8 +291,15 @@ export const NewPrescriptionModal = ({
         })),
         status: initialPrescription.status,
       };
-      onUpdate?.(initialPrescription._id, updatePayload);
-      onOpenChange(false);
+      setSubmitting(true);
+      try {
+        await onUpdate?.(initialPrescription._id, updatePayload);
+        onOpenChange(false);
+      } catch {
+        /* parent shows toast */
+      } finally {
+        setSubmitting(false);
+      }
       return;
     }
     if (!selectedPatient || !selectedAppointment) return;
@@ -296,8 +311,14 @@ export const NewPrescriptionModal = ({
       followUpDays,
       medicines: medicines.map(({ id, expanded, ...rest }) => rest),
     };
-    onSave?.(payload);
-    onOpenChange(false);
+    setSubmitting(true);
+    try {
+      await Promise.resolve(onSave?.(payload));
+    } catch {
+      /* parent shows toast */
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const canSend = isEditMode
@@ -305,6 +326,7 @@ export const NewPrescriptionModal = ({
     : Boolean(selectedPatient && selectedAppointment);
 
   const handleClose = () => {
+    if (submitting) return;
     onCancel?.();
     onOpenChange(false);
   };
@@ -324,10 +346,11 @@ export const NewPrescriptionModal = ({
           <button
             type="button"
             onClick={handleClose}
-            className="rounded-sm opacity-70 hover:opacity-100 p-1"
+            disabled={submitting}
+            className={`${modalHeaderCloseButtonClassName} disabled:opacity-40 disabled:pointer-events-none`}
             aria-label="Close"
           >
-            <X className="h-5 w-5 text-gray-600" />
+            <X className="h-5 w-5" strokeWidth={2} aria-hidden />
           </button>
         </DialogHeader>
 
@@ -655,23 +678,25 @@ export const NewPrescriptionModal = ({
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 pt-2 border-t border-[#dedee1]">
+          <div className={`${modalFooterRowClassName} pt-2 border-t border-[#dedee1]`}>
             <Button
               type="button"
               variant="ghost"
               onClick={handleClose}
-              className="inline-flex items-center gap-[5px] px-4 py-2 bg-grey-light hover:bg-grey-light/80 rounded-[6px] h-[44px] text-gray-600 font-title-4r"
+              disabled={submitting}
+              className={modalFooterCancelClassName}
+              leadingIcon={<X className="h-4 w-4" />}
             >
-              <X className="w-5 h-5" />
               Cancel
             </Button>
             <Button
               type="button"
-              onClick={handleSend}
+              onClick={() => void handleSend()}
               disabled={!canSend}
-              className="inline-flex items-center gap-[5px] px-4 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[6px] h-[44px] text-white font-title-4r disabled:opacity-50 disabled:pointer-events-none"
+              loading={submitting}
+              leadingIcon={<CircleCheck className="h-4 w-4" />}
+              className={`${modalFooterPrimaryClassName} disabled:opacity-50 disabled:pointer-events-none`}
             >
-              <Send className="w-5 h-5" />
               {isEditMode ? "Update Prescription" : "Send Prescription"}
             </Button>
           </div>

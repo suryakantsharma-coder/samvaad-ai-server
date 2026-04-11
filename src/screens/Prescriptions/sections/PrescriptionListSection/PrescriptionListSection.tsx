@@ -18,10 +18,10 @@ import {
   TableCell,
   TableHead,
   TableHeader,
+  TableLoadingRow,
   TableRow,
 } from "../../../../components/ui/table";
 import { ListError } from "../../../../components/ui/list-error";
-import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
 import { Pagination } from "../../../../components/ui/pagination";
 import { usePrescription } from "../../../../contexts/PrescriptionProvider";
 import {
@@ -29,9 +29,7 @@ import {
   Prescription,
 } from "../../../../types/prescription.type";
 
-function formatFollowUp(
-  followUp: Prescription["followUp"],
-): string {
+function formatFollowUp(followUp: Prescription["followUp"]): string {
   if (!followUp) return "—";
   return `${followUp.value} ${followUp.unit}`;
 }
@@ -86,12 +84,16 @@ export const PrescriptionListSection = ({
   onMarkAsDonePrescription,
   onViewRecord,
   onPrescriptionReport,
+  listStartDate = "",
+  listEndDate = "",
 }: {
   onEditPrescription: (prescription: Prescription) => void;
   onDeletePrescription: (prescription: Prescription) => void;
   onMarkAsDonePrescription: (prescription: Prescription) => void;
   onViewRecord?: (prescription: Prescription) => void;
   onPrescriptionReport?: (prescription: Prescription) => void;
+  listStartDate?: string;
+  listEndDate?: string;
 }): JSX.Element => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchPage, setSearchPage] = useState(1);
@@ -106,18 +108,25 @@ export const PrescriptionListSection = ({
     handleGetPrescriptions,
     handleSearchPrescriptions,
     resetSearchedPrescriptions,
+    currentStatusFilter,
   } = usePrescription();
 
   const isSearching = searchQuery.trim() !== "";
-  const listToShow = isSearching ? searchedPrescriptions ?? [] : prescriptions;
+  const listToShow = isSearching
+    ? (searchedPrescriptions ?? [])
+    : prescriptions;
   const searchTotalPages = Math.max(1, Math.ceil(listToShow.length / limit));
   const pagedSearchList = isSearching
     ? listToShow.slice((searchPage - 1) * limit, searchPage * limit)
     : listToShow;
 
   useEffect(() => {
-    handleGetPrescriptions(1, limit);
-  }, []);
+    handleGetPrescriptions(1, limit, {
+      startDate: listStartDate,
+      endDate: listEndDate,
+      ...(currentStatusFilter != null ? { status: currentStatusFilter } : {}),
+    });
+  }, [limit, listStartDate, listEndDate]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -132,16 +141,9 @@ export const PrescriptionListSection = ({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const showLoading = loading;
+  const tableLoading = loading && listToShow.length === 0;
   const showError = error && !loading;
 
-  if (showLoading) {
-    return (
-      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
-        <LoadingSpinner />
-      </section>
-    );
-  }
   if (showError) {
     return (
       <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
@@ -206,100 +208,97 @@ export const PrescriptionListSection = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pagedSearchList.map((prescription) => (
-                  <TableRow
-                    key={prescription._id}
-                    className="border-b border-[#dedee1] hover:bg-grey-light/50"
-                  >
-                    <TableCell className="p-[0px]">
-                      <span className="font-title-4l px-[20px] py-[16px] text-black font-medium text-[14px] leading-[19px] font-[number:var(--title-4l-font-weight)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                        {prescription.patientName}
-                      </span>
-                    </TableCell>
-                    <TableCell className="p-[0px]">
-                      <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                        {prescription.medicines?.length ?? 0} medicine(s)
-                        {prescription.medicines?.length
-                          ? `: ${prescription.medicines.map((m) => m.name).join(", ")}`
-                          : ""}
-                      </span>
-                    </TableCell>
-                    <TableCell className="p-[0px]">
-                      <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                        {formatDuration(prescription)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="p-[0px]">
-                      <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                        {formatFollowUp(prescription.followUp)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="p-[0px]">
-                      <div className="flex flex-col gap-[3px] px-[20px] py-[16px]">
-                        <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                          {prescription.appointmentDate
-                            ? new Date(
-                                prescription.appointmentDate,
-                              ).toLocaleDateString()
-                            : "—"}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="p-[0px]">
-                      <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                        {formatPrescriptionEndDate(prescription)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 px-[40px] py-[10px]"
-                          >
-                            <ThreeDotsVerticalIcon className="h-6 w-6" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {onViewRecord && (
-                            <DropdownMenuItem
-                              onClick={() => onViewRecord(prescription)}
-                            >
-                              View record
-                            </DropdownMenuItem>
-                          )}
-                          {onPrescriptionReport && (
-                            <DropdownMenuItem
-                              onClick={() => onPrescriptionReport(prescription)}
-                            >
-                              Prescription report
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={() => onEditPrescription(prescription)}
-                          >
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              onMarkAsDonePrescription(prescription)
-                            }
-                          >
-                            Mark as done
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              onDeletePrescription(prescription)
-                            }
-                          >
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                {tableLoading ? (
+                  <TableLoadingRow colSpan={7} />
+                ) : pagedSearchList.length === 0 ? (
+                  <TableRow className="border-b border-[#dedee1]">
+                    <TableCell
+                      colSpan={7}
+                      className="px-[20px] py-10 text-center text-x-70 font-title-4r"
+                    >
+                      No prescriptions found.
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  pagedSearchList.map((prescription) => (
+                    <TableRow
+                      key={prescription._id}
+                      className="border-b border-[#dedee1] hover:bg-grey-light/50"
+                    >
+                      <TableCell className="p-[0px]">
+                        <span className="font-title-4l px-[20px] py-[16px] text-black font-medium text-[14px] leading-[19px] font-[number:var(--title-4l-font-weight)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                          {prescription.patientName}
+                        </span>
+                      </TableCell>
+                      <TableCell className="p-[0px]">
+                        <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                          {prescription.medicines?.length ?? 0} medicine(s)
+                          {prescription.medicines?.length
+                            ? `: ${prescription.medicines.map((m) => m.name).join(", ")}`
+                            : ""}
+                        </span>
+                      </TableCell>
+                      <TableCell className="p-[0px]">
+                        <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                          {formatDuration(prescription)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="p-[0px]">
+                        <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                          {formatFollowUp(prescription.followUp)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="p-[0px]">
+                        <div className="flex flex-col gap-[3px] px-[20px] py-[16px]">
+                          <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                            {prescription.appointmentDate
+                              ? new Date(
+                                  prescription.appointmentDate,
+                                ).toLocaleDateString()
+                              : "—"}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="p-[0px]">
+                        <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                          {formatPrescriptionEndDate(prescription)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 px-[40px] py-[10px] hover:bg-transparent active:bg-transparent data-[state=open]:bg-transparent"
+                            >
+                              <ThreeDotsVerticalIcon className="h-6 w-6" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {onViewRecord && (
+                              <DropdownMenuItem
+                                onClick={() => onViewRecord(prescription)}
+                              >
+                                View record
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem
+                              onClick={() => onEditPrescription(prescription)}
+                            >
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => onDeletePrescription(prescription)}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
@@ -309,7 +308,15 @@ export const PrescriptionListSection = ({
         currentPage={isSearching ? searchPage : currentPage}
         totalPages={isSearching ? searchTotalPages : totalPages}
         onPageChange={(page) =>
-          isSearching ? setSearchPage(page) : handleGetPrescriptions(page, limit)
+          isSearching
+            ? setSearchPage(page)
+            : handleGetPrescriptions(page, limit, {
+                startDate: listStartDate,
+                endDate: listEndDate,
+                ...(currentStatusFilter != null
+                  ? { status: currentStatusFilter }
+                  : {}),
+              })
         }
         disabled={loading}
       />

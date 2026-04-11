@@ -29,6 +29,18 @@ function parsePrice(raw: unknown): string {
   return "—";
 }
 
+function parsePaymentAtMs(raw: unknown): number | undefined {
+  if (raw == null) return undefined;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    const d = new Date(raw);
+    return Number.isNaN(d.getTime()) ? undefined : d.getTime();
+  }
+  const s = typeof raw === "string" ? raw.trim() : "";
+  if (!s) return undefined;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? undefined : d.getTime();
+}
+
 function formatPaymentDate(raw: unknown): string {
   if (raw == null) return "—";
   const s = typeof raw === "string" ? raw.trim() : "";
@@ -113,6 +125,13 @@ function normalizeRow(raw: unknown, index: number): PaymentTableRow {
     r.paymentDate ?? r.paidAt ?? r.createdAt ?? r.updatedAt ?? r.date,
   );
 
+  const paymentAtMs =
+    parsePaymentAtMs(r.paymentDate) ??
+    parsePaymentAtMs(r.paidAt) ??
+    parsePaymentAtMs(r.createdAt) ??
+    parsePaymentAtMs(r.updatedAt) ??
+    parsePaymentAtMs(r.date);
+
   const status =
     getStr(r.status) ??
     getStr(r.paymentStatus) ??
@@ -141,6 +160,7 @@ function normalizeRow(raw: unknown, index: number): PaymentTableRow {
     appointmentTimeLabel,
     priceLabel,
     paymentDateLabel,
+    paymentAtMs,
     status,
     razorpayOrderId,
   };
@@ -201,12 +221,17 @@ export async function fetchPaymentsPage(params: {
   hospitalId: string;
   page: number;
   limit: number;
+  /** YYYY-MM-DD when API supports range filter */
+  fromDate?: string;
+  toDate?: string;
 }): Promise<{ rows: PaymentTableRow[]; meta: PaymentsListMeta }> {
   const qs = new URLSearchParams({
     hospitalId: params.hospitalId,
     page: String(params.page),
     limit: String(params.limit),
   });
+  if (params.fromDate?.trim()) qs.set("fromDate", params.fromDate.trim());
+  if (params.toDate?.trim()) qs.set("toDate", params.toDate.trim());
   const raw = await authFetch(`/api/payments?${qs.toString()}`, {
     method: "GET",
   });

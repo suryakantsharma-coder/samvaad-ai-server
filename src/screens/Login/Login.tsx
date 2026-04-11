@@ -8,17 +8,21 @@ import { showError } from "../../lib/toast";
 export const Login = (): JSX.Element => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const { handleLogin } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Login:", { email, password });
+    if (submitting) return;
+    setSubmitting(true);
     try {
       await handleLogin(email, password);
       navigate("/patients");
     } catch (error) {
       showError("Error", "Failed to login. Please check your credentials.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -58,7 +62,7 @@ export const Login = (): JSX.Element => {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
-          <Button type="submit" className="w-full">
+          <Button type="submit" className="w-full" loading={submitting}>
             Sign in
           </Button>
         </form>

@@ -298,6 +298,15 @@ curl -X GET "http://localhost:3000/api/doctors?page=1&limit=20" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
+### List doctor id + name (dropdowns / filters)
+
+Lightweight, hospital-scoped list for UI selects (e.g. patient list doctor filter).
+
+```bash
+curl -sS "https://api.samvaadai.com/api/doctors/names" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
 ### Search doctors by name
 
 Case-insensitive partial match on doctor full name. Optional `page` and `limit` for pagination.
@@ -355,6 +364,20 @@ All patient GET endpoints (list, search, get by ID) include an `appointments` ar
 
 ```bash
 curl -X GET "http://localhost:3000/api/patients?page=1&limit=20" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+Optional `doctorId` (MongoDB ObjectId of the doctor): returns patients whose appointments include that doctor (server-defined matching).
+
+```bash
+curl -X GET "http://localhost:3000/api/patients?page=1&limit=10&doctorId=698dc63dce8170480bb20dbf" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+Optional appointment (or visit) window: `startDate` and `endDate` as `YYYY-MM-DD` (inclusive; server-defined field). Can be combined with `doctorId`.
+
+```bash
+curl -X GET "http://localhost:3000/api/patients?page=1&limit=10&startDate=2026-04-01&endDate=2026-04-15&doctorId=698dc63dce8170480bb20dbf" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 
@@ -418,6 +441,10 @@ curl -X GET "http://localhost:3000/api/appointments?page=1&limit=20" \
 
 # Filter by doctor, patient, or status
 curl -X GET "http://localhost:3000/api/appointments?doctorId=DOCTOR_ID&patientId=PATIENT_ID&status=Upcoming" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# Date window (with tab filter, status, type as used by the dashboard)
+curl -X GET "http://localhost:3000/api/appointments?page=1&limit=10&filter=today&status=Upcoming&fromDate=2026-04-01&toDate=2026-04-30" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 

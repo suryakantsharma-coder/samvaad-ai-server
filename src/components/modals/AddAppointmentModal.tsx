@@ -4,9 +4,8 @@ import {
   UserIcon,
   CheckCircle2,
   AlertTriangle,
+  CircleCheck,
   X,
-  Save,
-  CheckCircle,
   Search,
   Trash2Icon,
 } from "lucide-react";
@@ -39,6 +38,12 @@ import {
 import { Patients } from "../../types/patient.type";
 import { usePatient } from "../../contexts/PatientProvider";
 import { useNavigate } from "react-router-dom";
+import {
+  modalFooterCancelClassName,
+  modalFooterDangerClassName,
+  modalFooterPrimaryClassName,
+  modalFooterRowClassName,
+} from "./modalFooterStyles";
 
 const ModalHeader = ({
   title,
@@ -135,6 +140,47 @@ export const NewAppointmentModal = ({
     usePatient();
   const [selectedPatient, setSelectedPatient] = useState<Patients | null>(null);
   const navigate = useNavigate();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveAppointment = async () => {
+    if (isSaving) return;
+    const appointmentIso = combineAppointmentDateTime(
+      formData.appointmentDateTime,
+      formData.timeSlot,
+    );
+    if (
+      !selectedDoctor?._id ||
+      !selectedPatient?._id ||
+      !formData.reason?.trim() ||
+      !formData.appointmentDateTime ||
+      !formData.timeSlot ||
+      !formData.type ||
+      !appointmentIso
+    ) {
+      showWarning("Warning", "Please fill all the fields.");
+      return;
+    }
+    const payload: AppointmentPayload = {
+      patient: selectedPatient._id,
+      doctor: selectedDoctor._id,
+      status: "Upcoming",
+      type: formData.type,
+      reason: formData.reason.trim(),
+      appointmentDateTime: appointmentIso,
+    };
+    setIsSaving(true);
+    try {
+      await handleCreateAppointment(payload);
+      onSave({
+        patientName: selectedPatient?.fullName || "",
+        doctorName: selectedDoctor?.fullName || "",
+        appointmentDate: formData.appointmentDateTime,
+        appointmentTime: formData.timeSlot,
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -460,52 +506,23 @@ export const NewAppointmentModal = ({
             </Select>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 ">
+          <div className={modalFooterRowClassName}>
             <Button
               variant="ghost"
-              className="text-gray-500 bg-[#F5F5F5] text-xs h-9 px-4"
+              className={modalFooterCancelClassName}
               onClick={onClose}
+              disabled={isSaving}
+              leadingIcon={<X className="h-4 w-4" />}
             >
-              <X className="w-4 h-4 mr-[2px]" /> Cancel
+              Cancel
             </Button>
             <Button
-              className="bg-[#0D9488] hover:bg-[#0B7A6F] text-white text-xs h-9 px-4"
-              onClick={async () => {
-                const appointmentIso = combineAppointmentDateTime(
-                  formData.appointmentDateTime,
-                  formData.timeSlot,
-                );
-                if (
-                  !selectedDoctor?._id ||
-                  !selectedPatient?._id ||
-                  !formData.reason?.trim() ||
-                  !formData.appointmentDateTime ||
-                  !formData.timeSlot ||
-                  !formData.type ||
-                  !appointmentIso
-                ) {
-                  showWarning("Warning", "Please fill all the fields.");
-                  return;
-                }
-                const payload: AppointmentPayload = {
-                  patient: selectedPatient._id,
-                  doctor: selectedDoctor._id,
-                  status: "Upcoming",
-                  type: formData.type,
-                  reason: formData.reason.trim(),
-                  appointmentDateTime: appointmentIso,
-                };
-
-                await handleCreateAppointment(payload);
-                onSave({
-                  patientName: selectedPatient?.fullName || "",
-                  doctorName: selectedDoctor?.fullName || "",
-                  appointmentDate: formData.appointmentDateTime,
-                  appointmentTime: formData.timeSlot,
-                });
-              }}
+              className={modalFooterPrimaryClassName}
+              onClick={() => void handleSaveAppointment()}
+              loading={isSaving}
+              leadingIcon={<CircleCheck className="h-4 w-4" />}
             >
-              <Save className="w-4 h-4 mr-[2px]" /> Save
+              Save
             </Button>
           </div>
         </div>
@@ -529,15 +546,22 @@ export const RescheduleModal = ({
     appointmentDateTime: "",
     timeSlot: "",
   });
-  const handleReschedule = () => {
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
+  const handleRescheduleClick = async () => {
+    if (rescheduleSubmitting) return;
     if (formData.appointmentDateTime !== data?.appointmentDateTime) {
       const payload: RescheduleAppointmentPayload = {
         appointmentDateTime: new Date(
           formData.appointmentDateTime,
         ).toISOString(),
       };
-      handleUpdateAppointment(data?._id || "", payload);
-      onReschedule();
+      setRescheduleSubmitting(true);
+      try {
+        await handleUpdateAppointment(data?._id || "", payload);
+        onReschedule();
+      } finally {
+        setRescheduleSubmitting(false);
+      }
     } else {
       showWarning("Warning", "No changes made.");
     }
@@ -612,22 +636,23 @@ export const RescheduleModal = ({
             </div>
           </div>
           <WhatsAppCheckbox label="Automatically send reschedule details to the patient's WhatsApp" />
-          <div className="flex justify-end gap-[20px] pt-4">
+          <div className={modalFooterRowClassName}>
             <Button
               variant="ghost"
-              className=" text-gray-500 text-xs h-9 px-4 bg-[#F5F5F5] text-[14px]"
+              className={modalFooterCancelClassName}
               onClick={onClose}
+              disabled={rescheduleSubmitting}
+              leadingIcon={<X className="h-4 w-4" />}
             >
-              <X className="w-4 h-4 mr-[2px]" /> Cancel
+              Cancel
             </Button>
             <Button
-              className="bg-[#0D9488] hover:bg-[#0B7A6F] text-white text-xs h-9 px-4 text-[14px]"
-              onClick={() => {
-                // validate the new date and time slot
-                handleReschedule();
-              }}
+              className={modalFooterPrimaryClassName}
+              onClick={() => void handleRescheduleClick()}
+              loading={rescheduleSubmitting}
+              leadingIcon={<CircleCheck className="h-4 w-4" />}
             >
-              <CheckCircle className="w-4 h-4 mr-[2px]" /> Save
+              Save
             </Button>
           </div>
         </div>
@@ -645,6 +670,18 @@ export const MarkAsDoneModal = ({
   data,
 }: any) => {
   const { handleMarkAsDoneAppointment } = useAppointments();
+  const [markDoneSubmitting, setMarkDoneSubmitting] = useState(false);
+  const handleConfirmDone = async () => {
+    const id = data?._id;
+    if (!id || markDoneSubmitting) return;
+    setMarkDoneSubmitting(true);
+    try {
+      await handleMarkAsDoneAppointment(id);
+      onDone();
+    } finally {
+      setMarkDoneSubmitting(false);
+    }
+  };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md p-0 border-none">
@@ -664,22 +701,23 @@ export const MarkAsDoneModal = ({
             as completed. Please confirm to proceed.
           </p>
           <WhatsAppCheckbox label="Automatically send completion message to the patient's WhatsApp" />
-          <div className="flex justify-end gap-3 pt-6">
+          <div className={modalFooterRowClassName}>
             <Button
               variant="ghost"
-              className="w-[86px] text-gray-500 text-xs h-9 px-6 bg-[#F5F5F5] text-[14px]"
+              className={modalFooterCancelClassName}
               onClick={onClose}
+              disabled={markDoneSubmitting}
+              leadingIcon={<X className="h-4 w-4" />}
             >
-              <X className="w-4 h-4 mr-1" /> Close
+              Close
             </Button>
             <Button
-              className="w-[86px] bg-[#0D9488] hover:bg-[#0B7A6F] text-white text-[14px] h-9 px-6"
-              onClick={() => {
-                handleMarkAsDoneAppointment(data?._id || "");
-                onDone();
-              }}
+              className={modalFooterPrimaryClassName}
+              onClick={() => void handleConfirmDone()}
+              loading={markDoneSubmitting}
+              leadingIcon={<CircleCheck className="h-4 w-4" />}
             >
-              <CheckCircle className="w-4 h-4 mr-1" /> Done
+              Done
             </Button>
           </div>
         </div>
@@ -697,11 +735,19 @@ export const CancelAppointmentModal = ({
   data,
 }: any) => {
   const { handleDeleteAppointment } = useAppointments();
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
 
-  const handleCancel = () => {
-    onCancel();
-    handleDeleteAppointment(data?._id || "");
-    onOpenChange(false);
+  const handleCancel = async () => {
+    const id = data?._id;
+    if (!id || cancelSubmitting) return;
+    setCancelSubmitting(true);
+    try {
+      await handleDeleteAppointment(id);
+      onCancel();
+      onOpenChange(false);
+    } finally {
+      setCancelSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -736,21 +782,22 @@ export const CancelAppointmentModal = ({
             <Input placeholder="Type your reason to cancel" className="h-9" />
           </div>
           <WhatsAppCheckbox label="Automatically send cancelation message to the patient's WhatsApp" />
-          <div className="flex justify-end gap-[20px] pt-4">
+          <div className={modalFooterRowClassName}>
             <Button
               variant="ghost"
-              className="w-[86px] text-gray-500 text-xs h-9 px-6 bg-[#F5F5F5] text-[14px]"
+              className={modalFooterCancelClassName}
               onClick={onClose}
+              disabled={cancelSubmitting}
+              leadingIcon={<X className="h-4 w-4" />}
             >
-              {/* <X className="w-4 h-4 mr-1" /> */} Close
+              Close
             </Button>
             <Button
-              className="bg-red-600 hover:bg-red-700 text-white text-xs h-9 px-6 text-[14px]"
-              onClick={() => {
-                handleCancel();
-              }}
+              className={modalFooterDangerClassName}
+              onClick={() => void handleCancel()}
+              loading={cancelSubmitting}
+              leadingIcon={<Trash2Icon className="h-4 w-4" />}
             >
-              {/* <X className="w-4 h-4 mr-1" /> */}
               Cancel Appointment
             </Button>
           </div>

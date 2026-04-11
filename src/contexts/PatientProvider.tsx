@@ -1,6 +1,6 @@
 // create patient provider
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useRef, useState } from "react";
 import { showSuccess, showError } from "../lib/toast";
 import {
   getPatients,
@@ -31,7 +31,13 @@ interface PatientContextType {
   loading: boolean;
   error: string | null;
   handleAddPatient: (patient: CreatePatientPayload) => void;
-  handlePatient: (page?: number, limit?: number, filter?: "all" | "today" | "tomorrow") => void;
+  handlePatient: (
+    page?: number,
+    limit?: number,
+    filter?: "all" | "today" | "tomorrow",
+    doctorId?: string,
+    dateRange?: { startDate: string; endDate: string },
+  ) => void;
   totalPages: number;
   currentPage: number;
   limit: number;
@@ -64,6 +70,11 @@ export const PatientProvider = ({
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(10);
+  /** When omitted on `handlePatient`, last non-empty list filter is reused (e.g. after delete). */
+  const listDoctorIdRef = useRef<string | null>(null);
+  /** YYYY-MM-DD; when `dateRange` arg omitted, previous range is reused. */
+  const listDateStartRef = useRef<string | null>(null);
+  const listDateEndRef = useRef<string | null>(null);
 
   const handleAddPatient = async (patient: CreatePatientPayload) => {
     try {
@@ -87,10 +98,29 @@ export const PatientProvider = ({
     page = 1,
     pageLimit = 10,
     filter: "all" | "today" | "tomorrow" = "all",
+    doctorId?: string,
+    dateRange?: { startDate: string; endDate: string },
   ) => {
     try {
       setLoading(true);
-      const response = await getPatients(page, pageLimit, filter);
+      if (doctorId !== undefined) {
+        const trimmed = doctorId.trim();
+        listDoctorIdRef.current = trimmed.length > 0 ? trimmed : null;
+      }
+      if (dateRange !== undefined) {
+        const s = dateRange.startDate?.trim();
+        const e = dateRange.endDate?.trim();
+        listDateStartRef.current = s && s.length > 0 ? s : null;
+        listDateEndRef.current = e && e.length > 0 ? e : null;
+      }
+      const response = await getPatients(
+        page,
+        pageLimit,
+        filter,
+        listDoctorIdRef.current,
+        listDateStartRef.current,
+        listDateEndRef.current,
+      );
       setPatients(response.data?.patients ?? []);
       const nextOverall = response.data?.overall;
       if (nextOverall && typeof nextOverall.totalPatients === "number") {

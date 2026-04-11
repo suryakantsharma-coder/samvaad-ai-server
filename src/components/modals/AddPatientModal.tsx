@@ -1,4 +1,4 @@
-import { ChevronDownIcon, UserIcon, X } from "lucide-react";
+import { ChevronDownIcon, CircleCheck, UserIcon, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
@@ -10,11 +10,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import {
+  modalFooterCancelClassName,
+  modalFooterPrimaryClassName,
+  modalFooterRowClassName,
+  modalHeaderCloseButtonClassName,
+} from "./modalFooterStyles";
 
 interface AddPatientModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (patient: PatientData) => void;
+  onSave: (patient: PatientData) => void | Promise<void>;
 }
 
 export interface PatientData {
@@ -31,6 +37,7 @@ export const AddPatientModal = ({
   onOpenChange,
   onSave,
 }: AddPatientModalProps): JSX.Element => {
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<PatientData>({
     name: "",
     age: 0,
@@ -40,17 +47,23 @@ export const AddPatientModal = ({
     countryCode: "+91",
   });
 
-  const handleSubmit = () => {
-    onSave(formData);
-    setFormData({
-      name: "",
-      age: 0,
-      phone: "",
-      gender: "Male",
-      reason: "",
-      countryCode: "+91",
-    });
-    onOpenChange(false);
+  const handleSubmit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await Promise.resolve(onSave(formData));
+      setFormData({
+        name: "",
+        age: 0,
+        phone: "",
+        gender: "Male",
+        reason: "",
+        countryCode: "+91",
+      });
+      onOpenChange(false);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleCancel = () => {
@@ -80,10 +93,10 @@ export const AddPatientModal = ({
           <button
             type="button"
             onClick={handleCancel}
-            className="rounded-sm opacity-70 hover:opacity-100 p-1 shrink-0"
+            className={modalHeaderCloseButtonClassName}
             aria-label="Close"
           >
-            <X className="h-5 w-5 text-gray-600" />
+            <X className="h-5 w-5" strokeWidth={2} aria-hidden />
           </button>
         </DialogHeader>
 
@@ -256,17 +269,21 @@ export const AddPatientModal = ({
             </Button>
           </div>
           */}
-          <div className="flex justify-end gap-[20px] pt-4">
+          <div className={modalFooterRowClassName}>
             <Button
               onClick={handleCancel}
               variant="ghost"
-              className="text-gray-500 text-xs h-9 px-6 bg-[#F5F5F5] hover:bg-[#F5F5F5]/90 text-[14px]"
+              disabled={submitting}
+              className={modalFooterCancelClassName}
+              leadingIcon={<X className="h-4 w-4" />}
             >
               Cancel
             </Button>
             <Button
-              onClick={handleSubmit}
-              className="bg-primary-2 hover:bg-primary-2/90 text-white text-xs h-9 px-6 text-[14px]"
+              onClick={() => void handleSubmit()}
+              loading={submitting}
+              leadingIcon={<CircleCheck className="h-4 w-4" />}
+              className={modalFooterPrimaryClassName}
             >
               Save
             </Button>

@@ -44,8 +44,8 @@ export const Doctors = (): JSX.Element => {
     }
   };
 
-  const handleSaveDoctor = (doctor: DoctorData) => {
-    void handleAddDoctor(doctorDataToPayload(doctor));
+  const handleSaveDoctor = async (doctor: DoctorData) => {
+    await handleAddDoctor(doctorDataToPayload(doctor));
   };
 
   const handleUpdateDoctorSubmit = async (

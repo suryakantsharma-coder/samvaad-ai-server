@@ -34,6 +34,7 @@ export const AuthContext = createContext<{
     role: string,
     hospitalId: string,
   ) => Promise<void>;
+  authHydrating: boolean;
 }>({
   accessToken: null,
   setAccessToken: () => {},
@@ -50,6 +51,7 @@ export const AuthContext = createContext<{
     role: string,
     hospitalId: string,
   ) => {},
+  authHydrating: false,
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -57,15 +59,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [hospitalUsers, setHospitalUsers] = useState<HospitalUser[]>([]);
   const [user, setUser] = useState<User | null>(null);
+  const [authHydrating, setAuthHydrating] = useState(
+    () => typeof window !== "undefined" && Boolean(localStorage.getItem("token")),
+  );
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    const user = localStorage.getItem("user");
-    if (token && user) {
-      handleUserProfile(token);
-    }
-  }, []);
 
   const refreshUser = async () => {
     const token = localStorage.getItem("token");
@@ -150,11 +147,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
-      handleUserProfile(token).catch((error) => {
-        console.error("Error checking token:", error);
-        navigate("/login");
-      });
+      setAuthHydrating(true);
+      void handleUserProfile(token)
+        .catch((error) => {
+          console.error("Error checking token:", error);
+          navigate("/login");
+        })
+        .finally(() => setAuthHydrating(false));
     } else {
+      setAuthHydrating(false);
       navigate("/login");
     }
   }, []);
@@ -173,6 +174,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         hospitalUsers,
         handleGetHospitalUsers,
         handleChangeUserRole,
+        authHydrating,
       }}
     >
       {children}

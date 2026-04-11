@@ -1,12 +1,16 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import { MoreVertical as MoreVerticalIcon } from "lucide-react";
+import {
+  MoreVertical as MoreVerticalIcon,
+  Search as SearchIcon,
+} from "lucide-react";
 import { Badge } from "../../../../components/ui/badge";
 import { Button } from "../../../../components/ui/button";
 import {
@@ -23,7 +27,6 @@ import {
   DropdownMenuTrigger,
 } from "../../../../components/ui/dropdown-menu";
 import { ListError } from "../../../../components/ui/list-error";
-import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
 import { Pagination } from "../../../../components/ui/pagination";
 import {
   Table,
@@ -31,13 +34,84 @@ import {
   TableCell,
   TableHead,
   TableHeader,
+  TableLoadingRow,
   TableRow,
 } from "../../../../components/ui/table";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "../../../../components/ui/toggle-group";
+import { Input } from "../../../../components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../../components/ui/select";
 import { fetchPaymentsPage } from "../../../../data/payments";
-import { showError, showSuccess, showWarning } from "../../../../lib/toast";
+import { formatTime12h } from "../../../../lib/dateTimeDisplay";
+import { showError, showSuccess } from "../../../../lib/toast";
 import type { PaymentTableRow } from "../../../../types/payment.type";
 
 const PAGE_SIZE = 20;
+
+function toYMDLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function startOfDayMs(d: Date): number {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x.getTime();
+}
+
+function endOfDayMs(d: Date): number {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x.getTime();
+}
+
+function rowMatchesDateTab(
+  row: PaymentTableRow,
+  tab: "all" | "today" | "tomorrow",
+): boolean {
+  if (tab === "all") return true;
+  if (row.paymentAtMs == null) return false;
+  const now = new Date();
+  if (tab === "today") {
+    return (
+      row.paymentAtMs >= startOfDayMs(now) &&
+      row.paymentAtMs <= endOfDayMs(now)
+    );
+  }
+  const tmr = new Date(now);
+  tmr.setDate(tmr.getDate() + 1);
+  return (
+    row.paymentAtMs >= startOfDayMs(tmr) && row.paymentAtMs <= endOfDayMs(tmr)
+  );
+}
+
+function rowMatchesStatusFilter(
+  row: PaymentTableRow,
+  filter: "all" | "paid" | "pending" | "failed",
+): boolean {
+  if (filter === "all") return true;
+  const s = row.status.toLowerCase().trim();
+  if (filter === "paid") {
+    return ["paid", "success", "completed", "captured"].includes(s);
+  }
+  if (filter === "pending") {
+    return ["pending", "processing", "created"].includes(s);
+  }
+  if (filter === "failed") {
+    return ["failed", "cancelled", "canceled", "refunded"].includes(s);
+  }
+  return true;
+}
 
 function statusBadgeClass(status: string): string {
   const s = status.toLowerCase();
@@ -63,6 +137,12 @@ function statusBadgeClass(status: string): string {
   return "bg-grey-light text-black hover:bg-grey-light";
 }
 
+/** Razorpay and similar APIs use "captured" for a successful charge; show as Paid in the UI. */
+function displayPaymentStatus(status: string): string {
+  if (status.toLowerCase().trim() === "captured") return "Paid";
+  return status;
+}
+
 function dash(v: string | undefined): string {
   const t = v?.trim();
   return t && t.length > 0 ? t : "—";
@@ -70,6 +150,48 @@ function dash(v: string | undefined): string {
 
 function formatPrice(price: string): string {
   return `₹ ${parseInt(price.replace("₹", "").replace(",", "")) / 100}`;
+}
+
+function rowMatchesSearch(row: PaymentTableRow, q: string): boolean {
+  const needle = q.trim().toLowerCase();
+  if (needle === "") return true;
+  const hay = [
+    row.patientName,
+    row.doctorName,
+    row.status,
+    displayPaymentStatus(row.status),
+    row.id,
+    row.patientPhone,
+    row.razorpayOrderId,
+    row.paymentDateLabel,
+    row.priceLabel,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return hay.includes(needle);
+}
+
+function PaymentDateCell({ row }: { row: PaymentTableRow }): JSX.Element {
+  if (row.paymentAtMs != null && !Number.isNaN(row.paymentAtMs)) {
+    return (
+      <div className="flex flex-col gap-[3px] px-[20px] py-[16px]">
+        <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+          {new Date(row.paymentAtMs).toLocaleDateString()}
+        </span>
+        <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
+          {formatTime12h(row.paymentAtMs)}
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-[3px] px-[20px] py-[16px]">
+      <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+        {row.paymentDateLabel}
+      </span>
+    </div>
+  );
 }
 
 function DetailBlock({
@@ -177,7 +299,19 @@ function PaymentDetailsDialog({
                   <div className="space-y-1">
                     <dt className="font-title-5r text-xs text-x-70">Paid on</dt>
                     <dd className="font-title-4r text-sm leading-snug text-black">
-                      {row.paymentDateLabel}
+                      {row.paymentAtMs != null &&
+                      !Number.isNaN(row.paymentAtMs) ? (
+                        <div className="flex flex-col gap-0.5">
+                          <span>
+                            {new Date(row.paymentAtMs).toLocaleDateString()}
+                          </span>
+                          <span className="font-title-5l text-x-70 text-xs">
+                            {formatTime12h(row.paymentAtMs)}
+                          </span>
+                        </div>
+                      ) : (
+                        row.paymentDateLabel
+                      )}
                     </dd>
                   </div>
                   <div className="space-y-1.5 sm:col-span-2">
@@ -186,7 +320,7 @@ function PaymentDetailsDialog({
                       <Badge
                         className={`rounded-[100px] px-2.5 py-[5px] font-title-4r ${statusBadgeClass(row.status)}`}
                       >
-                        {row.status}
+                        {displayPaymentStatus(row.status)}
                       </Badge>
                     </dd>
                   </div>
@@ -237,6 +371,9 @@ export const PaymentListSection = ({
   onRecordsMeta,
 }: PaymentListSectionProps): JSX.Element => {
   const navigate = useNavigate();
+  const [dateTab, setDateTab] = useState<"all" | "today" | "tomorrow">(
+    "today",
+  );
   const [page, setPage] = useState(1);
   const [rows, setRows] = useState<PaymentTableRow[]>([]);
   const [totalPages, setTotalPages] = useState(1);
@@ -244,8 +381,80 @@ export const PaymentListSection = ({
   const [error, setError] = useState<string | null>(null);
   const [detailRow, setDetailRow] = useState<PaymentTableRow | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "paid" | "pending" | "failed"
+  >("all");
+  const [dateSort, setDateSort] = useState<"newest" | "oldest">("newest");
   const onRecordsMetaRef = useRef(onRecordsMeta);
   onRecordsMetaRef.current = onRecordsMeta;
+
+  const listFromTo = useMemo(() => {
+    if (dateTab === "all") {
+      return { fromDate: undefined as string | undefined, toDate: undefined as string | undefined };
+    }
+    const now = new Date();
+    if (dateTab === "today") {
+      const ymd = toYMDLocal(now);
+      return { fromDate: ymd, toDate: ymd };
+    }
+    const tmr = new Date(now);
+    tmr.setDate(tmr.getDate() + 1);
+    const ymd = toYMDLocal(tmr);
+    return { fromDate: ymd, toDate: ymd };
+  }, [dateTab]);
+
+  const afterDateTab = useMemo(
+    () => rows.filter((r) => rowMatchesDateTab(r, dateTab)),
+    [rows, dateTab],
+  );
+
+  const afterStatus = useMemo(
+    () => afterDateTab.filter((r) => rowMatchesStatusFilter(r, statusFilter)),
+    [afterDateTab, statusFilter],
+  );
+
+  const afterSearch = useMemo(() => {
+    if (searchQuery.trim() === "") return afterStatus;
+    return afterStatus.filter((r) => rowMatchesSearch(r, searchQuery));
+  }, [afterStatus, searchQuery]);
+
+  const displayRows = useMemo(() => {
+    return [...afterSearch].sort((a, b) => {
+      const ta = a.paymentAtMs ?? 0;
+      const tb = b.paymentAtMs ?? 0;
+      if (ta === 0 && tb === 0) return 0;
+      if (ta === 0) return 1;
+      if (tb === 0) return -1;
+      return dateSort === "newest" ? tb - ta : ta - tb;
+    });
+  }, [afterSearch, dateSort]);
+
+  const dateTabLabels = useMemo(
+    () => [
+      { id: "all" as const, label: "All" },
+      { id: "today" as const, label: "Today" },
+      { id: "tomorrow" as const, label: "Tomorrow" },
+    ],
+    [],
+  );
+
+  const emptyStateMessage = useMemo(() => {
+    if (afterDateTab.length === 0) {
+      if (dateTab === "today") return "No payments for today.";
+      if (dateTab === "tomorrow") return "No payments for tomorrow.";
+      return "No payments found for this hospital.";
+    }
+    if (afterStatus.length === 0) {
+      return "No payments match the selected status.";
+    }
+    return "No payments match your search.";
+  }, [
+    dateTab,
+    afterDateTab.length,
+    afterStatus.length,
+    afterSearch.length,
+  ]);
 
   const openDetails = (row: PaymentTableRow) => {
     setDetailRow(row);
@@ -267,6 +476,8 @@ export const PaymentListSection = ({
         hospitalId: hospitalId.trim(),
         page,
         limit: PAGE_SIZE,
+        fromDate: listFromTo.fromDate,
+        toDate: listFromTo.toDate,
       });
       setRows(nextRows);
       setTotalPages(meta.totalPages);
@@ -279,7 +490,7 @@ export const PaymentListSection = ({
     } finally {
       setLoading(false);
     }
-  }, [hospitalId, page]);
+  }, [hospitalId, page, listFromTo.fromDate, listFromTo.toDate]);
 
   useEffect(() => {
     void load();
@@ -288,6 +499,10 @@ export const PaymentListSection = ({
   useEffect(() => {
     setPage(1);
   }, [hospitalId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [dateTab]);
 
   if (!hospitalId.trim()) {
     return (
@@ -307,123 +522,188 @@ export const PaymentListSection = ({
           if (!next) setDetailRow(null);
         }}
       />
-      <div className="flex flex-col overflow-x-auto -mx-0 min-h-[200px]">
-        {loading && (
-          <div className="flex justify-center py-16">
-            <LoadingSpinner />
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 px-5 md:px-6 pt-5 md:pt-6 pb-[26px]">
+        <ToggleGroup
+          type="single"
+          value={dateTab}
+          onValueChange={(v) => {
+            if (v === "all" || v === "today" || v === "tomorrow") {
+              setDateTab(v);
+            }
+          }}
+          className="inline-flex items-center gap-[15px] p-[3px] bg-grey-light rounded-[100px]"
+        >
+          {dateTabLabels.map((tab) => (
+            <ToggleGroupItem
+              key={tab.id}
+              value={tab.id}
+              className="inline-flex items-center justify-center gap-[5px] px-5 py-[5px] rounded-[100px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] data-[state=on]:bg-primary-2 data-[state=on]:text-white bg-transparent text-x-70"
+            >
+              {tab.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+
+        <div className="flex w-full min-w-0 flex-nowrap items-center justify-end gap-[15px] overflow-x-auto lg:min-w-0 lg:flex-1">
+          <div className="flex min-w-0 flex-1 max-w-[372px] items-center gap-2.5 px-2 py-2 bg-grey-light rounded-[100px] h-[38px]">
+            <SearchIcon className="w-6 h-6 shrink-0 text-black opacity-70" />
+            <Input
+              placeholder="Search by patient, doctor, status, ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="min-w-0 flex-1 border-0 bg-transparent opacity-70 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] focus-visible:ring-0 focus-visible:ring-offset-0 p-0"
+            />
           </div>
-        )}
-        {!loading && error && <ListError message={error} />}
-        {!loading && !error && (
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-grey-dark hover:bg-grey-dark border-0">
-                <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
-                  Patient name
-                </TableHead>
-                <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
-                  Doctor
-                </TableHead>
-                <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
-                  Price
-                </TableHead>
-                <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
-                  Payment date
-                </TableHead>
-                <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
-                  Status
-                </TableHead>
-                <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
-                  Action
-                </TableHead>
+
+          <Select
+            value={statusFilter}
+            onValueChange={(value) => {
+              if (
+                value === "all" ||
+                value === "paid" ||
+                value === "pending" ||
+                value === "failed"
+              ) {
+                setStatusFilter(value);
+              }
+            }}
+          >
+            <SelectTrigger className="flex h-[38px] w-[120px] shrink-0 items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={dateSort}
+            onValueChange={(value) => {
+              if (value === "newest" || value === "oldest") {
+                setDateSort(value);
+              }
+            }}
+          >
+            <SelectTrigger className="flex h-[38px] min-w-[120px] max-w-[160px] shrink-0 items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
+              <SelectValue placeholder="Sort" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Newest first</SelectItem>
+              <SelectItem value="oldest">Oldest first</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="flex flex-col overflow-x-auto -mx-0 min-h-[200px]">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-grey-dark hover:bg-grey-dark border-0">
+              <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                Patient name
+              </TableHead>
+              <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                Doctor
+              </TableHead>
+              <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                Price
+              </TableHead>
+              <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                Payment date and time
+              </TableHead>
+              <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                Status
+              </TableHead>
+              <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                Action
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableLoadingRow colSpan={6} />
+            ) : error ? (
+              <TableRow>
+                <TableCell colSpan={6} className="p-0 align-top">
+                  <ListError message={error} />
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="px-[20px] py-12 text-center font-title-4r text-x-70"
-                  >
-                    No payments found for this hospital.
+            ) : displayRows.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={6}
+                  className="px-[20px] py-12 text-center font-title-4r text-x-70"
+                >
+                  {emptyStateMessage}
+                </TableCell>
+              </TableRow>
+            ) : (
+              displayRows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className="border-b border-[#dedee1] hover:bg-grey-light/50"
+                >
+                  <TableCell className="px-[20px] py-[16px] font-title-4l text-black">
+                    {row.patientName}
                   </TableCell>
-                </TableRow>
-              ) : (
-                rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    className="border-b border-[#dedee1] hover:bg-grey-light/50"
-                  >
-                    <TableCell className="px-[20px] py-[16px] font-title-4l text-black">
-                      {row.patientName}
-                    </TableCell>
-                    <TableCell className="px-[20px] py-[16px] font-title-4l text-black">
-                      {row.doctorName}
-                    </TableCell>
-                    <TableCell className="px-[20px] py-[16px] font-title-4l text-black">
-                      {formatPrice(row.priceLabel)}
-                    </TableCell>
-                    <TableCell className="px-[20px] py-[16px] font-title-4l text-black">
-                      {row.paymentDateLabel}
-                    </TableCell>
-                    <TableCell className="px-[20px] py-[16px]">
-                      <Badge
-                        className={`rounded-[100px] px-2.5 py-[5px] font-title-4r ${statusBadgeClass(row.status)}`}
-                      >
-                        {row.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="px-[20px] py-[16px]">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 rounded-full hover:bg-grey-light"
-                            aria-label={`Actions for payment ${row.id}`}
-                          >
-                            <MoreVerticalIcon className="h-5 w-5" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openDetails(row)}>
-                            View details
-                          </DropdownMenuItem>
-                          {row.patientId ? (
-                            <DropdownMenuItem
-                              onClick={() =>
-                                navigate(
-                                  `/prescriptions/patient/${row.patientId}`,
-                                )
-                              }
-                            >
-                              View patient
-                            </DropdownMenuItem>
-                          ) : null}
-                          <DropdownMenuItem
-                            onClick={() => void copyText("Payment ID", row.id)}
-                          >
-                            Copy payment ID
-                          </DropdownMenuItem>
+                  <TableCell className="px-[20px] py-[16px] font-title-4l text-black">
+                    {row.doctorName}
+                  </TableCell>
+                  <TableCell className="px-[20px] py-[16px] font-title-4l text-black">
+                    {formatPrice(row.priceLabel)}
+                  </TableCell>
+                  <TableCell className="p-[0px] align-top">
+                    <PaymentDateCell row={row} />
+                  </TableCell>
+                  <TableCell className="px-[20px] py-[16px]">
+                    <Badge
+                      className={`rounded-[100px] px-2.5 py-[5px] font-title-4r ${statusBadgeClass(row.status)}`}
+                    >
+                      {displayPaymentStatus(row.status)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="px-[20px] py-[16px]">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full hover:bg-transparent active:bg-transparent data-[state=open]:bg-transparent"
+                          aria-label={`Actions for payment ${row.id}`}
+                        >
+                          <MoreVerticalIcon className="h-5 w-5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openDetails(row)}>
+                          View details
+                        </DropdownMenuItem>
+                        {row.patientId ? (
                           <DropdownMenuItem
                             onClick={() =>
-                              showWarning(
-                                "Download receipt",
-                                "Receipt download is not available for this payment yet.",
+                              navigate(
+                                `/prescriptions/patient/${row.patientId}`,
                               )
                             }
                           >
-                            Download receipt
+                            View patient
                           </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        )}
+                        ) : null}
+                        <DropdownMenuItem
+                          onClick={() => void copyText("Payment ID", row.id)}
+                        >
+                          Copy payment ID
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
       {!loading && !error && totalPages > 1 && (
         <Pagination

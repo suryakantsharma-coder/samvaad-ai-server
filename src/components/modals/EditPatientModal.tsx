@@ -1,9 +1,4 @@
-import {
-  CheckCircleIcon,
-  ChevronDownIcon,
-  UserIcon,
-  XIcon,
-} from "lucide-react";
+import { ChevronDownIcon, CircleCheck, UserIcon, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogTitle } from "../ui/dialog";
@@ -16,13 +11,18 @@ import {
   SelectValue,
 } from "../ui/select";
 import { PatientData } from "./AddPatientModal";
+import {
+  modalFooterCancelClassName,
+  modalFooterPrimaryClassName,
+  modalFooterRowClassName,
+} from "./modalFooterStyles";
 import { usePatient } from "../../contexts/PatientProvider";
 import { UpdatePatientPayload } from "../../types/patient.type";
 
 interface EditPatientModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (patient: PatientData & { _id?: string }) => void;
+  onSave: (patient: PatientData & { _id?: string }) => void | Promise<void>;
   patient: (PatientData & { _id?: string }) | null;
 }
 
@@ -32,6 +32,7 @@ export const EditPatientModal = ({
   onSave,
   patient,
 }: EditPatientModalProps): JSX.Element => {
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<PatientData & { _id?: string }>({
     name: "",
     age: 0,
@@ -50,20 +51,26 @@ export const EditPatientModal = ({
     }
   }, [patient]);
 
-  const handleSubmit = () => {
-    onSave(formData);
-    const rawPhone = (formData.phone || "").trim();
-    const phoneNumber = rawPhone.startsWith("+")
-      ? rawPhone.replace(/\s/g, "")
-      : `${(formData.countryCode || "").replace(/\s/g, "")}${rawPhone.replace(/\s/g, "")}`;
-    const payload: UpdatePatientPayload = {
-      age: formData.age,
-      phoneNumber,
-      reason: formData.reason,
-    };
-    handleUpdatePatient(patient?._id || "", payload);
-
-    onOpenChange(false);
+  const handleSubmit = async () => {
+    const id = patient?._id;
+    if (!id || submitting) return;
+    setSubmitting(true);
+    try {
+      const rawPhone = (formData.phone || "").trim();
+      const phoneNumber = rawPhone.startsWith("+")
+        ? rawPhone.replace(/\s/g, "")
+        : `${(formData.countryCode || "").replace(/\s/g, "")}${rawPhone.replace(/\s/g, "")}`;
+      const payload: UpdatePatientPayload = {
+        age: formData.age,
+        phoneNumber,
+        reason: formData.reason,
+      };
+      await handleUpdatePatient(id, payload);
+      await Promise.resolve(onSave(formData));
+      onOpenChange(false);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleCancel = () => {
@@ -227,25 +234,23 @@ export const EditPatientModal = ({
             </div>
           </div>
 
-          <div className="flex justify-end gap-[15px]">
+          <div className={modalFooterRowClassName}>
             <Button
               onClick={handleCancel}
               variant="ghost"
-              className="inline-flex items-center gap-[5px] px-[15px] py-1.5 bg-grey-light hover:bg-grey-light/80 rounded-[50px] h-[44px]"
+              disabled={submitting}
+              className={modalFooterCancelClassName}
+              leadingIcon={<X className="h-4 w-4" />}
             >
-              <XIcon className="w-5 h-5" />
-              <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
-                Cancel
-              </span>
+              Cancel
             </Button>
             <Button
-              onClick={handleSubmit}
-              className="inline-flex items-center gap-[5px] px-[15px] py-1.5 bg-primary-2 hover:bg-primary-2/90 rounded-[50px] h-[44px]"
+              onClick={() => void handleSubmit()}
+              loading={submitting}
+              leadingIcon={<CircleCheck className="h-4 w-4" />}
+              className={modalFooterPrimaryClassName}
             >
-              <CheckCircleIcon className="w-5 h-5" />
-              <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-white text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
-                Save
-              </span>
+              Save
             </Button>
           </div>
         </div>

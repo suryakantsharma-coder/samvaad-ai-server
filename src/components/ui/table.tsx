@@ -1,5 +1,9 @@
 import * as React from "react";
 import { cn } from "../../lib/utils";
+import {
+  LoadingSpinner,
+  type LoadingSpinnerSize,
+} from "./loading-spinner";
 
 const Table = React.forwardRef<
   HTMLTableElement,
@@ -106,6 +110,30 @@ const TableCaption = React.forwardRef<
   />
 ));
 TableCaption.displayName = "TableCaption";
+
+/** Centered spinner spanning all columns — use inside `TableBody` while data loads. */
+export function TableLoadingRow({
+  colSpan,
+  className,
+  spinnerSize = "sm",
+}: {
+  colSpan: number;
+  className?: string;
+  spinnerSize?: LoadingSpinnerSize;
+}): JSX.Element {
+  return (
+    <TableRow className="border-b border-[#dedee1] hover:bg-transparent">
+      <TableCell
+        colSpan={colSpan}
+        className={cn("py-12 align-middle text-center", className)}
+      >
+        <div className="flex justify-center">
+          <LoadingSpinner size={spinnerSize} className="py-2" />
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
 
 export {
   Table,

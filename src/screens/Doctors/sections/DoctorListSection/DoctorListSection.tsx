@@ -33,10 +33,10 @@ import {
   TableCell,
   TableHead,
   TableHeader,
+  TableLoadingRow,
   TableRow,
 } from "../../../../components/ui/table";
 import { ListError } from "../../../../components/ui/list-error";
-import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
 import { useDoctor } from "../../../../contexts/DoctorProvider";
 import type { Doctor } from "../../../../types/doctor.type";
 
@@ -85,7 +85,7 @@ export const DoctorListSection = ({
   } = useDoctor();
 
   const baseList =
-    searchQuery.trim() === "" ? doctors : searchedDoctors ?? [];
+    searchQuery.trim() === "" ? doctors : (searchedDoctors ?? []);
   const listToShow =
     statusFilter === "all"
       ? baseList
@@ -106,16 +106,10 @@ export const DoctorListSection = ({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const showLoading = loading && doctors.length === 0 && listToShow.length === 0;
+  const tableLoading =
+    loading && doctors.length === 0 && listToShow.length === 0;
   const showError = error && !loading;
 
-  if (showLoading) {
-    return (
-      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
-        <LoadingSpinner />
-      </section>
-    );
-  }
   if (showError) {
     return (
       <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
@@ -126,7 +120,7 @@ export const DoctorListSection = ({
 
   //  10:00 AM - 1:00 PM&#x2F;n2:00 AM - 6:00 PM make function to split the string and return the array of strings
   const splitAvailability = (availability: string) => {
-    return availability.split("&#x2F;n").map((item) => item.trim());
+    return availability.split("\n").map((item) => item.trim());
   };
 
   return (
@@ -143,10 +137,7 @@ export const DoctorListSection = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-[15px]">
-          <Select
-            value={statusFilter}
-            onValueChange={setStatusFilter}
-          >
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="flex w-[107px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -219,75 +210,87 @@ export const DoctorListSection = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {listToShow.map((doctor) => (
-              <TableRow
-                key={doctor._id}
-                className="border-b border-[#dedee1] hover:bg-grey-light/50"
-              >
-                <TableCell className="p-[0px]">
-                  <div className="flex items-center gap-[10px] px-[20px] py-[16px]">
-                    <Avatar className="w-10 h-10">
-                      <AvatarImage
-                        src={doctor.profileImage}
-                        alt={doctor.fullName}
-                      />
-                      <AvatarFallback>
-                        {doctor.fullName
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col">
-                      <span className="font-title-4l text-black font-medium text-[14px] leading-[19px] font-[number:var(--title-4l-font-weight)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                        {doctor.fullName}
-                      </span>
-                      <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
-                        {doctor.doctorId}
+            {tableLoading ? (
+              <TableLoadingRow colSpan={7} />
+            ) : listToShow.length === 0 ? (
+              <TableRow className="border-b border-[#dedee1]">
+                <TableCell
+                  colSpan={7}
+                  className="px-[20px] py-10 text-center text-x-70 font-title-4r"
+                >
+                  No doctors found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              listToShow.map((doctor) => (
+                <TableRow
+                  key={doctor._id}
+                  className="border-b border-[#dedee1] hover:bg-grey-light/50"
+                >
+                  <TableCell className="p-[0px]">
+                    <div className="flex items-center gap-[10px] px-[20px] py-[16px]">
+                      <Avatar className="w-10 h-10">
+                        <AvatarImage
+                          src={doctor.profileImage}
+                          alt={doctor.fullName}
+                        />
+                        <AvatarFallback>
+                          {doctor.fullName
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col">
+                        <span className="font-title-4l text-black font-medium text-[14px] leading-[19px] font-[number:var(--title-4l-font-weight)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                          {doctor.fullName}
+                        </span>
+                        <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
+                          {doctor.doctorId}
+                        </span>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <div className="inline-flex items-center gap-[5px] px-[20px] py-[16px]">
+                      <PhoneCallIcon className="w-4 h-4" />
+                      <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                        {doctor.phoneNumber}
                       </span>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <div className="inline-flex items-center gap-[5px] px-[20px] py-[16px]">
-                    <PhoneCallIcon className="w-4 h-4" />
-                    <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                      {doctor.phoneNumber}
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <div className="inline-flex items-center gap-[5px] px-[20px] py-[16px]">
+                      <MailIcon className="w-4 h-4" />
+                      <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                        {doctor.email}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                      {doctor.designation}
                     </span>
-                  </div>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <div className="inline-flex items-center gap-[5px] px-[20px] py-[16px]">
-                    <MailIcon className="w-4 h-4" />
-                    <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                      {doctor.email}
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <span className="font-title-4l flex flex-col gap-2 px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                      {splitAvailability(doctor.availability).map((item) => (
+                        <span key={item}>{item}</span>
+                      ))}
                     </span>
-                  </div>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                    {doctor.designation}
-                  </span>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <span className="font-title-4l flex flex-col gap-2 px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                    {splitAvailability(doctor.availability).map((item) => (
-                      <span key={item}>{item}</span>
-                    ))}
-                  </span>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <Badge
-                    className={`${getStatusColor(
-                      doctor.status as string,
-                    )} rounded-[100px] px-[20px] py-[5px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] hover:${getStatusColor(
-                      doctor.status as string,
-                    )}`}
-                  >
-                    {doctor.status}
-                  </Badge>
-                </TableCell>
-                {/* <TableCell className="p-[0px]">
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <Badge
+                      className={`${getStatusColor(
+                        doctor.status as string,
+                      )} rounded-[100px] px-[20px] py-[5px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] hover:${getStatusColor(
+                        doctor.status as string,
+                      )}`}
+                    >
+                      {doctor.status}
+                    </Badge>
+                  </TableCell>
+                  {/* <TableCell className="p-[0px]">
                   <div className="flex flex-col gap-[3px] px-[20px] py-[16px]">
                     <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
                       {doctor.utilization}%
@@ -297,32 +300,41 @@ export const DoctorListSection = ({
                     </span>
                   </div>
                 </TableCell> */}
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6">
-                        <MoreVerticalIcon className="h-6 w-6" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem disabled>View Profile</DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => onEditDoctor?.(doctor)}
-                      >
-                        Edit Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem disabled>View Schedule</DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-red-600 focus:text-red-600"
-                        onClick={() => onRemoveDoctor?.(doctor)}
-                      >
-                        Remove Doctor
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 hover:bg-transparent active:bg-transparent data-[state=open]:bg-transparent"
+                        >
+                          <MoreVerticalIcon className="h-6 w-6" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem disabled>
+                          View Profile
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => onEditDoctor?.(doctor)}
+                        >
+                          Edit Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem disabled>
+                          View Schedule
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-red-600 focus:text-red-600"
+                          onClick={() => onRemoveDoctor?.(doctor)}
+                        >
+                          Delete Doctor
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

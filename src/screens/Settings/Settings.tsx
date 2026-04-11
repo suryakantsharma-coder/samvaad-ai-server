@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { PatientSearchSection } from "../Patients/sections/PatientSearchSection";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
+import { Switch } from "../../components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -24,6 +25,9 @@ import {
   XCircle,
   Circle,
   Video,
+  KeyRound,
+  EyeIcon,
+  EyeOffIcon,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthProvider";
 import { useHospital } from "../../contexts/HospitalProvider";
@@ -48,7 +52,22 @@ import {
   fetchGoogleCalendarStatus,
 } from "../../data/googleCalendar";
 import type { User } from "../../types/auth.type";
-import { ChangePasswordModal } from "../../components/modals";
+
+/** Per-hospital WhatsApp notification toggles (localStorage until API exists). */
+const WHATSAPP_NOTIFICATION_PREFS_PREFIX = "samvaad-whatsapp-notification-prefs:";
+const LEGACY_REMINDER_PREFS_PREFIX = "samvaad-reminder-prefs:";
+
+type ReminderPrefsState = {
+  appointmentReminder: boolean;
+  prescriptionReminder: boolean;
+  medicineReminder: boolean;
+};
+
+const defaultReminderPrefs = (): ReminderPrefsState => ({
+  appointmentReminder: true,
+  prescriptionReminder: true,
+  medicineReminder: true,
+});
 
 /** Split stored phone (e.g. "+91 9876543210" or "9876543210") for the personal form. */
 function splitPhoneForForm(raw: string | undefined | null): {
@@ -77,7 +96,7 @@ export const Settings = (): JSX.Element => {
     updateHospitalById,
   } = useHospital();
   const isHospitalAdmin = user?.role === "hospital_admin";
-  /** Hospital + Integrations & Notifications (and notification sidebar on Personal). */
+  /** Hospital + Integrations & Notifications tab (admin / hospital_admin). */
   const canManageHospitalIntegrations =
     user?.role === "admin" || user?.role === "hospital_admin";
 
@@ -102,7 +121,6 @@ export const Settings = (): JSX.Element => {
   }, [canManageHospitalIntegrations, isHospitalAdmin]);
 
   const [activeTab, setActiveTab] = useState<string>("personal");
-  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   useEffect(() => {
     if (!isHospitalAdmin && activeTab === "auth") {
@@ -257,6 +275,58 @@ export const Settings = (): JSX.Element => {
     [user?.hospital],
   );
 
+  const [reminderPrefs, setReminderPrefs] = useState<ReminderPrefsState>(
+    defaultReminderPrefs,
+  );
+
+  useEffect(() => {
+    if (!settingsHospitalId) {
+      setReminderPrefs(defaultReminderPrefs());
+      return;
+    }
+    try {
+      const keyNew = `${WHATSAPP_NOTIFICATION_PREFS_PREFIX}${settingsHospitalId}`;
+      const keyLegacy = `${LEGACY_REMINDER_PREFS_PREFIX}${settingsHospitalId}`;
+      const raw =
+        localStorage.getItem(keyNew) ?? localStorage.getItem(keyLegacy);
+      if (raw) {
+        const p = JSON.parse(raw) as Partial<ReminderPrefsState>;
+        setReminderPrefs({
+          appointmentReminder: p.appointmentReminder !== false,
+          prescriptionReminder: p.prescriptionReminder !== false,
+          medicineReminder: p.medicineReminder !== false,
+        });
+        if (!localStorage.getItem(keyNew) && localStorage.getItem(keyLegacy)) {
+          localStorage.setItem(keyNew, raw);
+        }
+      } else {
+        setReminderPrefs(defaultReminderPrefs());
+      }
+    } catch {
+      setReminderPrefs(defaultReminderPrefs());
+    }
+  }, [settingsHospitalId]);
+
+  const patchReminderPrefs = useCallback(
+    (partial: Partial<ReminderPrefsState>) => {
+      setReminderPrefs((prev) => {
+        const next = { ...prev, ...partial };
+        if (settingsHospitalId) {
+          try {
+            localStorage.setItem(
+              `${WHATSAPP_NOTIFICATION_PREFS_PREFIX}${settingsHospitalId}`,
+              JSON.stringify(next),
+            );
+          } catch {
+            /* ignore quota / private mode */
+          }
+        }
+        return next;
+      });
+    },
+    [settingsHospitalId],
+  );
+
   const [whatsappCredsLinked, setWhatsappCredsLinked] = useState(false);
   const [whatsappCredsLoading, setWhatsappCredsLoading] = useState(false);
   const [whatsappOnboardingComplete, setWhatsappOnboardingComplete] =
@@ -301,7 +371,9 @@ export const Settings = (): JSX.Element => {
         loading: false,
         connected: null,
         error:
-          e instanceof Error ? e.message : "Could not load Google Calendar status.",
+          e instanceof Error
+            ? e.message
+            : "Could not load Google Calendar status.",
       });
     }
   }, [settingsHospitalId]);
@@ -468,11 +540,11 @@ export const Settings = (): JSX.Element => {
     }
   };
 
-  const [notifications, setNotifications] = useState({
-    newAppointment: true,
-    appointmentReminder: true,
-    appointmentRescheduled: true,
-  });
+  const [passwordCurrent, setPasswordCurrent] = useState("");
+  const [passwordNew, setPasswordNew] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [passwordShowNew, setPasswordShowNew] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
 
   const handleSavePersonal = async () => {
     setPersonalSaveLoading(true);
@@ -492,8 +564,9 @@ export const Settings = (): JSX.Element => {
       if (!hasChange) {
         showWarning(
           "Warning",
-          "Update your name, email, or phone, or use Change password.",
+          "Update your name, email, or phone, or use the Security card to change your password.",
         );
+        setPersonalSaveLoading(false);
         return;
       }
       await updateCurrentUserProfile(payload);
@@ -506,6 +579,43 @@ export const Settings = (): JSX.Element => {
       );
     } finally {
       setPersonalSaveLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    const cur = passwordCurrent.trim();
+    const next = passwordNew.trim();
+    const again = passwordConfirm.trim();
+    if (!cur) {
+      showWarning("Warning", "Enter your current password.");
+      return;
+    }
+    if (!next) {
+      showWarning("Warning", "Enter a new password.");
+      return;
+    }
+    if (next !== again) {
+      showWarning("Warning", "New password and confirmation do not match.");
+      return;
+    }
+    setPasswordSaving(true);
+    try {
+      await updateCurrentUserProfile({
+        password: next,
+        currentPassword: cur,
+      });
+      showSuccess("Success!", "Your password was updated.");
+      setPasswordCurrent("");
+      setPasswordNew("");
+      setPasswordConfirm("");
+      setPasswordShowNew(false);
+    } catch (err) {
+      showError(
+        "Error",
+        err instanceof Error ? err.message : "Failed to change password",
+      );
+    } finally {
+      setPasswordSaving(false);
     }
   };
 
@@ -622,7 +732,7 @@ export const Settings = (): JSX.Element => {
         </h1>
         <p className="opacity-90 font-title-3l leading-[20px] mt-[5px] font-[number:var(--title-3l-font-weight)] text-black text-[length:var(--title-3l-font-size)] tracking-[var(--title-3l-letter-spacing)] leading-[var(--title-3l-line-height)] [font-style:var(--title-3l-font-style)] max-w-prose">
           {canManageHospitalIntegrations
-            ? "Manage hospital details, integrations, and notification settings."
+            ? "Manage hospital details and integrations."
             : "Manage your profile and account preferences."}
         </p>
       </header>
@@ -652,142 +762,197 @@ export const Settings = (): JSX.Element => {
         {(activeTab === "personal" ||
           activeTab === "hospital" ||
           activeTab === "auth") && (
-          <div
-            className={
-              activeTab === "auth"
-                ? "lg:col-span-3 flex flex-col gap-6"
-                : canManageHospitalIntegrations
-                  ? "lg:col-span-2 flex flex-col gap-6"
-                  : "lg:col-span-3 flex flex-col gap-6"
-            }
-          >
+          <div className="lg:col-span-3 flex flex-col gap-6">
             {activeTab === "personal" && (
-              <div className="bg-white rounded-[10px] p-[25px] flex flex-col gap-6">
-                <div className="flex items-center gap-2">
-                  <UserIcon className="w-5 h-5" />
-                  <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
-                    Personal Information
-                  </h3>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                <div className="bg-white rounded-[10px] p-[25px] flex flex-col gap-6">
+                  <div className="flex items-center gap-2">
+                    <UserIcon className="w-5 h-5" />
+                    <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
+                      Personal Information
+                    </h3>
+                  </div>
 
-                <div className="flex flex-col gap-[10px] mt-[5px]">
-                  <div className="flex flex-col gap-[10px]">
-                    <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                      Profile Picture
-                    </label>
-                    <div className="flex items-center gap-4">
-                      <div className="w-[60px] h-[60px] rounded-full bg-grey-light flex items-center justify-center">
-                        <span className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)]">
-                          {getFirstCharacterAfterSpace(formData.fullName)}
-                        </span>
+                  <div className="flex flex-col gap-[10px] mt-[5px]">
+                    <div className="flex flex-col gap-[10px]">
+                      <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                        Profile Picture
+                      </label>
+                      <div className="flex items-center gap-4">
+                        <div className="w-[60px] h-[60px] rounded-full bg-grey-light flex items-center justify-center">
+                          <span className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)]">
+                            {getFirstCharacterAfterSpace(formData.fullName)}
+                          </span>
+                        </div>
                       </div>
-                      {/* <Button
-                        variant="outline"
-                        className="inline-flex items-center gap-2 px-4 py-2 h-[38px] border border-[#dedee1] rounded-[10px] bg-white hover:bg-grey-light"
-                      >
-                        <UploadIcon className="w-4 h-4" />
-                        <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)]">
-                          Upload Picture
-                        </span>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="w-9 h-9 text-red-500 hover:bg-red-50 bg-[#FFF1F1]"
-                      >
-                        <Trash2Icon className="w-5 h-5" />
-                      </Button> */}
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
-                    <div className="flex flex-col gap-2">
-                      <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                        Full Name
-                      </label>
-                      <Input
-                        value={formData.fullName}
-                        onChange={(e) =>
-                          setFormData({ ...formData, fullName: e.target.value })
-                        }
-                        className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3 px-1 rounded-[10px] border border-[#dedee1] bg-grey-light/30">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
-                        Password
-                      </span>
-                      <span className="font-title-5r text-x-70 text-sm">
-                        Change your password in a separate step.
-                      </span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setChangePasswordOpen(true)}
-                      className="h-[44px] px-5 rounded-[10px] border-[#dedee1] bg-white hover:bg-grey-light shrink-0"
-                    >
-                      Change password
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
-                    <div className="flex flex-col gap-2">
-                      <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                        Phone
-                      </label>
-                      <div className="flex gap-2.5">
-                        <Select
-                          value={formData.countryCode}
-                          onValueChange={(value) =>
-                            setFormData({ ...formData, countryCode: value })
-                          }
-                        >
-                          <SelectTrigger className="w-[100px] h-[44px] px-3 py-2 bg-white border border-[#dedee1] rounded-[10px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="+91">+91</SelectItem>
-                            <SelectItem value="+1">+1</SelectItem>
-                            <SelectItem value="+44">+44</SelectItem>
-                          </SelectContent>
-                        </Select>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
+                      <div className="flex flex-col gap-2">
+                        <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                          Full Name
+                        </label>
                         <Input
-                          type="tel"
-                          value={formData.phone}
+                          value={formData.fullName}
                           onChange={(e) =>
-                            setFormData({ ...formData, phone: e.target.value })
+                            setFormData({
+                              ...formData,
+                              fullName: e.target.value,
+                            })
                           }
-                          className="flex-1 h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                          className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
                         />
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-2">
-                      <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                        Email Address
-                      </label>
-                      <Input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) =>
-                          setFormData({ ...formData, email: e.target.value })
-                        }
-                        className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
+                      <div className="flex flex-col gap-2">
+                        <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                          Phone
+                        </label>
+                        <div className="flex gap-2.5">
+                          <Select
+                            value={formData.countryCode}
+                            onValueChange={(value) =>
+                              setFormData({ ...formData, countryCode: value })
+                            }
+                          >
+                            <SelectTrigger className="w-[100px] h-[44px] px-3 py-2 bg-white border border-[#dedee1] rounded-[10px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="+91">+91</SelectItem>
+                              <SelectItem value="+1">+1</SelectItem>
+                              <SelectItem value="+44">+44</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            type="tel"
+                            value={formData.phone}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                phone: e.target.value,
+                              })
+                            }
+                            className="flex-1 h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                          Email Address
+                        </label>
+                        <Input
+                          type="email"
+                          value={formData.email}
+                          onChange={(e) =>
+                            setFormData({ ...formData, email: e.target.value })
+                          }
+                          className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={() => void handleSavePersonal()}
+                        loading={personalSaveLoading}
+                        className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
+                      >
+                        Save
+                      </Button>
                     </div>
                   </div>
+                </div>
 
-                  <div className="flex justify-end">
+                <div className="bg-white rounded-[10px] p-[25px] flex flex-col gap-5">
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="w-5 h-5" />
+                    <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
+                      Security
+                    </h3>
+                  </div>
+                  <p className="font-title-5l text-[#57575f] text-sm leading-relaxed">
+                    Use a strong password you don&apos;t use elsewhere.
+                    You&apos;ll stay logged in on this device after updating.
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    <label
+                      htmlFor="settings-pw-current"
+                      className="font-title-4m text-black text-[length:var(--title-4m-font-size)]"
+                    >
+                      Current password
+                    </label>
+                    <Input
+                      id="settings-pw-current"
+                      type="password"
+                      autoComplete="current-password"
+                      value={passwordCurrent}
+                      onChange={(e) => setPasswordCurrent(e.target.value)}
+                      className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label
+                      htmlFor="settings-pw-new"
+                      className="font-title-4m text-black text-[length:var(--title-4m-font-size)]"
+                    >
+                      New password
+                    </label>
+                    <div className="relative">
+                      <Input
+                        id="settings-pw-new"
+                        type={passwordShowNew ? "text" : "password"}
+                        autoComplete="new-password"
+                        value={passwordNew}
+                        onChange={(e) => setPasswordNew(e.target.value)}
+                        className="h-[44px] px-4 py-2 pr-10 bg-white border border-[#dedee1] rounded-[10px]"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8"
+                        onClick={() => setPasswordShowNew((s) => !s)}
+                        aria-label={
+                          passwordShowNew ? "Hide password" : "Show password"
+                        }
+                      >
+                        {passwordShowNew ? (
+                          <EyeOffIcon className="w-4 h-4 text-x-70" />
+                        ) : (
+                          <EyeIcon className="w-4 h-4 text-x-70" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label
+                      htmlFor="settings-pw-confirm"
+                      className="font-title-4m text-black text-[length:var(--title-4m-font-size)]"
+                    >
+                      Confirm new password
+                    </label>
+                    <Input
+                      id="settings-pw-confirm"
+                      type={passwordShowNew ? "text" : "password"}
+                      autoComplete="new-password"
+                      value={passwordConfirm}
+                      onChange={(e) => setPasswordConfirm(e.target.value)}
+                      className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                    />
+                  </div>
+                  <div className="flex justify-end pt-1">
                     <Button
-                      onClick={() => void handleSavePersonal()}
-                      disabled={personalSaveLoading}
+                      type="button"
+                      onClick={() => void handleChangePassword()}
+                      loading={passwordSaving}
+                      leadingIcon={<KeyRound className="w-4 h-4" />}
                       className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
                     >
-                      {personalSaveLoading ? "Saving…" : "Save"}
+                      Update password
                     </Button>
                   </div>
                 </div>
@@ -885,10 +1050,10 @@ export const Settings = (): JSX.Element => {
                     </div>
                     <Button
                       type="submit"
-                      disabled={addUserLoading}
+                      loading={addUserLoading}
                       className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px] w-fit"
                     >
-                      {addUserLoading ? "Creating…" : "Add user"}
+                      Add user
                     </Button>
                   </form>
                 </div>
@@ -1256,12 +1421,11 @@ export const Settings = (): JSX.Element => {
                       <div className="flex justify-end">
                         <Button
                           onClick={handleSaveHospital}
-                          disabled={
-                            hospitalSaveLoading || currentHospitalLoading
-                          }
+                          loading={hospitalSaveLoading}
+                          disabled={currentHospitalLoading}
                           className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
                         >
-                          {hospitalSaveLoading ? "Saving…" : "Save"}
+                          Save
                         </Button>
                       </div>
                     </div>
@@ -1272,43 +1436,37 @@ export const Settings = (): JSX.Element => {
           </div>
         )}
 
-        {activeTab !== "auth" && canManageHospitalIntegrations && (
-          <div
-            className={
-              activeTab === "integrations"
-                ? "lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6"
-                : "lg:col-span-1 flex flex-col gap-6"
-            }
-          >
-            {activeTab === "integrations" && (
-              <div className="bg-white rounded-[10px] p-6 flex flex-col gap-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <svg
-                      className="w-5 h-5 shrink-0 text-[#25D366]"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      xmlns="http://www.w3.org/2000/svg"
-                      aria-hidden
-                    >
-                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.98a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-                    </svg>
-                    <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
-                      WhatsApp Integration
-                    </h3>
-                  </div>
-                  <input
-                    type="checkbox"
+        {activeTab === "integrations" && canManageHospitalIntegrations && (
+          <div className="lg:col-span-3 flex flex-col gap-6">
+            <div className="bg-white rounded-[10px] p-6 flex flex-col gap-4 border border-[#dedee1] shadow-sm">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 min-w-0">
+                  <svg
+                    className="w-5 h-5 shrink-0 text-[#25D366]"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden
+                  >
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.98a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+                  </svg>
+                  <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
+                    WhatsApp Integration
+                  </h3>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="font-title-4r text-x-70 text-sm whitespace-nowrap max-sm:hidden">
+                    {integrations.whatsapp ? "Enabled" : "Disabled"}
+                  </span>
+                  <Switch
                     checked={integrations.whatsapp}
-                    onChange={(e) =>
-                      setIntegrations({
-                        ...integrations,
-                        whatsapp: e.target.checked,
-                      })
+                    onCheckedChange={(whatsapp) =>
+                      setIntegrations((prev) => ({ ...prev, whatsapp }))
                     }
-                    className="w-11 h-6 rounded-full cursor-pointer shrink-0"
+                    aria-label="Enable WhatsApp integration"
                   />
                 </div>
+              </div>
                 <p className="font-title-4r font-[number:var(--title-4r-font-weight)] text-x-70 text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
                   Connect your WhatsApp Business Account to enable automated
                   patient communication, prescription sharing, and follow-up
@@ -1329,12 +1487,10 @@ export const Settings = (): JSX.Element => {
                       <Button
                         type="button"
                         onClick={() => void handleWhatsappStartOnboarding()}
-                        disabled={whatsappOnboardingRunning}
+                        loading={whatsappOnboardingRunning}
                         className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px] w-fit font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] text-white disabled:opacity-60"
                       >
-                        {whatsappOnboardingRunning
-                          ? "Onboarding…"
-                          : "Start onboarding"}
+                        Start onboarding
                       </Button>
                     ) : (
                       <>
@@ -1348,7 +1504,7 @@ export const Settings = (): JSX.Element => {
                         </Button>
                         {!integrations.whatsapp && (
                           <p className="font-title-5r font-[number:var(--title-5r-font-weight)] text-x-70 text-[length:var(--title-5r-font-size)] tracking-[var(--title-5r-letter-spacing)] leading-[var(--title-5r-line-height)] [font-style:var(--title-5r-font-style)]">
-                            Turn on the integration above to connect.
+                            Turn on the switch above to connect.
                           </p>
                         )}
                       </>
@@ -1378,7 +1534,10 @@ export const Settings = (): JSX.Element => {
                               />
                             )}
                             {step.status === "idle" && (
-                              <Circle className="w-5 h-5 text-x-70" aria-hidden />
+                              <Circle
+                                className="w-5 h-5 text-x-70"
+                                aria-hidden
+                              />
                             )}
                           </span>
                           <span className="flex flex-col gap-0.5 min-w-0">
@@ -1399,11 +1558,68 @@ export const Settings = (): JSX.Element => {
                     </ol>
                   )}
                 </div>
-              </div>
-            )}
 
-            {activeTab === "integrations" && (
-              <div className="bg-white rounded-[10px] p-6 flex flex-col gap-4 border border-[#dedee1] shadow-sm md:col-span-2">
+              {settingsHospitalId ? (
+                <div className="flex flex-col gap-3 pt-4 mt-1 border-t border-[#dedee1]">
+                  <div>
+                    <h4 className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                      WhatsApp notifications
+                    </h4>
+                    <p className="font-title-5r text-x-70 text-sm mt-1 leading-relaxed">
+                      These reminders are sent to patients on WhatsApp. They
+                      apply when your Business account is connected and the
+                      integration above is enabled.
+                    </p>
+                  </div>
+                  {!integrations.whatsapp ? (
+                    <p className="font-title-5r text-x-70 text-sm">
+                      Turn on WhatsApp integration above before messages can be
+                      delivered.
+                    </p>
+                  ) : null}
+                  <div className="flex flex-col gap-1 divide-y divide-[#dedee1] border border-[#dedee1] rounded-[10px] overflow-hidden">
+                    <div className="flex items-center justify-between gap-4 px-4 py-3 bg-white">
+                      <span className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                        Send appointment reminder
+                      </span>
+                      <Switch
+                        checked={reminderPrefs.appointmentReminder}
+                        onCheckedChange={(appointmentReminder) =>
+                          patchReminderPrefs({ appointmentReminder })
+                        }
+                        aria-label="WhatsApp: send appointment reminder"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-4 px-4 py-3 bg-white">
+                      <span className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                        Send prescription reminder
+                      </span>
+                      <Switch
+                        checked={reminderPrefs.prescriptionReminder}
+                        onCheckedChange={(prescriptionReminder) =>
+                          patchReminderPrefs({ prescriptionReminder })
+                        }
+                        aria-label="WhatsApp: send prescription reminder"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-4 px-4 py-3 bg-white">
+                      <span className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                        Send reminders to take medicine
+                      </span>
+                      <Switch
+                        checked={reminderPrefs.medicineReminder}
+                        onCheckedChange={(medicineReminder) =>
+                          patchReminderPrefs({ medicineReminder })
+                        }
+                        aria-label="WhatsApp: send reminders to take medicine"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="bg-white rounded-[10px] p-6 flex flex-col gap-4 border border-[#dedee1] shadow-sm">
                 <div className="flex items-center gap-2 min-w-0">
                   <Video
                     className="w-5 h-5 shrink-0 text-primary-2"
@@ -1476,16 +1692,10 @@ export const Settings = (): JSX.Element => {
                         variant="outline"
                         onClick={() => void refreshGoogleCalendarStatus()}
                         disabled={!settingsHospitalId}
+                        loading={googleMeetCal.loading}
                         className="h-[44px] px-5 rounded-[10px] border-[#dedee1] bg-white hover:bg-grey-light font-title-4r"
                       >
-                        {googleMeetCal.loading ? (
-                          <span className="inline-flex items-center gap-2">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Checking…
-                          </span>
-                        ) : (
-                          "Check status"
-                        )}
+                        Check status
                       </Button>
                       <Button
                         type="button"
@@ -1510,94 +1720,6 @@ export const Settings = (): JSX.Element => {
                   </>
                 )}
               </div>
-            )}
-
-            <div className="bg-white rounded-[10px] p-6 flex flex-col gap-4">
-              <div className="flex items-center gap-2">
-                <svg
-                  className="w-5 h-5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20ZM12 6C9.79 6 8 7.79 8 10H10C10 8.9 10.9 8 12 8C13.1 8 14 8.9 14 10C14 12 11 11.75 11 15H13C13 12.75 16 12.5 16 10C16 7.79 14.21 6 12 6ZM11 16V18H13V16H11Z"
-                    fill="currentColor"
-                  />
-                </svg>
-                <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
-                  Notification Control
-                </h3>
-              </div>
-
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                      New Appointment Booked
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={notifications.newAppointment}
-                      onChange={(e) =>
-                        setNotifications({
-                          ...notifications,
-                          newAppointment: e.target.checked,
-                        })
-                      }
-                      className="w-11 h-6 rounded-full cursor-pointer"
-                    />
-                  </div>
-                  <p className="font-title-5r font-[number:var(--title-5r-font-weight)] text-x-70 text-[length:var(--title-5r-font-size)] tracking-[var(--title-5r-letter-spacing)] leading-[var(--title-5r-line-height)] [font-style:var(--title-5r-font-style)]">
-                    When a new patient books a slot.
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                      Appointment Reminder
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={notifications.appointmentReminder}
-                      onChange={(e) =>
-                        setNotifications({
-                          ...notifications,
-                          appointmentReminder: e.target.checked,
-                        })
-                      }
-                      className="w-11 h-6 rounded-full cursor-pointer"
-                    />
-                  </div>
-                  <p className="font-title-5r font-[number:var(--title-5r-font-weight)] text-x-70 text-[length:var(--title-5r-font-size)] tracking-[var(--title-5r-letter-spacing)] leading-[var(--title-5r-line-height)] [font-style:var(--title-5r-font-style)]">
-                    Before scheduled time (e.g., 30 min prior).
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                      Appointment Rescheduled / Canceled
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={notifications.appointmentRescheduled}
-                      onChange={(e) =>
-                        setNotifications({
-                          ...notifications,
-                          appointmentRescheduled: e.target.checked,
-                        })
-                      }
-                      className="w-11 h-6 rounded-full cursor-pointer"
-                    />
-                  </div>
-                  <p className="font-title-5r font-[number:var(--title-5r-font-weight)] text-x-70 text-[length:var(--title-5r-font-size)] tracking-[var(--title-5r-letter-spacing)] leading-[var(--title-5r-line-height)] [font-style:var(--title-5r-font-style)]">
-                    Patient change alerts.
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
@@ -1646,11 +1768,6 @@ export const Settings = (): JSX.Element => {
           </div>
         </div> */}
       </div>
-
-      <ChangePasswordModal
-        open={changePasswordOpen}
-        onOpenChange={setChangePasswordOpen}
-      />
     </div>
   );
 };

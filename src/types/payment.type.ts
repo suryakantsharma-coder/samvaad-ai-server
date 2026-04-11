@@ -14,6 +14,8 @@ export type PaymentTableRow = {
   appointmentTimeLabel: string;
   priceLabel: string;
   paymentDateLabel: string;
+  /** Local-time instant for All / Today / Tomorrow filters (ms since epoch). */
+  paymentAtMs?: number;
   status: string;
   razorpayOrderId?: string;
 };

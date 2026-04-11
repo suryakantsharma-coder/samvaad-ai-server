@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   AddPatientModal,
   DeletePatientModal,
@@ -11,7 +11,30 @@ import { PatientSearchSection } from "./sections/PatientSearchSection";
 import { usePatient } from "../../contexts/PatientProvider";
 import { CreatePatientPayload } from "../../types/patient.type";
 
+function toYMDLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Inclusive last 30 days: today and the 29 prior calendar days. */
+function getDefaultPatientListDateRange(): { start: string; end: string } {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 29);
+  return { start: toYMDLocal(start), end: toYMDLocal(end) };
+}
+
 export const Patients = (): JSX.Element => {
+  const defaultListDateRange = useMemo(
+    () => getDefaultPatientListDateRange(),
+    [],
+  );
+  const [listStartDate, setListStartDate] = useState(
+    defaultListDateRange.start,
+  );
+  const [listEndDate, setListEndDate] = useState(defaultListDateRange.end);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -20,9 +43,7 @@ export const Patients = (): JSX.Element => {
   >(null);
   const { handleAddPatient, overall } = usePatient();
 
-  const handleAddPatients = (patient: PatientData) => {
-    console.log("Add patient:", patient);
-
+  const handleAddPatients = async (patient: PatientData) => {
     const payload: CreatePatientPayload = {
       fullName: patient.name,
       phoneNumber: patient.countryCode + " " + patient.phone,
@@ -30,7 +51,7 @@ export const Patients = (): JSX.Element => {
       gender: patient.gender as "Male" | "Female" | "Other",
       reason: patient.reason,
     };
-    handleAddPatient(payload);
+    await handleAddPatient(payload);
   };
 
   const handleEditPatient = (patient: PatientData & { _id?: string }) => {
@@ -60,10 +81,16 @@ export const Patients = (): JSX.Element => {
       <PatientHeaderSection
         onAddPatient={() => setAddModalOpen(true)}
         totalPatients={overall?.totalPatients}
+        startDate={listStartDate}
+        endDate={listEndDate}
+        onStartDateChange={setListStartDate}
+        onEndDateChange={setListEndDate}
       />
       <PatientListSection
         onEditPatient={openEditModal}
         onDeletePatient={openDeleteModal}
+        listStartDate={listStartDate}
+        listEndDate={listEndDate}
       />
 
       <AddPatientModal

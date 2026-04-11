@@ -1,19 +1,41 @@
-import {
-  CalendarIcon,
-  ChevronDownIcon,
-  ClockIcon,
-  PlusIcon,
-} from "lucide-react";
-import React from "react";
+import { CalendarIcon, ClockIcon, PlusIcon } from "lucide-react";
 import { Button } from "../../../../components/ui/button";
 
-interface PrescriptionsHeaderSectionProps {
+function formatRangeLabel(start: string, end: string): string {
+  if (!start.trim() || !end.trim()) return "Date range";
+  try {
+    const a = new Date(start + "T12:00:00");
+    const b = new Date(end + "T12:00:00");
+    if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime()))
+      return "Date range";
+    const opts: Intl.DateTimeFormatOptions = {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    };
+    return `${a.toLocaleDateString(undefined, opts)} – ${b.toLocaleDateString(undefined, opts)}`;
+  } catch {
+    return "Date range";
+  }
+}
+
+export interface PrescriptionsHeaderSectionProps {
   onAddPrescription: () => void;
+  startDate: string;
+  endDate: string;
+  onStartDateChange: (value: string) => void;
+  onEndDateChange: (value: string) => void;
 }
 
 export const PrescriptionsHeaderSection = ({
   onAddPrescription,
+  startDate,
+  endDate,
+  onStartDateChange,
+  onEndDateChange,
 }: PrescriptionsHeaderSectionProps): JSX.Element => {
+  const rangeLabel = formatRangeLabel(startDate, endDate);
+
   return (
     <header className="flex flex-col lg:flex-row w-full items-start justify-between gap-4">
       <div className="inline-flex flex-col items-start gap-[5px] flex-1">
@@ -31,13 +53,9 @@ export const PrescriptionsHeaderSection = ({
       <div className="flex flex-wrap items-center gap-[15px]">
         <div className="inline-flex items-center gap-2.5 px-[15px] py-[6px] bg-white rounded-[50px] h-[36px]">
           <div className="inline-flex items-center gap-2.5">
-            <ClockIcon className="w-5 h-5" />
+            <ClockIcon className="w-5 h-5" aria-hidden />
 
             <div className="inline-flex items-center gap-[5px]">
-              <span className="mt-[-1.00px] font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] whitespace-nowrap [font-style:var(--title-3m-font-style)]">
-                799
-              </span>
-
               <span className="mt-[-0.50px] font-title-4r font-[number:var(--title-4r-font-weight)] text-x-70 text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
                 Total Prescriptions
               </span>
@@ -45,24 +63,36 @@ export const PrescriptionsHeaderSection = ({
           </div>
         </div>
 
-        <div className="inline-flex items-center gap-2.5 px-[15px] py-[6px] bg-white rounded-[50px] h-[36px]">
-          <div className="inline-flex items-center gap-[5px]">
-            <CalendarIcon className="w-5 h-5" />
+        <div className="inline-flex flex-wrap items-center gap-2 sm:gap-[10px] px-[12px] sm:px-[15px] py-[6px] bg-white rounded-[50px] min-h-[36px]">
+          <CalendarIcon className="w-5 h-5 shrink-0 text-black" aria-hidden />
 
-            <span className="font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] leading-[var(--title-4r-line-height)] font-title-4r tracking-[var(--title-4r-letter-spacing)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
-              1 Nov -30 Nov
-            </span>
+          <span className="hidden sm:inline text-[13px] leading-[18px] font-title-4r text-x-70 max-w-[200px] truncate sm:max-w-none">
+            {rangeLabel}
+          </span>
+
+          <div className="inline-flex items-center gap-1.5">
+            <label className="sr-only" htmlFor="prescription-filter-start">
+              Start date
+            </label>
+            <input
+              id="prescription-filter-start"
+              type="date"
+              value={startDate}
+              onChange={(e) => onStartDateChange(e.target.value)}
+              className="h-8 min-w-0 w-[132px] rounded-full border-0 bg-grey-light px-2.5 text-[13px] font-title-4r text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-2/40"
+            />
+            <span className="text-x-70 text-xs shrink-0">–</span>
+            <label className="sr-only" htmlFor="prescription-filter-end">
+              End date
+            </label>
+            <input
+              id="prescription-filter-end"
+              type="date"
+              value={endDate}
+              onChange={(e) => onEndDateChange(e.target.value)}
+              className="h-8 min-w-0 w-[132px] rounded-full border-0 bg-grey-light px-2.5 text-[13px] font-title-4r text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-2/40"
+            />
           </div>
-
-          <img className="w-px h-4 object-cover" alt="Line" src="/line-1.svg" />
-
-          <button className="inline-flex items-center gap-[5px] bg-transparent border-none cursor-pointer">
-            <span className="mt-[-1.00px] font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
-              Last 30 days
-            </span>
-
-            <ChevronDownIcon className="w-4 h-4" />
-          </button>
         </div>
 
         <Button

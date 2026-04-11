@@ -33,6 +33,9 @@ export const getPatients = async (
   page: number,
   limit: number,
   filter?: PatientFilter,
+  doctorId?: string | null,
+  startDate?: string | null,
+  endDate?: string | null,
 ) => {
   const params = new URLSearchParams({
     page: String(page),
@@ -40,6 +43,18 @@ export const getPatients = async (
   });
   if (filter && filter !== "all") {
     params.set("filter", filter);
+  }
+  const id = doctorId?.trim();
+  if (id) {
+    params.set("doctorId", id);
+  }
+  const start = startDate?.trim();
+  const end = endDate?.trim();
+  if (start) {
+    params.set("startDate", start);
+  }
+  if (end) {
+    params.set("endDate", end);
   }
   return authFetch(`/api/patients?${params.toString()}`, {
     method: "GET",

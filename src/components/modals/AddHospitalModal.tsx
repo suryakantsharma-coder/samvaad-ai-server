@@ -1,4 +1,4 @@
-import { Building2, Check, Upload, X } from "lucide-react";
+import { Building2, CircleCheck, Upload, X } from "lucide-react";
 import React, { useCallback, useState } from "react";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
@@ -13,6 +13,12 @@ import {
 import { useHospital } from "../../contexts/HospitalProvider";
 import { showSuccess, showError } from "../../lib/toast";
 import { CreateHospitalPayload } from "../../types/hospital.type";
+import {
+  modalFooterCancelClassName,
+  modalFooterPrimaryClassName,
+  modalFooterRowClassName,
+  modalHeaderCloseButtonClassName,
+} from "./modalFooterStyles";
 
 export interface AddHospitalData {
   hospitalName: string;
@@ -178,10 +184,10 @@ export const AddHospitalModal = ({
           <button
             type="button"
             onClick={handleClose}
-            className="rounded-sm opacity-70 hover:opacity-100 p-1"
+            className={modalHeaderCloseButtonClassName}
             aria-label="Close"
           >
-            <X className="h-5 w-5 text-gray-600" />
+            <X className="h-5 w-5" strokeWidth={2} aria-hidden />
           </button>
         </DialogHeader>
 
@@ -390,25 +396,25 @@ export const AddHospitalModal = ({
           )}
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 pt-2 border-t border-[#dedee1]">
+          <div className={`${modalFooterRowClassName} pt-2 border-t border-[#dedee1]`}>
             <Button
               type="button"
               variant="ghost"
               onClick={handleClose}
               disabled={isSubmitting}
-              className="inline-flex items-center gap-[5px] px-4 py-2 bg-grey-light hover:bg-grey-light/80 rounded-[6px] h-[44px] text-gray-600 font-title-4r"
+              className={modalFooterCancelClassName}
+              leadingIcon={<X className="h-4 w-4" />}
             >
-              <X className="w-5 h-5" />
               Cancel
             </Button>
             <Button
               type="button"
               onClick={handleSave}
-              disabled={isSubmitting}
-              className="inline-flex items-center gap-[5px] px-4 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[6px] h-[44px] text-white font-title-4r disabled:opacity-60"
+              loading={isSubmitting}
+              leadingIcon={<CircleCheck className="h-4 w-4" />}
+              className={modalFooterPrimaryClassName}
             >
-              <Check className="w-5 h-5" />
-              {isSubmitting ? "Saving…" : "Save"}
+              Save
             </Button>
           </div>
         </div>

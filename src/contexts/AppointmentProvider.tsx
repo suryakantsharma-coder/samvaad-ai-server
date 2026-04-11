@@ -1,6 +1,6 @@
 // src/contexts/AppointmentProvider.tsx
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useRef, useState } from "react";
 import { showSuccess, showError } from "../lib/toast";
 import {
   createAppointment,
@@ -83,6 +83,9 @@ export const AppointmentProvider = ({
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
   const [limit, setLimit] = useState(10);
+  /** YYYY-MM-DD; updated only when `options` includes `fromDate` / `toDate` keys (list fetches). */
+  const listFromDateRef = useRef<string | null>(null);
+  const listToDateRef = useRef<string | null>(null);
 
   const handleGetAppointments = async (
     page: number,
@@ -93,13 +96,25 @@ export const AppointmentProvider = ({
       setLoading(true);
       const filter = options?.filter ?? "all";
       setCurrentFilter(filter);
+      if (options) {
+        if ("fromDate" in options) {
+          const v = options.fromDate;
+          listFromDateRef.current =
+            typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+        }
+        if ("toDate" in options) {
+          const v = options.toDate;
+          listToDateRef.current =
+            typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+        }
+      }
       const response = await getAppointments({
         page,
         limit,
         filter,
         sortOrder: options?.sortOrder,
-        fromDate: options?.fromDate,
-        toDate: options?.toDate,
+        fromDate: listFromDateRef.current ?? undefined,
+        toDate: listToDateRef.current ?? undefined,
         doctorId: options?.doctorId,
         patientId: options?.patientId,
         status: options?.status,

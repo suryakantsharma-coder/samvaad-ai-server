@@ -1,4 +1,5 @@
 import { Slot } from "@radix-ui/react-slot";
+import { Loader2 } from "lucide-react";
 import { type VariantProps, cva } from "class-variance-authority";
 import * as React from "react";
 import { cn } from "../../lib/utils";
@@ -37,17 +38,62 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
+  /** Disables the button and shows a spinner in place of `leadingIcon` (or before children). */
+  loading?: boolean;
+  /** Icon before label; hidden while `loading` (spinner shown in the same slot). */
+  leadingIcon?: React.ReactNode;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  (
+    {
+      className,
+      variant,
+      size,
+      asChild = false,
+      loading = false,
+      leadingIcon,
+      disabled,
+      children,
+      type = "button",
+      ...props
+    },
+    ref,
+  ) => {
     const Comp = asChild ? Slot : "button";
+    const isDisabled = disabled || (!asChild && loading);
+
+    if (asChild) {
+      return (
+        <Comp
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref}
+          {...props}
+        >
+          {children}
+        </Comp>
+      );
+    }
+
     return (
-      <Comp
+      <button
+        type={type}
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
+        disabled={isDisabled}
+        aria-busy={loading || undefined}
         {...props}
-      />
+      >
+        {loading ? (
+          <Loader2
+            className="h-4 w-4 animate-spin shrink-0"
+            aria-hidden
+          />
+        ) : (
+          leadingIcon
+        )}
+        {children}
+      </button>
     );
   },
 );

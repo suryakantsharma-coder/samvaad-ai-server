@@ -1,7 +1,13 @@
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, Trash2, X } from "lucide-react";
+import { useState } from "react";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import type { Doctor } from "../../types/doctor.type";
+import {
+  modalFooterCancelClassName,
+  modalFooterDangerClassName,
+  modalFooterRowClassName,
+} from "./modalFooterStyles";
 
 interface DeleteDoctorModalProps {
   open: boolean;
@@ -18,12 +24,17 @@ export const DeleteDoctorModal = ({
   doctor,
   onConfirm,
 }: DeleteDoctorModalProps): JSX.Element => {
+  const [submitting, setSubmitting] = useState(false);
   const handleConfirm = async () => {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       await onConfirm();
       onOpenChange(false);
     } catch {
       /* toast from DoctorProvider */
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -45,19 +56,22 @@ export const DeleteDoctorModal = ({
             <strong className="text-black">{name}</strong> will be removed from
             your doctors list. This cannot be undone. Please confirm to proceed.
           </p>
-          <div className="flex justify-end gap-[20px] pt-4">
+          <div className={modalFooterRowClassName}>
             <Button
               variant="ghost"
-              className="w-[86px] text-gray-500 text-xs h-9 px-6 bg-[#F5F5F5] text-[14px]"
+              className={modalFooterCancelClassName}
               onClick={onClose}
+              disabled={submitting}
+              leadingIcon={<X className="h-4 w-4" />}
             >
-              {/* <X className="w-4 h-4 mr-1" /> */} Close
+              Close
             </Button>
             <Button
-              className="bg-red-600 hover:bg-red-700 text-white text-xs h-9 px-6 text-[14px]"
+              className={modalFooterDangerClassName}
               onClick={() => void handleConfirm()}
+              loading={submitting}
+              leadingIcon={<Trash2 className="h-4 w-4" />}
             >
-              {/* <X className="w-4 h-4 mr-1" /> */}
               Remove doctor
             </Button>
           </div>

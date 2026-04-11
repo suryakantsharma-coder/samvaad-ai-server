@@ -3,6 +3,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 
 import { cn } from "../../lib/utils"
+import { dialogCloseButtonClassName } from "./dialog-close-styles"
 
 const Dialog = DialogPrimitive.Root
 
@@ -43,8 +44,13 @@ const DialogContent = React.forwardRef<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-slate-100 data-[state=open]:text-slate-500">
-        <X className="h-6 w-6" />
+      <DialogPrimitive.Close
+        className={cn(
+          "absolute right-3 top-3 z-10",
+          dialogCloseButtonClassName,
+        )}
+      >
+        <X className="h-5 w-5" strokeWidth={2} aria-hidden />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>

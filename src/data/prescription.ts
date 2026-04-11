@@ -13,6 +13,8 @@ export interface PrescriptionListParams {
   patientId?: string;
   appointmentId?: string;
   status?: PrescriptionStatusFilter;
+  startDate?: string;
+  endDate?: string;
 }
 
 export const getPrescriptions = async (params: PrescriptionListParams) => {
@@ -22,6 +24,10 @@ export const getPrescriptions = async (params: PrescriptionListParams) => {
   if (params.patientId) search.set("patientId", params.patientId);
   if (params.appointmentId) search.set("appointmentId", params.appointmentId);
   if (params.status) search.set("status", params.status);
+  const start = params.startDate?.trim();
+  const end = params.endDate?.trim();
+  if (start) search.set("startDate", start);
+  if (end) search.set("endDate", end);
 
   return authFetch(`/api/prescriptions?${search.toString()}`, {
     method: "GET",

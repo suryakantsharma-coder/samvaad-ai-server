@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useRef, useState } from "react";
 import {
   createPrescription,
   deletePrescription,
@@ -18,6 +18,8 @@ interface PrescriptionListOptions {
   status?: PrescriptionStatusFilter;
   patientId?: string;
   appointmentId?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 interface PrescriptionContextType {
@@ -64,6 +66,8 @@ export const PrescriptionProvider = ({
   const [limit, setLimit] = useState(10);
   const [currentStatusFilter, setCurrentStatusFilter] =
     useState<PrescriptionStatusFilter | null>(null);
+  const listStartDateRef = useRef<string | null>(null);
+  const listEndDateRef = useRef<string | null>(null);
 
   const handleGetPrescriptions = async (
     page: number,
@@ -73,13 +77,33 @@ export const PrescriptionProvider = ({
     try {
       setLoading(true);
       setError(null);
-      setCurrentStatusFilter(options?.status ?? null);
+      if (options != null && options.status !== undefined) {
+        setCurrentStatusFilter(options.status);
+      }
+      if (options) {
+        if ("startDate" in options) {
+          const v = options.startDate;
+          listStartDateRef.current =
+            typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+        }
+        if ("endDate" in options) {
+          const v = options.endDate;
+          listEndDateRef.current =
+            typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+        }
+      }
+      const statusForRequest =
+        options != null && options.status !== undefined
+          ? options.status
+          : currentStatusFilter ?? undefined;
       const response = await getPrescriptions({
         page,
         limit: pageLimit,
-        status: options?.status,
+        status: statusForRequest,
         patientId: options?.patientId,
         appointmentId: options?.appointmentId,
+        startDate: listStartDateRef.current ?? undefined,
+        endDate: listEndDateRef.current ?? undefined,
       });
       const list = response.data?.prescriptions ?? [];
       setPrescriptions(Array.isArray(list) ? list : []);
@@ -140,7 +164,7 @@ export const PrescriptionProvider = ({
     try {
       await updatePrescription(prescriptionId, payload);
       await handleGetPrescriptions(currentPage, limit, {
-        status: currentStatusFilter ?? undefined,
+        ...(currentStatusFilter != null ? { status: currentStatusFilter } : {}),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -152,7 +176,7 @@ export const PrescriptionProvider = ({
     try {
       await deletePrescription(prescriptionId);
       await handleGetPrescriptions(currentPage, limit, {
-        status: currentStatusFilter ?? undefined,
+        ...(currentStatusFilter != null ? { status: currentStatusFilter } : {}),
       });
       showSuccess("Success!", "Prescription deleted successfully.");
     } catch (err) {

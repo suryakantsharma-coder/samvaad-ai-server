@@ -29,10 +29,10 @@ import {
   TableCell,
   TableHead,
   TableHeader,
+  TableLoadingRow,
   TableRow,
 } from "../../../../components/ui/table";
 import { ListError } from "../../../../components/ui/list-error";
-import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
 import { API_BASE_URL } from "../../../../config";
 import { useHospital } from "../../../../contexts/HospitalProvider";
 import { Hospital } from "../../../../types/hospital.type";
@@ -267,16 +267,10 @@ export const HospitalListSection = (): JSX.Element => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const showLoading = isLoading && hospitals.length === 0 && listToShow.length === 0;
+  const tableLoading =
+    isLoading && hospitals.length === 0 && listToShow.length === 0;
   const showError = error && !isLoading;
 
-  if (showLoading) {
-    return (
-      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
-        <LoadingSpinner />
-      </section>
-    );
-  }
   if (showError) {
     return (
       <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
@@ -377,7 +371,19 @@ export const HospitalListSection = (): JSX.Element => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {listToShow.map((hospital: Hospital) => (
+            {tableLoading ? (
+              <TableLoadingRow colSpan={7} />
+            ) : listToShow.length === 0 ? (
+              <TableRow className="border-b border-[#dedee1]">
+                <TableCell
+                  colSpan={7}
+                  className="px-[20px] py-10 text-center text-x-70 font-title-4r"
+                >
+                  No hospitals found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              listToShow.map((hospital: Hospital) => (
               <TableRow
                 key={hospital._id}
                 className="border-b border-[#dedee1] hover:bg-grey-light/50"
@@ -440,7 +446,7 @@ export const HospitalListSection = (): JSX.Element => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 rounded-full hover:bg-grey-light"
+                        className="h-8 w-8 rounded-full hover:bg-transparent active:bg-transparent data-[state=open]:bg-transparent"
                       >
                         <MoreVerticalIcon className="h-5 w-5" />
                       </Button>
@@ -455,7 +461,8 @@ export const HospitalListSection = (): JSX.Element => {
                   </DropdownMenu>
                 </TableCell>
               </TableRow>
-            ))}
+            ))
+            )}
           </TableBody>
         </Table>
       </div>

@@ -18,25 +18,28 @@ export const Signup = (): JSX.Element => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [role, setRole] = useState("user");
   const [name, setName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
   const { handleRegister } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
 
     if (password !== confirmPassword) {
       showWarning("Warning", "Passwords do not match.");
       return;
     }
 
+    setSubmitting(true);
     try {
       await handleRegister(email, password, name, role);
       navigate("/login");
     } catch (error) {
       showError("Error", "Failed to sign up. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
-
-    console.log("Signup:", { email, password, confirmPassword, name, role });
   };
 
   return (
@@ -120,7 +123,7 @@ export const Signup = (): JSX.Element => {
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit" className="w-full">
+          <Button type="submit" className="w-full" loading={submitting}>
             Sign up
           </Button>
         </form>

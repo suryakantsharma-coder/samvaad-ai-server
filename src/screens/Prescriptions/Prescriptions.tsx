@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { showSuccess, showError } from "../../lib/toast";
 import { downloadPrescriptionReportPdf } from "../../lib/prescriptionPdf";
 import {
@@ -15,6 +15,20 @@ import type {
 import { PatientSearchSection } from "../Patients/sections/PatientSearchSection";
 import { PrescriptionsHeaderSection } from "./sections/PrescriptionHeaderSection/ PrescriptionsHeaderSection";
 import { PrescriptionListSection } from "./sections/PrescriptionListSection/PrescriptionListSection";
+
+function toYMDLocal(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function getDefaultPrescriptionListDateRange(): { start: string; end: string } {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - 29);
+  return { start: toYMDLocal(start), end: toYMDLocal(end) };
+}
 
 function mapModalPayloadToCreate(
   payload: NewPrescriptionPayload,
@@ -49,6 +63,12 @@ function mapModalPayloadToCreate(
 }
 
 export const Prescriptions = (): JSX.Element => {
+  const defaultListDateRange = useMemo(
+    () => getDefaultPrescriptionListDateRange(),
+    [],
+  );
+  const [listStartDate, setListStartDate] = useState(defaultListDateRange.start);
+  const [listEndDate, setListEndDate] = useState(defaultListDateRange.end);
   const [showNewPrescriptionModal, setShowNewPrescriptionModal] =
     useState(false);
   const [editingPrescription, setEditingPrescription] =
@@ -63,6 +83,7 @@ export const Prescriptions = (): JSX.Element => {
     handleGetPrescriptions,
     handleDeletePrescription: deletePrescriptionById,
     limit,
+    currentStatusFilter,
   } = usePrescription();
 
   const modalOpen = showNewPrescriptionModal || editingPrescription !== null;
@@ -80,7 +101,11 @@ export const Prescriptions = (): JSX.Element => {
         mapModalPayloadToCreate(payload, payload.appointmentId),
       );
       handleCloseModal(false);
-      await handleGetPrescriptions(1, limit);
+      await handleGetPrescriptions(1, limit, {
+        startDate: listStartDate,
+        endDate: listEndDate,
+        ...(currentStatusFilter != null ? { status: currentStatusFilter } : {}),
+      });
       showSuccess("Success!", "Prescription created successfully.");
     } catch (e) {
       showError(
@@ -97,7 +122,11 @@ export const Prescriptions = (): JSX.Element => {
     try {
       await handleUpdatePrescription(prescriptionId, payload);
       handleCloseModal(false);
-      await handleGetPrescriptions(1, limit);
+      await handleGetPrescriptions(1, limit, {
+        startDate: listStartDate,
+        endDate: listEndDate,
+        ...(currentStatusFilter != null ? { status: currentStatusFilter } : {}),
+      });
       showSuccess("Success!", "Prescription updated successfully.");
     } catch (e) {
       showError(
@@ -112,6 +141,10 @@ export const Prescriptions = (): JSX.Element => {
       <PatientSearchSection />
       <PrescriptionsHeaderSection
         onAddPrescription={() => setShowNewPrescriptionModal(true)}
+        startDate={listStartDate}
+        endDate={listEndDate}
+        onStartDateChange={setListStartDate}
+        onEndDateChange={setListEndDate}
       />
       <NewPrescriptionModal
         open={modalOpen}
@@ -140,6 +173,8 @@ export const Prescriptions = (): JSX.Element => {
         prescription={viewingPrescription}
       />
       <PrescriptionListSection
+        listStartDate={listStartDate}
+        listEndDate={listEndDate}
         onEditPrescription={(p) => setEditingPrescription(p)}
         onDeletePrescription={(p) => setPrescriptionPendingDelete(p)}
         onMarkAsDonePrescription={() => {}}

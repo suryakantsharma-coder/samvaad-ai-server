@@ -6,7 +6,6 @@ export { DeleteDoctorModal } from "./DeleteDoctorModal";
 export { NewPrescriptionModal } from "./NewPrescriptionModal";
 export { DeletePrescriptionModal } from "./DeletePrescriptionModal";
 export { PrescriptionViewModal } from "./PrescriptionViewModal";
-export { ChangePasswordModal } from "./ChangePasswordModal";
 export { AddHospitalModal } from "./AddHospitalModal";
 export type {
   NewPrescriptionPayload,

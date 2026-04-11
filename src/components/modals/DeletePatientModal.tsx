@@ -1,4 +1,5 @@
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Trash2, X } from "lucide-react";
+import { useState } from "react";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -8,6 +9,11 @@ import {
 } from "../ui/dialog";
 import { usePatient } from "../../contexts/PatientProvider";
 import { PatientData } from "./AddPatientModal";
+import {
+  modalFooterCancelClassName,
+  modalFooterDangerClassName,
+  modalFooterRowClassName,
+} from "./modalFooterStyles";
 
 interface DeletePatientModalProps {
   open: boolean;
@@ -25,10 +31,20 @@ export const DeletePatientModal = ({
   patientName,
 }: DeletePatientModalProps): JSX.Element => {
   const { handleDeletePatient } = usePatient();
-  const handleDelete = () => {
-    onDelete();
-    handleDeletePatient(patient?._id || "");
-    onOpenChange(false);
+  const [submitting, setSubmitting] = useState(false);
+  const handleDelete = async () => {
+    const id = patient?._id;
+    if (!id || submitting) return;
+    setSubmitting(true);
+    try {
+      await handleDeletePatient(id);
+      onDelete();
+      onOpenChange(false);
+    } catch {
+      /* PatientProvider shows error toast */
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -52,17 +68,21 @@ export const DeletePatientModal = ({
             from the hospital database. This action will remove all associated
             appointments, prescriptions, and medical history permanently.
           </p>
-          <div className="flex justify-end gap-[20px] pt-4">
+          <div className={modalFooterRowClassName}>
             <Button
               variant="ghost"
-              className="w-[86px] text-gray-500 text-xs h-9 px-6 bg-[#F5F5F5] text-[14px]"
+              className={modalFooterCancelClassName}
               onClick={handleClose}
+              disabled={submitting}
+              leadingIcon={<X className="h-4 w-4" />}
             >
               Close
             </Button>
             <Button
-              className="bg-red-600 hover:bg-red-700 text-white text-xs h-9 px-6 text-[14px]"
-              onClick={handleDelete}
+              className={modalFooterDangerClassName}
+              onClick={() => void handleDelete()}
+              loading={submitting}
+              leadingIcon={<Trash2 className="h-4 w-4" />}
             >
               Delete patient
             </Button>

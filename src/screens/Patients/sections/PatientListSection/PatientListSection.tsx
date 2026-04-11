@@ -27,6 +27,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
+  TableLoadingRow,
   TableRow,
 } from "../../../../components/ui/table";
 import {
@@ -34,10 +35,10 @@ import {
   ToggleGroupItem,
 } from "../../../../components/ui/toggle-group";
 import { ListError } from "../../../../components/ui/list-error";
-import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
 import { Pagination } from "../../../../components/ui/pagination";
 import { PatientData } from "../../../../components/modals/AddPatientModal";
 import { usePatient } from "../../../../contexts/PatientProvider";
+import { getDoctorNames, type DoctorNameRow } from "../../../../data/doctor";
 import { formatTime12h } from "../../../../lib/dateTimeDisplay";
 import { useNavigate } from "react-router-dom";
 
@@ -170,17 +171,25 @@ const patientsData = [
 interface PatientListSectionProps {
   onEditPatient: (patient: PatientData & { _id?: string }) => void;
   onDeletePatient: (patient: PatientData & { _id?: string }) => void;
+  /** YYYY-MM-DD; forwarded to GET /api/patients as `startDate` / `endDate` when set. */
+  listStartDate?: string;
+  listEndDate?: string;
 }
 
 export const PatientListSection = ({
   onEditPatient,
   onDeletePatient,
+  listStartDate = "",
+  listEndDate = "",
 }: PatientListSectionProps): JSX.Element => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<PatientFilterTab>("all");
   const [statusFilter, setStatusFilter] = useState<
     "all" | "completed" | "today" | "upcoming" | "cancelled"
   >("all");
+  const [doctorFilter, setDoctorFilter] = useState<string>("__all__");
+  const [doctorsForFilter, setDoctorsForFilter] = useState<DoctorNameRow[]>([]);
+
   const {
     patients,
     searchedPatients,
@@ -208,8 +217,37 @@ export const PatientListSection = ({
         );
 
   useEffect(() => {
-    handlePatient(1, limit, activeTab);
-  }, [activeTab]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await getDoctorNames();
+        if (!cancelled) {
+          setDoctorsForFilter(
+            [...list].sort((a, b) =>
+              a.fullName.localeCompare(b.fullName, undefined, {
+                sensitivity: "base",
+              }),
+            ),
+          );
+        }
+      } catch {
+        if (!cancelled) setDoctorsForFilter([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const doctorIdForApi = doctorFilter === "__all__" ? "" : doctorFilter.trim();
+  const dateRangeForApi = {
+    startDate: listStartDate,
+    endDate: listEndDate,
+  };
+
+  useEffect(() => {
+    handlePatient(1, limit, activeTab, doctorIdForApi, dateRangeForApi);
+  }, [activeTab, limit, doctorIdForApi, listStartDate, listEndDate]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -228,16 +266,8 @@ export const PatientListSection = ({
     }
   };
 
-  const showLoading = loading;
   const showError = error && !loading;
 
-  if (showLoading) {
-    return (
-      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
-        <LoadingSpinner />
-      </section>
-    );
-  }
   if (showError) {
     return (
       <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
@@ -283,7 +313,6 @@ export const PatientListSection = ({
               if (
                 value === "all" ||
                 value === "completed" ||
-                value === "today" ||
                 value === "upcoming" ||
                 value === "cancelled"
               ) {
@@ -309,12 +338,6 @@ export const PatientListSection = ({
               </SelectItem>
               <SelectItem
                 className="text-[14px] leading-[19px] font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]"
-                value="today"
-              >
-                Today
-              </SelectItem>
-              <SelectItem
-                className="text-[14px] leading-[19px] font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]"
                 value="upcoming"
               >
                 Upcoming
@@ -328,15 +351,28 @@ export const PatientListSection = ({
             </SelectContent>
           </Select>
 
-          <Button
-            variant="ghost"
-            className="inline-flex items-center gap-[5px] px-2.5 py-1.5 bg-grey-light rounded-[100px] hover:bg-grey-light"
-          >
-            <FilterIcon className="w-6 h-6" />
-            <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
-              Filter
-            </span>
-          </Button>
+          <Select value={doctorFilter} onValueChange={setDoctorFilter}>
+            <SelectTrigger className="flex min-w-[200px] max-w-[180px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
+              <SelectValue placeholder="Doctor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem
+                className="text-[14px] leading-[19px] font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]"
+                value="__all__"
+              >
+                All doctors
+              </SelectItem>
+              {doctorsForFilter.map((d) => (
+                <SelectItem
+                  key={d._id}
+                  className="text-[14px] leading-[19px] font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]"
+                  value={d._id}
+                >
+                  {d.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -371,163 +407,182 @@ export const PatientListSection = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {listToShow.map((patient, index) => (
-              <TableRow
-                key={index}
-                className="border-b border-[#dedee1] hover:bg-grey-light/50"
-              >
-                <TableCell className="p-[0px]">
-                  <div className="flex flex-col px-[20px] py-[15px]">
-                    <span className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                      {patient.fullName}
-                    </span>
-                    <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
-                      {patient.age}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <div className="inline-flex items-center gap-[5px] px-[20px] py-[15px]">
-                    <PhoneCallIcon className="w-4 h-4" />
-                    <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                      {patient.phoneNumber}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <div className="inline-flex items-center gap-2.5 px-[20px] py-[15px]">
-                    <img
-                      className="w-4 h-4"
-                      alt={patient.gender}
-                      src={
-                        patient.gender === "Male" ? "/male.svg" : "/female.svg"
-                      }
-                    />
-                    <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                      {patient.gender}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <span className="font-title-4l px-[20px] py-[15px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                    {patient.reason || "No reason provided"}
-                  </span>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <span className="font-title-4l px-[20px] py-[15px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                    {/* {patient.doctor || "No doctor assigned"} */}
-                    {patient?.appointments?.length &&
-                    patient?.appointments?.length > 0
-                      ? patient?.appointments[0]?.doctor?.fullName ||
-                        "No doctor assigned"
-                      : "No doctor assigned"}
-                  </span>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <Badge
-                    className={`${
-                      patient?.appointments?.length &&
-                      patient?.appointments?.length > 0
-                        ? patient?.appointments[0]?.status === "Completed"
-                          ? "bg-[#dffff2] text-[#00955b]"
-                          : patient?.appointments[0]?.status === "Cancelled"
-                            ? "bg-[#ffe9e9] text-[#ff0004]"
-                            : patient?.appointments[0]?.status === "Upcoming"
-                              ? "bg-[#fff1e0] text-[#ff9000]"
-                              : "bg-[#fff1e0] text-[#ff9000]"
-                        : "bg-[#fff1e0] text-[#ff9000]"
-                    } rounded-[100px] px-[10px] py-[5px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] hover:${
-                      patient?.appointments?.length &&
-                      patient?.appointments?.length > 0
-                        ? patient?.appointments[0]?.status === "Completed"
-                          ? "bg-[#dffff2] text-[#00955b]"
-                          : patient?.appointments[0]?.status === "Cancelled"
-                            ? "bg-[#ffe9e9] text-[#ff0004]"
-                            : patient?.appointments[0]?.status === "Upcoming"
-                              ? "bg-[#fff1e0] text-[#ff9000]"
-                              : "bg-[#fff1e0] text-[#ff9000]"
-                        : "bg-[#fff1e0] text-[#ff9000]"
-                    }`}
-                  >
-                    {/* {patient.status || "Upcoming"} */}
-                    {patient?.appointments?.length &&
-                    patient?.appointments?.length > 0
-                      ? patient?.appointments[0]?.status || "Upcoming"
-                      : "Upcoming"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <div className="flex flex-col gap-[3px] px-[20px] py-[15px]">
-                    <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                      {patient.appointments?.length &&
-                      patient.appointments?.length > 0
-                        ? new Date(
-                            patient.appointments[0]?.appointmentDateTime,
-                          ).toLocaleDateString() ||
-                          "No appointment date and time"
-                        : "No appointment date and time"}
-                    </span>
-                    <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
-                      {patient.appointments?.length &&
-                      patient.appointments?.length > 0
-                        ? formatTime12h(
-                            patient.appointments[0]?.appointmentDateTime,
-                          ) || "No appointment date and time"
-                        : "No appointment date and time"}
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6">
-                        <MoreVerticalIcon className="h-6 w-6" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>View Details</DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          onEditPatient({
-                            name: patient.fullName,
-                            age: patient.age,
-                            phone: patient.phoneNumber,
-                            gender: patient.gender,
-                            reason: patient.reason || "",
-                            countryCode: "+91",
-                            _id: patient?._id || "",
-                          })
-                        }
-                      >
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          onDeletePatient({
-                            name: patient.fullName,
-                            age: patient.age,
-                            phone: patient.phoneNumber,
-                            gender: patient.gender,
-                            reason: "No reason provided",
-                            countryCode: "+91",
-                            _id: patient?._id || "",
-                          })
-                        }
-                      >
-                        Delete
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() =>
-                          navigate(`/prescriptions/patient/${patient._id}`)
-                        }
-                      >
-                        Patient History
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {loading ? (
+              <TableLoadingRow colSpan={8} />
+            ) : listToShow.length === 0 ? (
+              <TableRow className="border-b border-[#dedee1]">
+                <TableCell
+                  colSpan={8}
+                  className="px-[20px] py-10 text-center text-x-70 font-title-4r"
+                >
+                  No patients match the current filters or search.
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              listToShow.map((patient, index) => (
+                <TableRow
+                  key={index}
+                  className="border-b border-[#dedee1] hover:bg-grey-light/50"
+                >
+                  <TableCell className="p-[0px]">
+                    <div className="flex flex-col px-[20px] py-[15px]">
+                      <span className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                        {patient.fullName}
+                      </span>
+                      <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
+                        {patient.age}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <div className="inline-flex items-center gap-[5px] px-[20px] py-[15px]">
+                      <PhoneCallIcon className="w-4 h-4" />
+                      <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                        {patient.phoneNumber}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <div className="inline-flex items-center gap-2.5 px-[20px] py-[15px]">
+                      <img
+                        className="w-4 h-4"
+                        alt={patient.gender}
+                        src={
+                          patient.gender === "Male"
+                            ? "/male.svg"
+                            : "/female.svg"
+                        }
+                      />
+                      <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                        {patient.gender}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <span className="font-title-4l px-[20px] py-[15px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                      {patient.reason || "No reason provided"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <span className="font-title-4l px-[20px] py-[15px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                      {/* {patient.doctor || "No doctor assigned"} */}
+                      {patient?.appointments?.length &&
+                      patient?.appointments?.length > 0
+                        ? patient?.appointments[0]?.doctor?.fullName ||
+                          "No doctor assigned"
+                        : "No doctor assigned"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <Badge
+                      className={`${
+                        patient?.appointments?.length &&
+                        patient?.appointments?.length > 0
+                          ? patient?.appointments[0]?.status === "Completed"
+                            ? "bg-[#dffff2] text-[#00955b]"
+                            : patient?.appointments[0]?.status === "Cancelled"
+                              ? "bg-[#ffe9e9] text-[#ff0004]"
+                              : patient?.appointments[0]?.status === "Upcoming"
+                                ? "bg-[#fff1e0] text-[#ff9000]"
+                                : "bg-[#fff1e0] text-[#ff9000]"
+                          : "bg-[#fff1e0] text-[#ff9000]"
+                      } rounded-[100px] px-[10px] py-[5px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] hover:${
+                        patient?.appointments?.length &&
+                        patient?.appointments?.length > 0
+                          ? patient?.appointments[0]?.status === "Completed"
+                            ? "bg-[#dffff2] text-[#00955b]"
+                            : patient?.appointments[0]?.status === "Cancelled"
+                              ? "bg-[#ffe9e9] text-[#ff0004]"
+                              : patient?.appointments[0]?.status === "Upcoming"
+                                ? "bg-[#fff1e0] text-[#ff9000]"
+                                : "bg-[#fff1e0] text-[#ff9000]"
+                          : "bg-[#fff1e0] text-[#ff9000]"
+                      }`}
+                    >
+                      {/* {patient.status || "Upcoming"} */}
+                      {patient?.appointments?.length &&
+                      patient?.appointments?.length > 0
+                        ? patient?.appointments[0]?.status || "Upcoming"
+                        : "Upcoming"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <div className="flex flex-col gap-[3px] px-[20px] py-[15px]">
+                      <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                        {patient.appointments?.length &&
+                        patient.appointments?.length > 0
+                          ? new Date(
+                              patient.appointments[0]?.appointmentDateTime,
+                            ).toLocaleDateString() ||
+                            "No appointment date and time"
+                          : "No appointment date and time"}
+                      </span>
+                      <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
+                        {patient.appointments?.length &&
+                        patient.appointments?.length > 0
+                          ? formatTime12h(
+                              patient.appointments[0]?.appointmentDateTime,
+                            ) || "No appointment date and time"
+                          : "No appointment date and time"}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 hover:bg-transparent active:bg-transparent data-[state=open]:bg-transparent"
+                        >
+                          <MoreVerticalIcon className="h-6 w-6" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>View Details</DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            onEditPatient({
+                              name: patient.fullName,
+                              age: patient.age,
+                              phone: patient.phoneNumber,
+                              gender: patient.gender,
+                              reason: patient.reason || "",
+                              countryCode: "+91",
+                              _id: patient?._id || "",
+                            })
+                          }
+                        >
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            navigate(`/prescriptions/patient/${patient._id}`)
+                          }
+                        >
+                          Patient History
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            onDeletePatient({
+                              name: patient.fullName,
+                              age: patient.age,
+                              phone: patient.phoneNumber,
+                              gender: patient.gender,
+                              reason: "No reason provided",
+                              countryCode: "+91",
+                              _id: patient?._id || "",
+                            })
+                          }
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
@@ -535,7 +590,15 @@ export const PatientListSection = ({
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          onPageChange={(page) => handlePatient(page, limit, activeTab)}
+          onPageChange={(page) =>
+            handlePatient(
+              page,
+              limit,
+              activeTab,
+              doctorIdForApi,
+              dateRangeForApi,
+            )
+          }
           disabled={loading}
         />
       )}

@@ -27,6 +27,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
+  TableLoadingRow,
   TableRow,
 } from "../../../../components/ui/table";
 import {
@@ -34,7 +35,6 @@ import {
   ToggleGroupItem,
 } from "../../../../components/ui/toggle-group";
 import { ListError } from "../../../../components/ui/list-error";
-import { LoadingSpinner } from "../../../../components/ui/loading-spinner";
 import { Pagination } from "../../../../components/ui/pagination";
 import { useAppointments } from "../../../../contexts/AppointmentProvider";
 import { formatTime12h } from "../../../../lib/dateTimeDisplay";
@@ -83,10 +83,15 @@ export const AppointmentListSection = ({
   onCancelAppointment,
   onRescheduleAppointment,
   onMarkAsDoneAppointment,
+  listFromDate = "",
+  listToDate = "",
 }: {
   onCancelAppointment: (appointment: Appointments) => void;
   onRescheduleAppointment: (appointment: Appointments) => void;
   onMarkAsDoneAppointment: (appointment: Appointments) => void;
+  /** YYYY-MM-DD → GET /api/appointments `fromDate` / `toDate`. */
+  listFromDate?: string;
+  listToDate?: string;
 }): JSX.Element => {
   const [activeTab, setActiveTab] = useState<"all" | "today" | "tomorrow">(
     "today",
@@ -142,8 +147,10 @@ export const AppointmentListSection = ({
       sortOrder: sortOrderForApi,
       status: statusForApi,
       type: typeForApi,
+      fromDate: listFromDate,
+      toDate: listToDate,
     });
-  }, [activeTab, statusFilter, typeFilter]);
+  }, [activeTab, statusFilter, typeFilter, limit, listFromDate, listToDate]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -207,13 +214,6 @@ export const AppointmentListSection = ({
   const showLoading = loading && searchQuery.trim() === "";
   const showError = error && !loading;
 
-  if (showLoading) {
-    return (
-      <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
-        <LoadingSpinner />
-      </section>
-    );
-  }
   if (showError) {
     return (
       <section className="flex flex-col bg-white rounded-[10px] overflow-hidden">
@@ -258,7 +258,6 @@ export const AppointmentListSection = ({
             onValueChange={(value) => {
               if (
                 value === "all" ||
-                value === "today" ||
                 value === "upcoming" ||
                 value === "completed" ||
                 value === "cancelled"
@@ -272,7 +271,6 @@ export const AppointmentListSection = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
               <SelectItem value="upcoming">Upcoming</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -286,11 +284,7 @@ export const AppointmentListSection = ({
                 value === "all" ||
                 value === "checkup" ||
                 value === "consultation" ||
-                value === "emergency" ||
-                value === "other" ||
                 value === "hospital" ||
-                value === "zoom" ||
-                value === "video_call" ||
                 value === "tele-caller"
               ) {
                 setTypeFilter(value);
@@ -304,24 +298,10 @@ export const AppointmentListSection = ({
               <SelectItem value="all">All</SelectItem>
               <SelectItem value="checkup">Checkup</SelectItem>
               <SelectItem value="consultation">Consultation</SelectItem>
-              <SelectItem value="emergency">Emergency</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
               <SelectItem value="hospital">Hospital</SelectItem>
-              <SelectItem value="zoom">Zoom</SelectItem>
-              <SelectItem value="video_call">Video Call</SelectItem>
               <SelectItem value="tele-caller">Tele-caller</SelectItem>
             </SelectContent>
           </Select>
-
-          {/* <Button
-            variant="ghost"
-            className="inline-flex items-center gap-[5px] px-2.5 py-1.5 bg-grey-light rounded-[100px] hover:bg-grey-light"
-          >
-            <FilterIcon className="w-6 h-6" />
-            <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
-              Filter
-            </span>
-          </Button> */}
         </div>
       </div>
 
@@ -358,7 +338,9 @@ export const AppointmentListSection = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {listToShow.length === 0 ? (
+                {showLoading ? (
+                  <TableLoadingRow colSpan={8} />
+                ) : listToShow.length === 0 ? (
                   <TableRow className="border-b border-[#dedee1]">
                     <TableCell
                       colSpan={8}
@@ -454,7 +436,7 @@ export const AppointmentListSection = ({
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6 px-[40px] py-[10px]"
+                              className="h-6 w-6 px-[40px] py-[10px] hover:bg-transparent active:bg-transparent data-[state=open]:bg-transparent"
                             >
                               <ThreeDotsVerticalIcon className="h-6 w-6" />
                             </Button>
@@ -540,6 +522,8 @@ export const AppointmentListSection = ({
               sortOrder: sortOrderForApi,
               status: statusForApi,
               type: typeForApi,
+              fromDate: listFromDate,
+              toDate: listToDate,
             });
           }}
           disabled={loading}

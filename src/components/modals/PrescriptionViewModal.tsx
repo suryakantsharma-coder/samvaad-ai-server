@@ -1,4 +1,5 @@
 import { Download, Printer } from "lucide-react";
+import { useState } from "react";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { PrescriptionHospitalDoctorInfo } from "../prescription/PrescriptionHospitalDoctorInfo";
@@ -8,6 +9,10 @@ import {
   downloadPrescriptionReportPdf,
   openPrescriptionReportPdfInNewTab,
 } from "../../lib/prescriptionPdf";
+import {
+  modalFooterOutlineClassName,
+  modalFooterPrimaryClassName,
+} from "./modalFooterStyles";
 import { getDiagnosis } from "../../lib/prescriptionMeta";
 import type { Prescription } from "../../types/prescription.type";
 
@@ -22,12 +27,27 @@ export const PrescriptionViewModal = ({
   onOpenChange,
   prescription,
 }: PrescriptionViewModalProps): JSX.Element => {
-  const handleDownloadPdf = () => {
-    if (prescription) downloadPrescriptionReportPdf(prescription);
+  const [pdfAction, setPdfAction] = useState<null | "print" | "download">(null);
+  const pdfBusy = pdfAction !== null;
+
+  const handleDownloadPdf = async () => {
+    if (!prescription || pdfBusy) return;
+    setPdfAction("download");
+    try {
+      await downloadPrescriptionReportPdf(prescription);
+    } finally {
+      setPdfAction(null);
+    }
   };
 
-  const handlePrintPdf = () => {
-    if (prescription) void openPrescriptionReportPdfInNewTab(prescription);
+  const handlePrintPdf = async () => {
+    if (!prescription || pdfBusy) return;
+    setPdfAction("print");
+    try {
+      await openPrescriptionReportPdfInNewTab(prescription);
+    } finally {
+      setPdfAction(null);
+    }
   };
 
   return (
@@ -57,18 +77,22 @@ export const PrescriptionViewModal = ({
                 <div className="flex items-center gap-2 shrink-0">
                   <Button
                     type="button"
-                    onClick={handlePrintPdf}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 h-auto rounded-[10px] bg-white border border-[#dedee1] hover:bg-grey-light text-black font-title-4r shrink-0"
+                    onClick={() => void handlePrintPdf()}
+                    disabled={pdfBusy}
+                    loading={pdfAction === "print"}
+                    leadingIcon={<Printer className="h-4 w-4" />}
+                    className={`${modalFooterOutlineClassName} shrink-0 font-title-4r`}
                   >
-                    <Printer className="w-4 h-4" />
                     Print PDF
                   </Button>
                   <Button
                     type="button"
-                    onClick={handleDownloadPdf}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 h-auto rounded-[10px] bg-primary-2 hover:bg-primary-2/90 text-white font-title-4r shrink-0"
+                    onClick={() => void handleDownloadPdf()}
+                    disabled={pdfBusy}
+                    loading={pdfAction === "download"}
+                    leadingIcon={<Download className="h-4 w-4" />}
+                    className={`${modalFooterPrimaryClassName} shrink-0 font-title-4r`}
                   >
-                    <Download className="w-4 h-4" />
                     Download PDF
                   </Button>
                 </div>
