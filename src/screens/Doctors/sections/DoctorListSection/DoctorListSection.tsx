@@ -5,7 +5,7 @@ import {
   PhoneCall as PhoneCallIcon,
   Search as SearchIcon,
 } from "lucide-react";
-import React, { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Avatar,
   AvatarFallback,
@@ -37,6 +37,7 @@ import {
   TableRow,
 } from "../../../../components/ui/table";
 import { ListError } from "../../../../components/ui/list-error";
+import { Pagination } from "../../../../components/ui/pagination";
 import { useDoctor } from "../../../../contexts/DoctorProvider";
 import type { Doctor } from "../../../../types/doctor.type";
 
@@ -78,7 +79,7 @@ export const DoctorListSection = ({
     loading,
     error,
     page,
-    limit,
+    totalPages,
     getDoctorsData,
     searchDoctorsByName,
     resetSearchedDoctors,
@@ -92,18 +93,23 @@ export const DoctorListSection = ({
       : baseList.filter((d) => d.status === statusFilter);
 
   useEffect(() => {
-    getDoctorsData();
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery.trim()) {
-        searchDoctorsByName(searchQuery);
+    const run = () => {
+      const q = searchQuery.trim();
+      if (q) {
+        void searchDoctorsByName(q, 1);
       } else {
         resetSearchedDoctors();
+        void getDoctorsData({ page: 1 });
       }
-    }, 300);
-    return () => clearTimeout(timer);
+    };
+    if (searchQuery.trim()) {
+      const timer = window.setTimeout(run, 300);
+      return () => window.clearTimeout(timer);
+    }
+    run();
+    return undefined;
+    // Intentionally only searchQuery: avoid re-running when list page changes (stable pagination).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- searchDoctorsByName, getDoctorsData, resetSearchedDoctors
   }, [searchQuery]);
 
   const tableLoading =
@@ -338,6 +344,19 @@ export const DoctorListSection = ({
           </TableBody>
         </Table>
       </div>
+      <Pagination
+        currentPage={page}
+        totalPages={totalPages}
+        onPageChange={(p) => {
+          const q = searchQuery.trim();
+          if (q) {
+            void searchDoctorsByName(q, p);
+          } else {
+            void getDoctorsData({ page: p });
+          }
+        }}
+        disabled={loading}
+      />
     </section>
   );
 };

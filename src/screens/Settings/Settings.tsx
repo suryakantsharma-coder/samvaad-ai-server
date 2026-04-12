@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { PatientSearchSection } from "../Patients/sections/PatientSearchSection";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Switch } from "../../components/ui/switch";
@@ -32,8 +31,13 @@ import {
 import { useAuth } from "../../contexts/AuthProvider";
 import { useHospital } from "../../contexts/HospitalProvider";
 import { showSuccess, showError, showWarning } from "../../lib/toast";
+import { isSuperAdminRole } from "../../lib/userRole";
 import { connectWhatsAppEmbeddedSignup } from "../../lib/whatsappConnect";
-import { getHospitalUsers, updateCurrentUserProfile } from "../../data/auth";
+import {
+  getHospitalUsers,
+  updateCurrentUserProfile,
+  uploadProfilePicture,
+} from "../../data/auth";
 import {
   fetchWhatsappCredsForOnboarding,
   getWhatsappOnboardingStatus,
@@ -52,6 +56,10 @@ import {
   fetchGoogleCalendarStatus,
 } from "../../data/googleCalendar";
 import type { User } from "../../types/auth.type";
+import { API_BASE_URL } from "../../config";
+import {
+  validateSettingsHospitalForm,
+} from "../../lib/hospitalValidation";
 
 /** Per-hospital WhatsApp notification toggles (localStorage until API exists). */
 const WHATSAPP_NOTIFICATION_PREFS_PREFIX = "samvaad-whatsapp-notification-prefs:";
@@ -86,6 +94,52 @@ function splitPhoneForForm(raw: string | undefined | null): {
   return { countryCode: "+91", national: p.replace(/\D/g, "") };
 }
 
+function buildLocalPhoneDigits(phone: string): string {
+  return phone.replace(/\D/g, "");
+}
+
+function buildDialDigits(countryCode: string, phone: string): string {
+  const cc = countryCode.replace(/\D/g, "");
+  const p = phone.replace(/\D/g, "");
+  return cc ? `${cc}${p}` : p;
+}
+
+/** Map stored `whatsappNumber` (e.g. 919876543210) into country + national fields. */
+function splitWhatsappDigitsForForm(raw: string | undefined): {
+  countryCode: string;
+  national: string;
+} {
+  if (!raw?.trim()) return { countryCode: "+91", national: "" };
+  const d = raw.replace(/\D/g, "");
+  if (d.length >= 12 && d.startsWith("91")) {
+    return { countryCode: "+91", national: d.slice(2) };
+  }
+  if (d.length === 10) return { countryCode: "+91", national: d };
+  if (d.length > 10) return { countryCode: "+91", national: d.slice(-10) };
+  return { countryCode: "+91", national: d };
+}
+
+const HOSPITAL_LOGO_MAX_MB = 5;
+
+/** Resolve stored `logoUrl` (path or filename) to a full URL for `<img src>`. */
+function hospitalLogoImageSrc(logoUrl: string | undefined): string | undefined {
+  if (!logoUrl?.trim()) return undefined;
+  const u = logoUrl.trim();
+  if (u.startsWith("http://") || u.startsWith("https://")) return u;
+  return u.startsWith("/") ? `${API_BASE_URL}${u}` : `${API_BASE_URL}/${u}`;
+}
+
+/** Personal tab: draft preview wins; then `profilePicUrl` from API, then legacy keys. */
+function resolvePersonalAvatarSrc(
+  draftPreview: string | null | undefined,
+  u: User | null | undefined,
+): string | undefined {
+  if (draftPreview) return draftPreview;
+  const raw =
+    u?.profilePicUrl ?? u?.profilePictureUrl ?? u?.profilePicture;
+  return hospitalLogoImageSrc(raw);
+}
+
 export const Settings = (): JSX.Element => {
   const { user, refreshUser } = useAuth();
   const {
@@ -98,7 +152,9 @@ export const Settings = (): JSX.Element => {
   const isHospitalAdmin = user?.role === "hospital_admin";
   /** Hospital + Integrations & Notifications tab (admin / hospital_admin). */
   const canManageHospitalIntegrations =
-    user?.role === "admin" || user?.role === "hospital_admin";
+    user?.role === "admin" ||
+    isSuperAdminRole(user?.role) ||
+    user?.role === "hospital_admin";
 
   const settingsTabs = useMemo(() => {
     const tabs: Array<{ id: string; label: string; icon: typeof UserIcon }> = [
@@ -214,6 +270,14 @@ export const Settings = (): JSX.Element => {
     whatsappNumber: "",
     whatsappCountryCode: "+91",
     officialEmail: "",
+    contactPerson: "",
+    registrationNumber: "",
+    hospitalUrl: "",
+    emergencyCountryCode: "+91",
+    emergencyPhone: "",
+    receptionistCountryCode: "+91",
+    receptionistPhone: "",
+    reviewUrls: ["", ""] as [string, string],
   });
 
   useEffect(() => {
@@ -244,6 +308,10 @@ export const Settings = (): JSX.Element => {
   // Fill hospital form when currentHospital is loaded
   useEffect(() => {
     if (currentHospital) {
+      const wa = splitWhatsappDigitsForForm(currentHospital.whatsappNumber);
+      const em = splitWhatsappDigitsForForm(currentHospital.emergencyNumber);
+      const rec = splitWhatsappDigitsForForm(currentHospital.receptionistNumber);
+      const reviews = currentHospital.reviewUrls ?? [];
       setFormData((prev) => ({
         ...prev,
         hospitalName: currentHospital.name ?? prev.hospitalName,
@@ -252,10 +320,22 @@ export const Settings = (): JSX.Element => {
         city: currentHospital.city ?? prev.city,
         pincode: currentHospital.pincode ?? prev.pincode,
         phoneRouting: currentHospital.phoneNumber ?? prev.phoneRouting,
-        phoneRoutingCountryCode:
-          currentHospital.phoneCountryCode ?? prev.phoneRoutingCountryCode,
+        phoneRoutingCountryCode: "+91",
         officialEmail: currentHospital.email ?? prev.officialEmail,
-        whatsappNumber: currentHospital.phoneNumber ?? prev.whatsappNumber,
+        contactPerson: currentHospital.contactPerson ?? prev.contactPerson,
+        registrationNumber:
+          currentHospital.registrationNumber ?? prev.registrationNumber,
+        hospitalUrl: currentHospital.url ?? prev.hospitalUrl,
+        emergencyCountryCode: "+91",
+        emergencyPhone: em.national,
+        receptionistCountryCode: "+91",
+        receptionistPhone: rec.national,
+        whatsappCountryCode: "+91",
+        whatsappNumber: wa.national,
+        reviewUrls: [
+          reviews[0] ?? "",
+          reviews[1] ?? "",
+        ] as [string, string],
       }));
     }
   }, [currentHospital]);
@@ -264,7 +344,43 @@ export const Settings = (): JSX.Element => {
   const [hospitalSaveError, setHospitalSaveError] = useState<string | null>(
     null,
   );
+  const hospitalLogoInputRef = useRef<HTMLInputElement>(null);
+  const [hospitalLogoDraft, setHospitalLogoDraft] = useState<File | null>(null);
+  const [draftHospitalLogoPreviewUrl, setDraftHospitalLogoPreviewUrl] =
+    useState<string | null>(null);
+
+  useEffect(() => {
+    if (!hospitalLogoDraft) {
+      setDraftHospitalLogoPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(hospitalLogoDraft);
+    setDraftHospitalLogoPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [hospitalLogoDraft]);
+
   const [personalSaveLoading, setPersonalSaveLoading] = useState(false);
+  const profileAvatarInputRef = useRef<HTMLInputElement>(null);
+  const [profilePictureDraft, setProfilePictureDraft] = useState<File | null>(
+    null,
+  );
+  const [draftProfilePicturePreviewUrl, setDraftProfilePicturePreviewUrl] =
+    useState<string | null>(null);
+
+  useEffect(() => {
+    if (!profilePictureDraft) {
+      setDraftProfilePicturePreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(profilePictureDraft);
+    setDraftProfilePicturePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [profilePictureDraft]);
+
+  const personalAvatarDisplayUrl = useMemo(
+    () => resolvePersonalAvatarSrc(draftProfilePicturePreviewUrl, user),
+    [draftProfilePicturePreviewUrl, user],
+  );
 
   const [integrations, setIntegrations] = useState({
     whatsapp: true,
@@ -549,6 +665,12 @@ export const Settings = (): JSX.Element => {
   const handleSavePersonal = async () => {
     setPersonalSaveLoading(true);
     try {
+      let didAnything = false;
+      if (profilePictureDraft) {
+        await uploadProfilePicture(profilePictureDraft);
+        setProfilePictureDraft(null);
+        didAnything = true;
+      }
       const payload: Parameters<typeof updateCurrentUserProfile>[0] = {
         name: formData.fullName.trim(),
         email: formData.email.trim(),
@@ -557,19 +679,21 @@ export const Settings = (): JSX.Element => {
       if (phoneDigits) {
         payload.phoneNumber = phoneDigits;
       }
-      const hasChange =
+      const hasTextChange =
         Boolean(payload.name) ||
         Boolean(payload.email) ||
         Boolean(payload.phoneNumber);
-      if (!hasChange) {
+      if (hasTextChange) {
+        await updateCurrentUserProfile(payload);
+        didAnything = true;
+      }
+      if (!didAnything) {
         showWarning(
           "Warning",
-          "Update your name, email, or phone, or use the Security card to change your password.",
+          "Choose a profile photo or update your name, email, or phone.",
         );
-        setPersonalSaveLoading(false);
         return;
       }
-      await updateCurrentUserProfile(payload);
       await refreshUser();
       showSuccess("Success!", "Your profile was updated.");
     } catch (err) {
@@ -625,17 +749,54 @@ export const Settings = (): JSX.Element => {
       setHospitalSaveError("No hospital linked to your account.");
       return;
     }
+    const validationError = validateSettingsHospitalForm(formData);
+    if (validationError) {
+      setHospitalSaveError(validationError);
+      showError("Validation", validationError);
+      return;
+    }
     setHospitalSaveError(null);
     setHospitalSaveLoading(true);
     try {
-      await updateHospitalById(hospitalId, {
-        name: formData.hospitalName || undefined,
-        phoneNumber: formData.phoneRouting || undefined,
-        email: formData.officialEmail || undefined,
-        address: formData.address || undefined,
-        city: formData.city || undefined,
-        pincode: formData.pincode || undefined,
-      });
+      const logo = hospitalLogoDraft;
+      const mainDigits = buildLocalPhoneDigits(formData.phoneRouting);
+      const waDigits = buildDialDigits(
+        formData.whatsappCountryCode,
+        formData.whatsappNumber,
+      );
+      const emergencyDigits = buildDialDigits(
+        formData.emergencyCountryCode,
+        formData.emergencyPhone,
+      );
+      const receptionistDigits = buildDialDigits(
+        formData.receptionistCountryCode,
+        formData.receptionistPhone,
+      );
+      const r0 = formData.reviewUrls[0]?.trim() ?? "";
+      const r1 = formData.reviewUrls[1]?.trim() ?? "";
+      await updateHospitalById(
+        hospitalId,
+        {
+          name: formData.hospitalName || undefined,
+          phoneNumber: mainDigits || undefined,
+          phoneCountryCode: formData.phoneRoutingCountryCode || undefined,
+          email: formData.officialEmail || undefined,
+          contactPerson: formData.contactPerson || undefined,
+          registrationNumber: formData.registrationNumber || undefined,
+          url: formData.hospitalUrl || undefined,
+          address: formData.address || undefined,
+          city: formData.city || undefined,
+          pincode: formData.pincode || undefined,
+          emergencyNumber: emergencyDigits || undefined,
+          receptionistNumber: receptionistDigits || undefined,
+          whatsappNumber: waDigits || undefined,
+          reviewUrls:
+            r0 || r1 ? [r0, r1] : undefined,
+        },
+        logo ? { logo } : undefined,
+      );
+      setHospitalLogoDraft(null);
+      await fetchHospitalById(hospitalId);
       showSuccess("Success!", "Hospital information updated successfully.");
     } catch (err) {
       const msg =
@@ -723,9 +884,7 @@ export const Settings = (): JSX.Element => {
   };
 
   return (
-    <div className="bg-app-background w-full min-h-screen flex flex-col gap-[25px] p-4 md:p-6">
-      <PatientSearchSection />
-
+    <div className="w-full flex flex-col gap-[25px] p-4 md:p-6">
       <header className="flex flex-col items-start gap-[5px]">
         <h1 className="mt-[-1.00px] leading-[19px] font-medium text-black text-[28px] sm:text-[40px] leading-[32px] sm:leading-[44px] [font-family:'Archivo',Helvetica] tracking-[0]">
           Settings
@@ -766,11 +925,26 @@ export const Settings = (): JSX.Element => {
             {activeTab === "personal" && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
                 <div className="bg-white rounded-[10px] p-[25px] flex flex-col gap-6">
-                  <div className="flex items-center gap-2">
-                    <UserIcon className="w-5 h-5" />
-                    <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
-                      Personal Information
-                    </h3>
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-full bg-grey-light flex items-center justify-center overflow-hidden shrink-0 border border-[#dedee1]">
+                      {personalAvatarDisplayUrl ? (
+                        <img
+                          src={personalAvatarDisplayUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="font-title-4m font-semibold text-black text-sm">
+                          {getFirstCharacterAfterSpace(formData.fullName)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <UserIcon className="w-5 h-5 shrink-0" />
+                      <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
+                        Personal Information
+                      </h3>
+                    </div>
                   </div>
 
                   <div className="flex flex-col gap-[10px] mt-[5px]">
@@ -779,11 +953,74 @@ export const Settings = (): JSX.Element => {
                         Profile Picture
                       </label>
                       <div className="flex items-center gap-4">
-                        <div className="w-[60px] h-[60px] rounded-full bg-grey-light flex items-center justify-center">
-                          <span className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)]">
-                            {getFirstCharacterAfterSpace(formData.fullName)}
-                          </span>
+                        <input
+                          ref={profileAvatarInputRef}
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                          className="hidden"
+                          id="settings-profile-picture-input"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = "";
+                            if (!file) return;
+                            if (!file.type.startsWith("image/")) {
+                              showWarning(
+                                "Warning",
+                                "Please choose an image file.",
+                              );
+                              return;
+                            }
+                            if (
+                              file.size >
+                              HOSPITAL_LOGO_MAX_MB * 1024 * 1024
+                            ) {
+                              showWarning(
+                                "Warning",
+                                `Image must be ${HOSPITAL_LOGO_MAX_MB}MB or smaller.`,
+                              );
+                              return;
+                            }
+                            setProfilePictureDraft(file);
+                          }}
+                        />
+                        <div className="w-[60px] h-[60px] rounded-full bg-grey-light flex items-center justify-center overflow-hidden shrink-0 border border-[#dedee1]">
+                          {personalAvatarDisplayUrl ? (
+                            <img
+                              src={personalAvatarDisplayUrl}
+                              alt=""
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)]">
+                              {getFirstCharacterAfterSpace(formData.fullName)}
+                            </span>
+                          )}
                         </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() =>
+                            profileAvatarInputRef.current?.click()
+                          }
+                          className="inline-flex items-center gap-2 px-4 py-2 h-[38px] border border-[#dedee1] rounded-[10px] bg-white hover:bg-grey-light"
+                        >
+                          <UploadIcon className="w-4 h-4" />
+                          <span className="font-title-4r text-black text-[length:var(--title-4r-font-size)]">
+                            Upload Picture
+                          </span>
+                        </Button>
+                        {profilePictureDraft ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="w-9 h-9 text-red-500 hover:bg-red-50 bg-[#FFF1F1]"
+                            onClick={() => setProfilePictureDraft(null)}
+                            aria-label="Remove selected image"
+                          >
+                            <Trash2Icon className="w-5 h-5" />
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
 
@@ -868,11 +1105,26 @@ export const Settings = (): JSX.Element => {
                 </div>
 
                 <div className="bg-white rounded-[10px] p-[25px] flex flex-col gap-5">
-                  <div className="flex items-center gap-2">
-                    <KeyRound className="w-5 h-5" />
-                    <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
-                      Security
-                    </h3>
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-full bg-grey-light flex items-center justify-center overflow-hidden shrink-0 border border-[#dedee1]">
+                      {personalAvatarDisplayUrl ? (
+                        <img
+                          src={personalAvatarDisplayUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="font-title-4m font-semibold text-black text-sm">
+                          {getFirstCharacterAfterSpace(formData.fullName)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <KeyRound className="w-5 h-5 shrink-0" />
+                      <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
+                        Security
+                      </h3>
+                    </div>
                   </div>
                   <p className="font-title-5l text-[#57575f] text-sm leading-relaxed">
                     Use a strong password you don&apos;t use elsewhere.
@@ -1201,15 +1453,63 @@ export const Settings = (): JSX.Element => {
                           Hospital Logo
                         </label>
                         <div className="flex items-center gap-4">
-                          <div className="w-[60px] h-[60px] rounded-full bg-grey-light flex items-center justify-center">
-                            <span className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)]">
-                              {formData.hospitalName
-                                ?.slice(0, 2)
-                                .toUpperCase() ?? "—"}
-                            </span>
+                          <input
+                            ref={hospitalLogoInputRef}
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                            className="hidden"
+                            id="settings-hospital-logo-input"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              e.target.value = "";
+                              if (!file) return;
+                              if (!file.type.startsWith("image/")) {
+                                showWarning(
+                                  "Warning",
+                                  "Please choose an image file.",
+                                );
+                                return;
+                              }
+                              if (
+                                file.size >
+                                HOSPITAL_LOGO_MAX_MB * 1024 * 1024
+                              ) {
+                                showWarning(
+                                  "Warning",
+                                  `Image must be ${HOSPITAL_LOGO_MAX_MB}MB or smaller.`,
+                                );
+                                return;
+                              }
+                              setHospitalLogoDraft(file);
+                            }}
+                          />
+                          <div className="w-[60px] h-[60px] rounded-full bg-grey-light flex items-center justify-center overflow-hidden shrink-0">
+                            {draftHospitalLogoPreviewUrl ||
+                            hospitalLogoImageSrc(currentHospital?.logoUrl) ? (
+                              <img
+                                src={
+                                  draftHospitalLogoPreviewUrl ??
+                                  hospitalLogoImageSrc(
+                                    currentHospital?.logoUrl,
+                                  )
+                                }
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)]">
+                                {formData.hospitalName
+                                  ?.slice(0, 2)
+                                  .toUpperCase() ?? "—"}
+                              </span>
+                            )}
                           </div>
                           <Button
+                            type="button"
                             variant="outline"
+                            onClick={() =>
+                              hospitalLogoInputRef.current?.click()
+                            }
                             className="inline-flex items-center gap-2 px-4 py-2 h-[38px] border border-[#dedee1] rounded-[10px] bg-white hover:bg-grey-light"
                           >
                             <UploadIcon className="w-4 h-4" />
@@ -1217,13 +1517,18 @@ export const Settings = (): JSX.Element => {
                               Upload Picture
                             </span>
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="w-9 h-9 text-red-500 hover:bg-red-50 bg-[#FFF1F1]"
-                          >
-                            <Trash2Icon className="w-5 h-5" />
-                          </Button>
+                          {hospitalLogoDraft ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="w-9 h-9 text-red-500 hover:bg-red-50 bg-[#FFF1F1]"
+                              onClick={() => setHospitalLogoDraft(null)}
+                              aria-label="Remove selected image"
+                            >
+                              <Trash2Icon className="w-5 h-5" />
+                            </Button>
+                          ) : null}
                         </div>
                       </div>
 
@@ -1259,6 +1564,57 @@ export const Settings = (): JSX.Element => {
                             className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
                           />
                         </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Contact person
+                          </label>
+                          <Input
+                            value={formData.contactPerson}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                contactPerson: e.target.value,
+                              })
+                            }
+                            className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Registration / GST no.
+                          </label>
+                          <Input
+                            value={formData.registrationNumber}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                registrationNumber: e.target.value,
+                              })
+                            }
+                            className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                          Hospital website
+                        </label>
+                        <Input
+                          type="url"
+                          value={formData.hospitalUrl}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              hospitalUrl: e.target.value,
+                            })
+                          }
+                          placeholder="https://"
+                          className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                        />
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
@@ -1345,8 +1701,6 @@ export const Settings = (): JSX.Element => {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="+91">+91</SelectItem>
-                                <SelectItem value="+1">+1</SelectItem>
-                                <SelectItem value="+44">+44</SelectItem>
                               </SelectContent>
                             </Select>
                             <Input
@@ -1358,6 +1712,7 @@ export const Settings = (): JSX.Element => {
                                   phoneRouting: e.target.value,
                                 })
                               }
+                              placeholder="9876543210"
                               className="flex-1 h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
                             />
                           </div>
@@ -1382,8 +1737,6 @@ export const Settings = (): JSX.Element => {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="+91">+91</SelectItem>
-                                <SelectItem value="+1">+1</SelectItem>
-                                <SelectItem value="+44">+44</SelectItem>
                               </SelectContent>
                             </Select>
                             <Input
@@ -1395,6 +1748,80 @@ export const Settings = (): JSX.Element => {
                                   whatsappNumber: e.target.value,
                                 })
                               }
+                              placeholder="9876543210"
+                              className="flex-1 h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Emergency number
+                          </label>
+                          <div className="flex gap-2.5">
+                            <Select
+                              value={formData.emergencyCountryCode}
+                              onValueChange={(value) =>
+                                setFormData({
+                                  ...formData,
+                                  emergencyCountryCode: value,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="w-[100px] h-[44px] px-3 py-2 bg-white border border-[#dedee1] rounded-[10px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="+91">+91</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="tel"
+                              value={formData.emergencyPhone}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  emergencyPhone: e.target.value,
+                                })
+                              }
+                              placeholder="9876543210"
+                              className="flex-1 h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Receptionist number
+                          </label>
+                          <div className="flex gap-2.5">
+                            <Select
+                              value={formData.receptionistCountryCode}
+                              onValueChange={(value) =>
+                                setFormData({
+                                  ...formData,
+                                  receptionistCountryCode: value,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="w-[100px] h-[44px] px-3 py-2 bg-white border border-[#dedee1] rounded-[10px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="+91">+91</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="tel"
+                              value={formData.receptionistPhone}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  receptionistPhone: e.target.value,
+                                })
+                              }
+                              placeholder="9876543210"
                               className="flex-1 h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
                             />
                           </div>
@@ -1416,6 +1843,45 @@ export const Settings = (): JSX.Element => {
                           }
                           className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
                         />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Review URL 1
+                          </label>
+                          <Input
+                            type="url"
+                            value={formData.reviewUrls[0]}
+                            onChange={(e) => {
+                              const next: [string, string] = [
+                                ...formData.reviewUrls,
+                              ] as [string, string];
+                              next[0] = e.target.value;
+                              setFormData({ ...formData, reviewUrls: next });
+                            }}
+                            placeholder="https://"
+                            className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Review URL 2
+                          </label>
+                          <Input
+                            type="url"
+                            value={formData.reviewUrls[1]}
+                            onChange={(e) => {
+                              const next: [string, string] = [
+                                ...formData.reviewUrls,
+                              ] as [string, string];
+                              next[1] = e.target.value;
+                              setFormData({ ...formData, reviewUrls: next });
+                            }}
+                            placeholder="https://"
+                            className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                          />
+                        </div>
                       </div>
 
                       <div className="flex justify-end">

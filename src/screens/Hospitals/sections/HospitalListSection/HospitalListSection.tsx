@@ -1,18 +1,18 @@
 import {
   Filter as FilterIcon,
-  LayoutGrid,
-  List,
   Mail as MailIcon,
   MoreVertical as MoreVerticalIcon,
   PhoneCall as PhoneCallIcon,
   Search as SearchIcon,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Badge } from "../../../../components/ui/badge";
 import { Button } from "../../../../components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../../../../components/ui/dropdown-menu";
 import { Input } from "../../../../components/ui/input";
@@ -33,9 +33,14 @@ import {
   TableRow,
 } from "../../../../components/ui/table";
 import { ListError } from "../../../../components/ui/list-error";
+import { Pagination } from "../../../../components/ui/pagination";
 import { API_BASE_URL } from "../../../../config";
+import { useAuth } from "../../../../contexts/AuthProvider";
 import { useHospital } from "../../../../contexts/HospitalProvider";
+import { isSuperAdminRole } from "../../../../lib/userRole";
+import { showSuccess } from "../../../../lib/toast";
 import { Hospital } from "../../../../types/hospital.type";
+import { DeactivateHospitalModal } from "../DeactivateHospitalModal";
 
 export interface HospitalRow {
   id: string;
@@ -49,93 +54,6 @@ export interface HospitalRow {
   gstRegistration: string;
   url: string;
 }
-
-const hospitalsDummyData: HospitalRow[] = [
-  {
-    id: "1",
-    name: "CityCare Health Center",
-    hospitalId: "HSP-1005",
-    iconBg: "bg-red-100",
-    iconName: "cross",
-    phone: "+91 3456728902",
-    email: "citycare@hospital.com",
-    contactPerson: "Sophia Adams",
-    gstRegistration: "27AACCC8456M1Z2",
-    url: "www.citycarehealth.in",
-  },
-  {
-    id: "2",
-    name: "MedBridge SuperCare",
-    hospitalId: "HSP-1005",
-    iconBg: "bg-sky-100",
-    iconName: "building",
-    phone: "+91 3456728902",
-    email: "citycare@hospital.com",
-    contactPerson: "Sophia Adams",
-    gstRegistration: "27AACCC8456M1Z2",
-    url: "www.citycarehealth.in",
-  },
-  {
-    id: "3",
-    name: "HealWell Clinic",
-    hospitalId: "HSP-1005",
-    iconBg: "bg-blue-100",
-    iconName: "shield",
-    phone: "+91 5678234570",
-    email: "healwell@hospital.com",
-    contactPerson: "Olivia Turner",
-    gstRegistration: "29AABCH2345K1Z5",
-    url: "www.citycarehealth.in",
-  },
-  {
-    id: "4",
-    name: "CareFirst Hospital",
-    hospitalId: "HSP-1005",
-    iconBg: "bg-red-50",
-    iconName: "cross",
-    phone: "+91 7834071117",
-    email: "citycare@hospital.com",
-    contactPerson: "Sofia Finland",
-    gstRegistration: "27AACCC8456M1Z2",
-    url: "www.citycarehealth.in",
-  },
-  {
-    id: "5",
-    name: "LifeSpring Multispeciality",
-    hospitalId: "HSP-1005",
-    iconBg: "bg-emerald-100",
-    iconName: "leaf",
-    phone: "+91 3456728902",
-    email: "citycare@hospital.com",
-    contactPerson: "Joe cupper",
-    gstRegistration: "27AACCC8456M1Z2",
-    url: "www.citycarehealth.in",
-  },
-  {
-    id: "6",
-    name: "Sunrise Medical Institute",
-    hospitalId: "HSP-1005",
-    iconBg: "bg-violet-100",
-    iconName: "sun",
-    phone: "+91 5824906437",
-    email: "citycare@hospital.com",
-    contactPerson: "James Miller",
-    gstRegistration: "9AAECS9901P1Z7",
-    url: "www.citycarehealth.in",
-  },
-  {
-    id: "7",
-    name: "NovaLife Health Hub",
-    hospitalId: "HSP-1005",
-    iconBg: "bg-green-100",
-    iconName: "heart",
-    phone: "+91 3456728902",
-    email: "citycare@hospital.com",
-    contactPerson: "Mills Willer",
-    gstRegistration: "27AACCC8456M1Z2",
-    url: "www.citycarehealth.in",
-  },
-];
 
 const HospitalIcon = ({
   iconBg,
@@ -236,36 +154,75 @@ const HospitalIcon = ({
   </div>
 );
 
+function isActiveHospital(h: Hospital): boolean {
+  return h.isActive !== false;
+}
+
 export const HospitalListSection = (): JSX.Element => {
+  const { user } = useAuth();
+  const isSuperAdmin = isSuperAdminRole(user?.role);
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "active" | "inactive"
+  >("all");
+  const [hospitalPendingDeactivate, setHospitalPendingDeactivate] =
+    useState<Hospital | null>(null);
   const {
     hospitals,
     searchedHospitals,
     isLoading,
     error,
+    totalPages,
+    currentPage,
     handleGetHospitals,
     handleSearchHospitals,
     resetSearchedHospitals,
+    handleDeactivateHospital,
   } = useHospital();
 
   const listToShow =
     searchQuery.trim() === "" ? hospitals : (searchedHospitals ?? []);
 
-  useEffect(() => {
-    handleGetHospitals();
-  }, []);
+  const colCount = isSuperAdmin ? 8 : 7;
+
+  const apiFilter = useMemo(
+    () => ({
+      isActive:
+        !isSuperAdmin || statusFilter === "all"
+          ? ("all" as const)
+          : statusFilter === "active"
+            ? true
+            : false,
+    }),
+    [isSuperAdmin, statusFilter],
+  );
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery.trim()) {
-        handleSearchHospitals(searchQuery);
+    const run = () => {
+      const q = searchQuery.trim();
+      if (q) {
+        void handleSearchHospitals(q, apiFilter, 1);
       } else {
         resetSearchedHospitals();
+        void handleGetHospitals(apiFilter, 1);
       }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+    };
+
+    if (searchQuery.trim()) {
+      const timer = window.setTimeout(run, 300);
+      return () => window.clearTimeout(timer);
+    }
+    run();
+    return undefined;
+  }, [
+    searchQuery,
+    statusFilter,
+    isSuperAdmin,
+    apiFilter,
+    handleGetHospitals,
+    handleSearchHospitals,
+    resetSearchedHospitals,
+  ]);
 
   const tableLoading =
     isLoading && hospitals.length === 0 && listToShow.length === 0;
@@ -293,53 +250,35 @@ export const HospitalListSection = (): JSX.Element => {
         </div>
 
         <div className="flex flex-wrap items-center gap-[15px]">
-          <Select>
-            <SelectTrigger className="flex w-[107px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
-
+          {isSuperAdmin ? (
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => {
+                if (v === "all" || v === "active" || v === "inactive") {
+                  setStatusFilter(v);
+                }
+              }}
+            >
+              <SelectTrigger className="flex w-[130px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : null}
           <Button
+            type="button"
             variant="ghost"
-            className="inline-flex items-center gap-[5px] px-2.5 py-1.5 bg-grey-light rounded-[100px] hover:bg-grey-light border-0"
+            className="inline-flex items-center gap-[5px] px-2.5 py-1.5 bg-grey-light rounded-[100px] hover:bg-grey-light"
           >
             <FilterIcon className="w-6 h-6" />
             <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
               Filter
             </span>
           </Button>
-
-          <div className="inline-flex items-center p-[2px] bg-grey-light rounded-[100px]">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setViewMode("list")}
-              className={`h-8 w-8 rounded-full shrink-0 ${
-                viewMode === "list"
-                  ? "bg-primary-2 text-white hover:bg-primary-2 hover:text-white"
-                  : "hover:bg-white text-black"
-              }`}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setViewMode("grid")}
-              className={`h-8 w-8 rounded-full shrink-0 ${
-                viewMode === "grid"
-                  ? "bg-primary-2 text-white hover:bg-primary-2 hover:text-white"
-                  : "hover:bg-white text-black"
-              }`}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
       </div>
 
@@ -362,9 +301,14 @@ export const HospitalListSection = (): JSX.Element => {
               <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
                 GST/Registration No.
               </TableHead>
-              <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+              {/* <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
                 Hospital URL
-              </TableHead>
+              </TableHead> */}
+              {isSuperAdmin ? (
+                <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                  Status
+                </TableHead>
+              ) : null}
               <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
                 Action
               </TableHead>
@@ -372,11 +316,11 @@ export const HospitalListSection = (): JSX.Element => {
           </TableHeader>
           <TableBody>
             {tableLoading ? (
-              <TableLoadingRow colSpan={7} />
+              <TableLoadingRow colSpan={colCount} />
             ) : listToShow.length === 0 ? (
               <TableRow className="border-b border-[#dedee1]">
                 <TableCell
-                  colSpan={7}
+                  colSpan={colCount}
                   className="px-[20px] py-10 text-center text-x-70 font-title-4r"
                 >
                   No hospitals found.
@@ -384,88 +328,136 @@ export const HospitalListSection = (): JSX.Element => {
               </TableRow>
             ) : (
               listToShow.map((hospital: Hospital) => (
-              <TableRow
-                key={hospital._id}
-                className="border-b border-[#dedee1] hover:bg-grey-light/50"
-              >
-                <TableCell className="p-[0px]">
-                  <div className="flex items-center gap-[10px] px-[20px] py-[16px]">
-                    <HospitalIcon
-                      iconBg={hospital.logoUrl}
-                      iconName={hospital.logoUrl}
-                    />
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-title-4l text-black font-medium text-[14px] leading-[19px] font-[number:var(--title-4l-font-weight)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                        {hospital.name}
-                      </span>
-                      <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
-                        ID - {hospital.registrationNumber}
+                <TableRow
+                  key={hospital._id}
+                  className="border-b border-[#dedee1] hover:bg-grey-light/50"
+                >
+                  <TableCell className="p-[0px]">
+                    <div className="flex items-center gap-[10px] px-[20px] py-[16px]">
+                      <HospitalIcon
+                        iconBg={hospital.logoUrl ?? ""}
+                        iconName={hospital.logoUrl ?? ""}
+                      />
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-title-4l text-black font-medium text-[14px] leading-[19px] font-[number:var(--title-4l-font-weight)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                          {hospital.name}
+                        </span>
+                        <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
+                          ID - {hospital.registrationNumber}
+                        </span>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <div className="inline-flex items-center gap-[5px] px-[20px] py-[16px]">
+                      <PhoneCallIcon className="w-4 h-4 text-black shrink-0" />
+                      <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                        {hospital.phoneNumber}
                       </span>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <div className="inline-flex items-center gap-[5px] px-[20px] py-[16px]">
-                    <PhoneCallIcon className="w-4 h-4 text-black shrink-0" />
-                    <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                      {hospital.phoneNumber}
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <div className="inline-flex items-center gap-[5px] px-[20px] py-[16px]">
+                      <MailIcon className="w-4 h-4 text-black shrink-0" />
+                      <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                        {hospital.email}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                      {hospital.contactPerson}
                     </span>
-                  </div>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <div className="inline-flex items-center gap-[5px] px-[20px] py-[16px]">
-                    <MailIcon className="w-4 h-4 text-black shrink-0" />
-                    <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                      {hospital.email}
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                      {hospital.registrationNumber}
                     </span>
-                  </div>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                    {hospital.contactPerson}
-                  </span>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                    {hospital.registrationNumber}
-                  </span>
-                </TableCell>
-                <TableCell className="p-[0px]">
-                  <a
-                    href={`https://${hospital.url}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-[#0077b6] text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] underline hover:text-[#005f8c] [font-style:var(--title-4l-font-style)]"
-                  >
-                    {hospital.url}
-                  </a>
-                </TableCell>
-                <TableCell className="px-[20px] py-[16px]">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded-full hover:bg-transparent active:bg-transparent data-[state=open]:bg-transparent"
+                  </TableCell>
+                  {/* <TableCell className="p-[0px]">
+                                       <a
+                      href={`https://${hospital.url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-[#0077b6] text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] underline hover:text-[#005f8c] [font-style:var(--title-4l-font-style)]"
+                    >
+                      {hospital.url}
+                    </a>
+                  </TableCell> */}
+                  {isSuperAdmin ? (
+                    <TableCell className="px-[20px] py-[16px]">
+                      <Badge
+                        variant="outline"
+                        className={
+                          isActiveHospital(hospital)
+                            ? "border-0 bg-[#d0f5e6] text-[#00c896] font-title-4r"
+                            : "border-0 bg-[#e6e6e6] text-[#757575] font-title-4r"
+                        }
                       >
-                        <MoreVerticalIcon className="h-5 w-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem>View Details</DropdownMenuItem>
-                      <DropdownMenuItem>Edit Hospital</DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600">
-                        Remove Hospital
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))
+                        {isActiveHospital(hospital) ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                  ) : null}
+                  <TableCell className="px-[20px] py-[16px]">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full hover:bg-transparent active:bg-transparent data-[state=open]:bg-transparent"
+                        >
+                          <MoreVerticalIcon className="h-5 w-5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem>View Details</DropdownMenuItem>
+                        <DropdownMenuItem>Edit Hospital</DropdownMenuItem>
+                        {isSuperAdmin && isActiveHospital(hospital) ? (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-red-600 focus:text-red-600"
+                              onClick={() =>
+                                setHospitalPendingDeactivate(hospital)
+                              }
+                            >
+                              Deactivate hospital
+                            </DropdownMenuItem>
+                          </>
+                        ) : null}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>
       </div>
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={(page) => {
+          const q = searchQuery.trim();
+          if (q) {
+            void handleSearchHospitals(q, apiFilter, page);
+          } else {
+            void handleGetHospitals(apiFilter, page);
+          }
+        }}
+        disabled={isLoading}
+      />
+      <DeactivateHospitalModal
+        hospital={hospitalPendingDeactivate}
+        open={hospitalPendingDeactivate !== null}
+        onOpenChange={(open) => {
+          if (!open) setHospitalPendingDeactivate(null);
+        }}
+        deactivate={handleDeactivateHospital}
+        onDeactivated={() => {
+          showSuccess("Updated", "Hospital has been deactivated.");
+        }}
+      />
     </section>
   );
 };

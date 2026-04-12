@@ -1,6 +1,12 @@
 // create a doctor context
 
-import { createContext, useContext, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useState,
+  type ReactNode,
+} from "react";
 import { showSuccess, showError } from "../lib/toast";
 import {
   CreateDoctorPayload,
@@ -14,29 +20,75 @@ import {
   updateDoctor,
   deleteDoctor,
 } from "../data/doctor";
+import type { ListOverallPatch } from "../lib/listOverallFromApi";
+import { pickOverallFromApiData } from "../lib/listOverallFromApi";
+
+const DEFAULT_DOCTOR_PAGE_LIMIT = 10;
+
+function parseDoctorListResponse(
+  response: unknown,
+  fallbackPage: number,
+  fallbackLimit: number,
+): {
+  doctors: Doctor[];
+  page: number;
+  limit: number;
+  totalPages: number;
+} {
+  const root = response as Record<string, unknown> | undefined;
+  const data =
+    root && typeof root.data === "object" && root.data !== null
+      ? (root.data as Record<string, unknown>)
+      : {};
+  const doctors = (Array.isArray(data.doctors) ? data.doctors : []) as Doctor[];
+  const pag =
+    data.pagination != null && typeof data.pagination === "object"
+      ? (data.pagination as Record<string, unknown>)
+      : {};
+  const page =
+    Number(pag.page ?? data.page ?? fallbackPage) || fallbackPage;
+  const limit =
+    Number(pag.limit ?? data.limit ?? fallbackLimit) || fallbackLimit;
+  const totalPagesRaw = Number(pag.totalPages ?? data.totalPages);
+  const totalRaw = Number(pag.total ?? data.total ?? data.totalCount);
+  const totalPages =
+    Number.isFinite(totalPagesRaw) && totalPagesRaw > 0 ?
+      totalPagesRaw
+    : Math.max(
+        1,
+        Math.ceil(
+          (Number.isFinite(totalRaw) ? totalRaw : doctors.length) / limit,
+        ) || 1,
+      );
+  return { doctors, page, limit, totalPages };
+}
 
 export const DoctorContext = createContext<{
   doctors: Doctor[];
+  overall: ListOverallPatch;
   loading: boolean;
   error: string | null;
   page: number;
   limit: number;
-  getDoctorsData: () => Promise<void>;
+  totalPages: number;
+  getDoctorsData: (opts?: { page?: number; limit?: number }) => Promise<void>;
   handleAddDoctor: (doctor: CreateDoctorPayload) => Promise<void>;
   handleUpdateDoctor: (
     doctorId: string,
     payload: UpdateDoctorPayload,
   ) => Promise<void>;
   handleDeleteDoctor: (doctorId: string) => Promise<void>;
-  searchDoctorsByName: (q: string) => Promise<void>;
+  searchDoctorsByName: (q: string, page?: number) => Promise<void>;
   searchedDoctors: Doctor[] | null;
   resetSearchedDoctors: () => void;
 }>({
   doctors: [],
+  overall: {},
   loading: false,
   error: null,
   page: 1,
-  limit: 10,
+  limit: DEFAULT_DOCTOR_PAGE_LIMIT,
+  totalPages: 1,
   getDoctorsData: () => Promise.resolve(),
   handleAddDoctor: () => Promise.resolve(),
   handleUpdateDoctor: () => Promise.resolve(),
@@ -46,29 +98,48 @@ export const DoctorContext = createContext<{
   resetSearchedDoctors: () => {},
 });
 
-export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
+export const DoctorProvider = ({ children }: { children: ReactNode }) => {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [overall, setOverall] = useState<ListOverallPatch>({});
   const [searchedDoctors, setSearchedDoctors] = useState<Doctor[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState(DEFAULT_DOCTOR_PAGE_LIMIT);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const getDoctorsData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await getDoctors(1, 10);
-      setDoctors(response.data.doctors as Doctor[]);
-      const page = response.data.pagination;
-      setPage(page.page);
-      setLimit(page.limit);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load doctors");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const getDoctorsData = useCallback(
+    async (opts?: { page?: number; limit?: number }) => {
+      const nextPage = opts?.page ?? page;
+      const nextLimit = opts?.limit ?? limit;
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await getDoctors(nextPage, nextLimit);
+        const data = (response as { data?: Record<string, unknown> })?.data;
+        const parsed = parseDoctorListResponse(
+          response,
+          nextPage,
+          nextLimit,
+        );
+        setDoctors(parsed.doctors);
+        setPage(parsed.page);
+        setLimit(parsed.limit);
+        setTotalPages(parsed.totalPages);
+        if (data) {
+          const overallPatch = pickOverallFromApiData(data);
+          if (Object.keys(overallPatch).length > 0) {
+            setOverall((prev) => ({ ...prev, ...overallPatch }));
+          }
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load doctors");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [page, limit],
+  );
 
   const handleAddDoctor = async (doctor: CreateDoctorPayload) => {
     try {
@@ -79,7 +150,7 @@ export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
       if (created) {
         setDoctors((prev) => [...prev, created as Doctor]);
       } else {
-        await getDoctorsData();
+        await getDoctorsData({ page: 1 });
       }
       showSuccess("Success!", "Doctor added successfully.");
     } catch (err) {
@@ -91,28 +162,36 @@ export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const searchDoctorsByName = async (q: string) => {
-    try {
-      if (!q.trim()) {
-        setSearchedDoctors(null);
-        return;
+  const searchDoctorsByName = useCallback(
+    async (q: string, searchPage = 1) => {
+      try {
+        if (!q.trim()) {
+          setSearchedDoctors(null);
+          return;
+        }
+        setLoading(true);
+        setError(null);
+        const response = await searchDoctors(q.trim(), searchPage, limit);
+        const parsed = parseDoctorListResponse(response, searchPage, limit);
+        setSearchedDoctors(parsed.doctors);
+        setPage(parsed.page);
+        setLimit(parsed.limit);
+        setTotalPages(parsed.totalPages);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to search doctors",
+        );
+        setSearchedDoctors([]);
+      } finally {
+        setLoading(false);
       }
-      setLoading(true);
-      setError(null);
-      const response = await searchDoctors(q.trim(), 1, 10);
-      setSearchedDoctors((response.data?.doctors ?? []) as Doctor[]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to search doctors");
-      setSearchedDoctors([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [limit],
+  );
 
-  // reset searched doctors
-  const resetSearchedDoctors = () => {
+  const resetSearchedDoctors = useCallback(() => {
     setSearchedDoctors(null);
-  };
+  }, []);
 
   const handleUpdateDoctor = async (
     doctorId: string,
@@ -122,7 +201,7 @@ export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(true);
       setError(null);
       await updateDoctor(doctorId, payload);
-      await getDoctorsData();
+      await getDoctorsData({ page: 1 });
       showSuccess("Success!", "Doctor updated successfully.");
     } catch (err) {
       const msg =
@@ -140,7 +219,7 @@ export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(true);
       setError(null);
       await deleteDoctor(doctorId);
-      await getDoctorsData();
+      await getDoctorsData({ page: 1 });
       showSuccess("Success!", "Doctor removed successfully.");
     } catch (err) {
       const msg =
@@ -157,10 +236,12 @@ export const DoctorProvider = ({ children }: { children: React.ReactNode }) => {
     <DoctorContext.Provider
       value={{
         doctors,
+        overall,
         loading,
         error,
         page,
         limit,
+        totalPages,
         getDoctorsData,
         handleAddDoctor,
         handleUpdateDoctor,

@@ -18,7 +18,6 @@ import type {
 import type { PatientHistoryResponse } from "../../types/appointment.type";
 import type { Patients } from "../../types/patient.type";
 import { formatTime12h } from "../../lib/dateTimeDisplay";
-import { PatientSearchSection } from "../Patients/sections/PatientSearchSection";
 import { NewPrescriptionModal } from "../../components/modals";
 import type { NewPrescriptionPayload } from "../../components/modals/NewPrescriptionModal";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
@@ -159,29 +158,23 @@ export const PatientRecord = (): JSX.Element => {
 
   if (loading && !patient) {
     return (
-      <div className="bg-app-background min-h-screen flex flex-col">
-        <PatientSearchSection />
-        <div className="flex-1 flex items-center justify-center p-8">
-          <p className="font-title-4r text-x-70">Loading...</p>
-        </div>
+      <div className="flex items-center justify-center p-8 py-16">
+        <p className="font-title-4r text-x-70">Loading...</p>
       </div>
     );
   }
 
   if (!patientId || (!patient && !patientFromState)) {
     return (
-      <div className="bg-app-background min-h-screen flex flex-col">
-        <PatientSearchSection />
-        <div className="flex-1 flex items-center justify-center p-8">
-          <p className="font-title-4r text-x-70">Patient not found.</p>
-          <Button
-            variant="ghost"
-            className="mt-4"
-            onClick={() => navigate("/prescriptions")}
-          >
-            Back to Prescriptions
-          </Button>
-        </div>
+      <div className="flex flex-col items-center justify-center p-8 py-16">
+        <p className="font-title-4r text-x-70">Patient not found.</p>
+        <Button
+          variant="ghost"
+          className="mt-4"
+          onClick={() => navigate("/prescriptions")}
+        >
+          Back to Prescriptions
+        </Button>
       </div>
     );
   }
@@ -189,9 +182,7 @@ export const PatientRecord = (): JSX.Element => {
   const p = patient ?? patientFromState!;
 
   return (
-    <div className="bg-app-background w-full min-h-screen flex flex-col">
-      <PatientSearchSection />
-
+    <div className="w-full flex flex-col">
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 md:px-6 py-6 flex flex-col gap-[24px]">
         {/* Two-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr,1fr] gap-4 flex-1">

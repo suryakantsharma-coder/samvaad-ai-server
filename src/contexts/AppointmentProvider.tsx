@@ -10,6 +10,7 @@ import {
   searchAppointments,
   updateAppointment,
 } from "../data/appointment";
+import { pickOverallFromApiData } from "../lib/listOverallFromApi";
 import {
   Appointments,
   AppointmentPayload,
@@ -25,6 +26,7 @@ export interface AppointmentCounts {
 export interface AppointmentOverall {
   totalAppointments?: number;
   totalPatients?: number;
+  totalDoctors?: number;
 }
 
 interface AppointmentListOptions {
@@ -129,12 +131,9 @@ export const AppointmentProvider = ({
           tomorrow: nextCounts.tomorrow ?? 0,
         });
       }
-      const nextOverall = response.data?.overall;
-      if (nextOverall) {
-        setOverall({
-          totalAppointments: nextOverall.totalAppointments,
-          totalPatients: nextOverall.totalPatients,
-        });
+      const overallPatch = pickOverallFromApiData(response.data);
+      if (Object.keys(overallPatch).length > 0) {
+        setOverall((prev) => ({ ...prev, ...overallPatch }));
       }
       const pagination = response.data?.pagination;
       if (pagination) {

@@ -7,7 +7,6 @@ import {
 import { PatientData } from "../../components/modals/AddPatientModal";
 import { PatientHeaderSection } from "./sections/PatientHeaderSection";
 import { PatientListSection } from "./sections/PatientListSection";
-import { PatientSearchSection } from "./sections/PatientSearchSection";
 import { usePatient } from "../../contexts/PatientProvider";
 import { CreatePatientPayload } from "../../types/patient.type";
 
@@ -76,11 +75,11 @@ export const Patients = (): JSX.Element => {
   };
 
   return (
-    <div className="bg-app-background w-full min-h-screen flex flex-col gap-[25px] p-4 md:p-6">
-      <PatientSearchSection />
+    <div className="w-full flex flex-col gap-[25px] p-4 md:p-6">
       <PatientHeaderSection
         onAddPatient={() => setAddModalOpen(true)}
         totalPatients={overall?.totalPatients}
+        totalDoctors={overall?.totalDoctors}
         startDate={listStartDate}
         endDate={listEndDate}
         onStartDateChange={setListStartDate}

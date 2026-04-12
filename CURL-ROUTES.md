@@ -255,7 +255,7 @@ curl -X POST "http://localhost:3000/api/hospitals" \
 
 **Roles:** admin or hospital_admin. **Hospital scoping:** hospital_admin can update only their own hospital (403 for other IDs).
 
-Accepts **JSON** or **multipart/form-data**. To change the logo, send a file in the `logo` field.
+Accepts **JSON** or **multipart/form-data**. To change the logo, send the image in the `file` field.
 
 **Example – JSON:**
 
@@ -269,9 +269,9 @@ curl -X PATCH "http://localhost:3000/api/hospitals/HOSPITAL_ID" \
 **Example – update logo only (multipart):**
 
 ```bash
-curl -X PATCH "http://localhost:3000/api/hospitals/HOSPITAL_ID" \
+curl -sS -X PATCH "http://localhost:3000/api/hospitals/HOSPITAL_ID" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -F "logo=@/path/to/new-logo.jpg"
+  -F "file=@/path/to/new-logo.png;type=image/png"
 ```
 
 ### Delete hospital (admin only)

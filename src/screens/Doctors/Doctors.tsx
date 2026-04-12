@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { PatientSearchSection } from "../Patients/sections/PatientSearchSection";
 import { DoctorHeaderSection } from "./sections/DoctorHeaderSection";
 import { DoctorListSection } from "./sections/DoctorListSection";
 import {
@@ -32,7 +31,7 @@ export const Doctors = (): JSX.Element => {
   const [doctorPendingDelete, setDoctorPendingDelete] = useState<Doctor | null>(
     null,
   );
-  const { handleAddDoctor, handleUpdateDoctor, handleDeleteDoctor } =
+  const { handleAddDoctor, handleUpdateDoctor, handleDeleteDoctor, overall } =
     useDoctor();
 
   const doctorModalOpen = showAddModal || editingDoctor !== null;
@@ -57,9 +56,9 @@ export const Doctors = (): JSX.Element => {
   };
 
   return (
-    <div className="bg-app-background w-full min-h-screen flex flex-col gap-[25px] p-4 md:p-6">
-      <PatientSearchSection />
+    <div className="w-full flex flex-col gap-[25px] p-4 md:p-6">
       <DoctorHeaderSection
+        totalDoctors={overall?.totalDoctors}
         onAddDoctor={() => {
           setEditingDoctor(null);
           setShowAddModal(true);

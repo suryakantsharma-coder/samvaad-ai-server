@@ -7,6 +7,7 @@ import {
   searchPatients,
   updatePatient,
 } from "../data/patient";
+import { pickOverallFromApiData } from "../lib/listOverallFromApi";
 import {
   CreatePatientPayload,
   Patients,
@@ -16,6 +17,7 @@ import { createPatient, deletePatient } from "../data/patient";
 
 export interface PatientOverall {
   totalPatients?: number;
+  totalDoctors?: number;
 }
 
 export interface PatientCounts {
@@ -122,9 +124,9 @@ export const PatientProvider = ({
         listDateEndRef.current,
       );
       setPatients(response.data?.patients ?? []);
-      const nextOverall = response.data?.overall;
-      if (nextOverall && typeof nextOverall.totalPatients === "number") {
-        setOverall({ totalPatients: nextOverall.totalPatients });
+      const overallPatch = pickOverallFromApiData(response.data);
+      if (Object.keys(overallPatch).length > 0) {
+        setOverall((prev) => ({ ...prev, ...overallPatch }));
       }
       const nextCounts = response.data?.counts;
       if (nextCounts && typeof nextCounts.all === "number") {

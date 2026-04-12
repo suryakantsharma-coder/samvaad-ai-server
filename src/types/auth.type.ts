@@ -8,6 +8,10 @@ export type User = {
   phoneNumber?: string;
   /** Some responses may use `phone` instead of `phoneNumber`. */
   phone?: string;
+  /** Profile image path or URL (preferred field from API). */
+  profilePicUrl?: string;
+  profilePictureUrl?: string;
+  profilePicture?: string;
   createdAt: string;
   updatedAt: string;
 };

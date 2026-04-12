@@ -1,4 +1,4 @@
-import { Building2, CircleCheck, Upload, X } from "lucide-react";
+import { Building2, CircleCheck, Upload, UserPlus, X } from "lucide-react";
 import React, { useCallback, useState } from "react";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
@@ -10,8 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { registerUserWithHospital } from "../../data/auth";
 import { useHospital } from "../../contexts/HospitalProvider";
-import { showSuccess, showError } from "../../lib/toast";
+import { showSuccess, showError, showWarning } from "../../lib/toast";
+import { validateCreateHospitalForm } from "../../lib/hospitalValidation";
 import { CreateHospitalPayload } from "../../types/hospital.type";
 import {
   modalFooterCancelClassName,
@@ -22,7 +24,6 @@ import {
 
 export interface AddHospitalData {
   hospitalName: string;
-  countryCode: string;
   phone: string;
   email: string;
   contactPerson: string;
@@ -31,7 +32,19 @@ export interface AddHospitalData {
   city: string;
   pincode: string;
   hospitalUrl: string;
+  emergencyCountryCode: string;
+  emergencyPhone: string;
+  receptionistCountryCode: string;
+  receptionistPhone: string;
+  whatsappCountryCode: string;
+  whatsappPhone: string;
+  reviewUrls: [string, string];
   pictureFile?: File | null;
+  /** First user linked to this hospital (required). */
+  memberName: string;
+  memberEmail: string;
+  memberPassword: string;
+  memberRole: "hospital_admin" | "doctor";
 }
 
 interface AddHospitalModalProps {
@@ -40,19 +53,31 @@ interface AddHospitalModalProps {
   onSave?: (data: AddHospitalData) => void;
 }
 
-const DEFAULT_FORM: AddHospitalData = {
-  hospitalName: "",
-  countryCode: "+91",
-  phone: "569 334 3366",
-  email: "",
-  contactPerson: "",
-  gstRegistration: "",
-  address: "",
-  city: "",
-  pincode: "",
-  hospitalUrl: "",
-  pictureFile: null,
-};
+function createEmptyForm(): AddHospitalData {
+  return {
+    hospitalName: "",
+    phone: "",
+    email: "",
+    contactPerson: "",
+    gstRegistration: "",
+    address: "",
+    city: "",
+    pincode: "",
+    hospitalUrl: "",
+    emergencyCountryCode: "+91",
+    emergencyPhone: "",
+    receptionistCountryCode: "+91",
+    receptionistPhone: "",
+    whatsappCountryCode: "+91",
+    whatsappPhone: "",
+    reviewUrls: ["", ""],
+    pictureFile: null,
+    memberName: "",
+    memberEmail: "",
+    memberPassword: "",
+    memberRole: "hospital_admin",
+  };
+}
 
 const CITIES = [
   "Mumbai",
@@ -94,50 +119,163 @@ const CITIES = [
 ];
 
 const MAX_FILE_SIZE_MB = 5;
+const MIN_MEMBER_PASSWORD_LEN = 8;
+
+function validateHospitalMember(fields: {
+  memberName: string;
+  memberEmail: string;
+  memberPassword: string;
+}): string | null {
+  if (!fields.memberName.trim()) {
+    return "Enter the hospital member's full name.";
+  }
+  const email = fields.memberEmail.trim();
+  if (!email) {
+    return "Enter the hospital member's email.";
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return "Enter a valid email for the hospital member.";
+  }
+  if (fields.memberPassword.length < MIN_MEMBER_PASSWORD_LEN) {
+    return `Member password must be at least ${MIN_MEMBER_PASSWORD_LEN} characters.`;
+  }
+  return null;
+}
+
+/** Local digits only — matches API sample `phoneNumber`: `"9876543210"`. */
+function buildLocalPhoneDigits(phone: string): string {
+  return phone.replace(/\D/g, "");
+}
+
+/** Country code + local digits — matches API sample `whatsappNumber`: `"919876543210"`. */
+function buildDialDigits(countryCode: string, phone: string): string {
+  const cc = countryCode.replace(/\D/g, "");
+  const p = phone.replace(/\D/g, "");
+  return cc ? `${cc}${p}` : p;
+}
 
 export const AddHospitalModal = ({
   open,
   onOpenChange,
   onSave,
 }: AddHospitalModalProps): JSX.Element => {
-  const [formData, setFormData] = useState<AddHospitalData>(DEFAULT_FORM);
+  const [formData, setFormData] = useState<AddHospitalData>(createEmptyForm);
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { handleCreateHospital } = useHospital();
 
   const handleClose = useCallback(() => {
-    setFormData(DEFAULT_FORM);
+    setFormData(createEmptyForm());
     setSubmitError(null);
     onOpenChange(false);
   }, [onOpenChange]);
 
   const handleSave = useCallback(async () => {
     setSubmitError(null);
-    const payload: CreateHospitalPayload = {
-      name: formData.hospitalName,
-      phoneCountryCode: formData.countryCode,
-      phoneNumber: formData.phone,
+
+    const mainDigits = buildLocalPhoneDigits(formData.phone);
+    const waDigits = buildDialDigits(
+      formData.whatsappCountryCode,
+      formData.whatsappPhone,
+    );
+    const review0 = formData.reviewUrls[0]?.trim() ?? "";
+    const review1 = formData.reviewUrls[1]?.trim() ?? "";
+
+    const validationError = validateCreateHospitalForm({
+      hospitalName: formData.hospitalName,
       email: formData.email,
       contactPerson: formData.contactPerson,
-      registrationNumber: formData.gstRegistration,
+      gstRegistration: formData.gstRegistration,
       address: formData.address,
       city: formData.city,
       pincode: formData.pincode,
-      url: formData.hospitalUrl,
-      logoUrl: formData.pictureFile?.name ?? "",
+      hospitalUrl: formData.hospitalUrl,
+      phone: formData.phone,
+      whatsappCountryCode: formData.whatsappCountryCode,
+      whatsappPhone: formData.whatsappPhone,
+      emergencyCountryCode: formData.emergencyCountryCode,
+      emergencyPhone: formData.emergencyPhone,
+      receptionistCountryCode: formData.receptionistCountryCode,
+      receptionistPhone: formData.receptionistPhone,
+      reviewUrls: formData.reviewUrls,
+    });
+    if (validationError) {
+      setSubmitError(validationError);
+      showError("Validation", validationError);
+      return;
+    }
+
+    const memberError = validateHospitalMember({
+      memberName: formData.memberName,
+      memberEmail: formData.memberEmail,
+      memberPassword: formData.memberPassword,
+    });
+    if (memberError) {
+      setSubmitError(memberError);
+      showError("Validation", memberError);
+      return;
+    }
+
+    const payload: CreateHospitalPayload = {
+      name: formData.hospitalName.trim(),
+      phoneNumber: mainDigits,
+      email: formData.email.trim(),
+      contactPerson: formData.contactPerson.trim(),
+      registrationNumber: formData.gstRegistration.trim(),
+      address: formData.address.trim(),
+      city: formData.city.trim(),
+      pincode: formData.pincode.trim(),
+      url: formData.hospitalUrl.trim(),
+      emergencyNumber: buildDialDigits(
+        formData.emergencyCountryCode,
+        formData.emergencyPhone,
+      ),
+      receptionistNumber: buildDialDigits(
+        formData.receptionistCountryCode,
+        formData.receptionistPhone,
+      ),
+      whatsappNumber: waDigits,
+      reviewUrls: [review0, review1],
+      ...(formData.pictureFile && { logoUrl: formData.pictureFile.name }),
     };
 
     setIsSubmitting(true);
     try {
-      await handleCreateHospital(payload);
+      const hospitalId = await handleCreateHospital(payload);
+      let memberRegistered = false;
+      try {
+        await registerUserWithHospital({
+          email: formData.memberEmail.trim(),
+          password: formData.memberPassword,
+          name: formData.memberName.trim(),
+          role: formData.memberRole,
+          hospitalId,
+        });
+        memberRegistered = true;
+      } catch (memberErr) {
+        const msg =
+          memberErr instanceof Error ?
+            memberErr.message
+          : "Failed to register member";
+        showWarning(
+          "Hospital created",
+          `${msg} The hospital exists — add this user later from user management if needed.`,
+        );
+      }
       const dataToNotify = formData;
-      setFormData(DEFAULT_FORM);
+      setFormData(createEmptyForm());
       onOpenChange(false);
       onSave?.(dataToNotify);
-      showSuccess("Success!", "Hospital created successfully.");
+      if (memberRegistered) {
+        showSuccess(
+          "Success!",
+          "Hospital and member account created successfully.",
+        );
+      }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to create hospital";
+      const message =
+        err instanceof Error ? err.message : "Failed to create hospital";
       setSubmitError(message);
       showError("Error", message);
     } finally {
@@ -169,9 +307,17 @@ export const AddHospitalModal = ({
     setIsDragging(false);
   }, []);
 
+  const setReviewUrl = useCallback((index: 0 | 1, value: string) => {
+    setFormData((prev) => {
+      const next: [string, string] = [...prev.reviewUrls] as [string, string];
+      next[index] = value;
+      return { ...prev, reviewUrls: next };
+    });
+  }, []);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[600px] w-[90vw] p-0 gap-0 rounded-[10px] border border-[#dedee1] overflow-hidden [&>button]:hidden max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-[720px] w-[90vw] p-0 gap-0 rounded-[10px] border border-[#dedee1] overflow-hidden [&>button]:hidden max-h-[90vh] flex flex-col">
         <DialogHeader className="flex flex-row items-center justify-between gap-2 px-5 py-4 border-b border-[#dedee1] bg-grey-light rounded-t-[10px]">
           <div className="flex items-center gap-2">
             <div className="flex items-center justify-center p-[2px] rounded-[50px] bg-white border border-[#dedee1]">
@@ -211,34 +357,17 @@ export const AddHospitalModal = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
               <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
-                Phone<span className="text-red-500">*</span>
+                Phone number<span className="text-red-500">*</span>
               </label>
-              <div className="flex gap-2">
-                <Select
-                  value={formData.countryCode}
-                  onValueChange={(v) =>
-                    setFormData({ ...formData, countryCode: v })
-                  }
-                >
-                  <SelectTrigger className="w-[90px] h-[38px] px-3 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="+91">+91</SelectItem>
-                    <SelectItem value="+1">+1</SelectItem>
-                    <SelectItem value="+44">+44</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
-                  placeholder="569 334 3366"
-                  className="flex-1 h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
-                />
-              </div>
+              <Input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
+                placeholder="9876543210"
+                className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
+              />
             </div>
             <div className="flex flex-col gap-2">
               <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
@@ -280,7 +409,7 @@ export const AddHospitalModal = ({
                 onChange={(e) =>
                   setFormData({ ...formData, gstRegistration: e.target.value })
                 }
-                placeholder="Type name"
+                placeholder="REG123"
                 className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
               />
             </div>
@@ -332,7 +461,7 @@ export const AddHospitalModal = ({
                 onChange={(e) =>
                   setFormData({ ...formData, pincode: e.target.value })
                 }
-                placeholder="Type pincode"
+                placeholder="400001"
                 className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
               />
             </div>
@@ -349,9 +478,223 @@ export const AddHospitalModal = ({
               onChange={(e) =>
                 setFormData({ ...formData, hospitalUrl: e.target.value })
               }
-              placeholder="URL here"
+              placeholder="https://example.com"
               className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
             />
+          </div>
+
+          {/* Hospital member — at least one user linked on create */}
+          <div className="rounded-[10px] border border-[#dedee1] bg-grey-light/40 p-4 flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-2/10 text-primary-2">
+                <UserPlus className="h-4 w-4" aria-hidden />
+              </div>
+              <div>
+                <p className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                  Assign hospital member<span className="text-red-500">*</span>
+                </p>
+                <p className="font-title-5l text-x-70 text-xs mt-0.5">
+                  Create one login (hospital admin or doctor) for this hospital.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2 lg:col-span-2">
+                <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                  Member full name<span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={formData.memberName}
+                  onChange={(e) =>
+                    setFormData({ ...formData, memberName: e.target.value })
+                  }
+                  placeholder="e.g. Dr. Priya Sharma"
+                  className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                  Member email<span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="email"
+                  value={formData.memberEmail}
+                  onChange={(e) =>
+                    setFormData({ ...formData, memberEmail: e.target.value })
+                  }
+                  placeholder="admin@hospital.com"
+                  className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                  Member password<span className="text-red-500">*</span>
+                </label>
+                <Input
+                  type="password"
+                  value={formData.memberPassword}
+                  onChange={(e) =>
+                    setFormData({ ...formData, memberPassword: e.target.value })
+                  }
+                  placeholder={`Min. ${MIN_MEMBER_PASSWORD_LEN} characters`}
+                  className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
+                  autoComplete="new-password"
+                />
+              </div>
+              <div className="flex flex-col gap-2 lg:col-span-2">
+                <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                  Role<span className="text-red-500">*</span>
+                </label>
+                <Select
+                  value={formData.memberRole}
+                  onValueChange={(v) =>
+                    setFormData({
+                      ...formData,
+                      memberRole: v as "hospital_admin" | "doctor",
+                    })
+                  }
+                >
+                  <SelectTrigger className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hospital_admin">
+                      Hospital admin
+                    </SelectItem>
+                    <SelectItem value="doctor">Doctor</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* WhatsApp */}
+          <div className="flex flex-col gap-2">
+            <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+              WhatsApp number<span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-2">
+              <Select
+                value={formData.whatsappCountryCode}
+                onValueChange={(v) =>
+                  setFormData({ ...formData, whatsappCountryCode: v })
+                }
+              >
+                <SelectTrigger className="w-[90px] h-[38px] px-3 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r">
+                  <SelectValue />
+                </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="+91">+91</SelectItem>
+                  </SelectContent>
+              </Select>
+              <Input
+                type="tel"
+                value={formData.whatsappPhone}
+                onChange={(e) =>
+                  setFormData({ ...formData, whatsappPhone: e.target.value })
+                }
+                placeholder="9876543210"
+                className="flex-1 h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
+              />
+            </div>
+          </div>
+
+          {/* Emergency | Receptionist — same layout as WhatsApp (+91 + number) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-2">
+              <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                Emergency number<span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-2">
+                <Select
+                  value={formData.emergencyCountryCode}
+                  onValueChange={(v) =>
+                    setFormData({ ...formData, emergencyCountryCode: v })
+                  }
+                >
+                  <SelectTrigger className="w-[90px] h-[38px] px-3 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="+91">+91</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="tel"
+                  value={formData.emergencyPhone}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      emergencyPhone: e.target.value,
+                    })
+                  }
+                  placeholder="9876543210"
+                  className="flex-1 h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                Receptionist number<span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-2">
+                <Select
+                  value={formData.receptionistCountryCode}
+                  onValueChange={(v) =>
+                    setFormData({ ...formData, receptionistCountryCode: v })
+                  }
+                >
+                  <SelectTrigger className="w-[90px] h-[38px] px-3 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="+91">+91</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="tel"
+                  value={formData.receptionistPhone}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      receptionistPhone: e.target.value,
+                    })
+                  }
+                  placeholder="9876543210"
+                  className="flex-1 h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Review URLs */}
+          <div className="grid grid-cols-1 gap-4">
+            <div className="flex flex-col gap-2">
+              <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                Review URL 1<span className="text-red-500">*</span>
+              </label>
+              <Input
+                type="url"
+                value={formData.reviewUrls[0]}
+                onChange={(e) => setReviewUrl(0, e.target.value)}
+                placeholder="https://g.page/r/..."
+                className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                Review URL 2<span className="text-red-500">*</span>
+              </label>
+              <Input
+                type="url"
+                value={formData.reviewUrls[1]}
+                onChange={(e) => setReviewUrl(1, e.target.value)}
+                placeholder="https://www.practo.com/..."
+                className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
+              />
+            </div>
           </div>
 
           {/* Upload Picture */}

@@ -18,6 +18,14 @@ import {
   modalHeaderCloseButtonClassName,
 } from "./modalFooterStyles";
 
+function RequiredMark(): JSX.Element {
+  return (
+    <span className="text-[#ff0004] ml-0.5" aria-hidden>
+      *
+    </span>
+  );
+}
+
 export interface DoctorData {
   name: string;
   phone: string;
@@ -223,6 +231,7 @@ export const AddDoctorModal = ({
           <div className="flex flex-col gap-2">
             <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
               Doctor Name
+              <RequiredMark />
             </label>
             <Input
               value={formData.name}
@@ -237,6 +246,7 @@ export const AddDoctorModal = ({
           <div className="flex flex-col gap-2">
             <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
               Doctor Designation
+              <RequiredMark />
             </label>
             <Input
               value={formData.designation}
@@ -252,6 +262,7 @@ export const AddDoctorModal = ({
             <div className="flex flex-col gap-2">
               <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
                 Phone
+                <RequiredMark />
               </label>
               <div className="flex gap-2.5">
                 <Select
@@ -284,6 +295,7 @@ export const AddDoctorModal = ({
             <div className="flex flex-col gap-2">
               <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
                 Email Address
+                <RequiredMark />
               </label>
               <div className="relative">
                 <Input
@@ -303,6 +315,7 @@ export const AddDoctorModal = ({
           <div className="flex flex-col gap-2">
             <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
               Working Days
+              <RequiredMark />
             </label>
             <div className="flex flex-wrap justify-between">
               {[
@@ -366,7 +379,8 @@ export const AddDoctorModal = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
               <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                Availability (Morning)<span className="text-[#ff0004]">*</span>
+                Availability (Morning)
+                <RequiredMark />
               </label>
               <div className="flex items-center gap-2.5">
                 <Input
@@ -395,7 +409,8 @@ export const AddDoctorModal = ({
 
             <div className="flex flex-col gap-2">
               <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                Availability(Evening)<span className="text-[#ff0004]">*</span>
+                Availability (Evening)
+                <RequiredMark />
               </label>
               <div className="flex items-center gap-2.5">
                 <Input
@@ -427,6 +442,7 @@ export const AddDoctorModal = ({
           <div className="flex flex-col gap-2">
             <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
               Status
+              <RequiredMark />
             </label>
             <Select
               value={formData.status}

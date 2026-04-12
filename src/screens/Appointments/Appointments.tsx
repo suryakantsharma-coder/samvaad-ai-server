@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from "react";
-import { PatientSearchSection } from "../Patients/sections/PatientSearchSection";
 import { AppointmentHeaderSection } from "./sections/AppointmentHeaderSection";
 import { AppointmentListSection } from "./sections/AppointmentListSection";
 import {
@@ -38,12 +37,12 @@ export const Appointments = (): JSX.Element => {
   const [appointmentData, setAppointmentData] = useState<any>(null);
   const { handleMarkAsDoneAppointment, overall, counts } = useAppointments();
   return (
-    <div className="bg-app-background w-full min-h-screen flex flex-col gap-[25px] p-4 md:p-6">
-      <PatientSearchSection />
+    <div className="w-full flex flex-col gap-[25px] p-4 md:p-6">
       <AppointmentHeaderSection
         onAddAppointment={() => setShowAddModal(true)}
         totalAppointments={overall?.totalAppointments}
         totalPatients={overall?.totalPatients}
+        totalDoctors={overall?.totalDoctors}
         todayCount={counts.today}
         tomorrowCount={counts.tomorrow}
         fromDate={listFromDate}

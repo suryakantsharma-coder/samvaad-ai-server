@@ -206,6 +206,13 @@ function extractListAndMeta(
       totalPagesRaw
     : Math.max(1, Math.ceil(total / limit) || 1);
 
+  const overallBlock = asDict(dataNode.overall);
+  let totalDoctors: number | undefined;
+  if (overallBlock) {
+    const n = Number(overallBlock.totalDoctors);
+    if (Number.isFinite(n)) totalDoctors = n;
+  }
+
   return {
     rows,
     meta: {
@@ -213,28 +220,14 @@ function extractListAndMeta(
       page,
       limit,
       totalPages,
+      totalDoctors,
     },
   };
 }
 
-export async function fetchPaymentsPage(params: {
-  hospitalId: string;
-  page: number;
-  limit: number;
-  /** YYYY-MM-DD when API supports range filter */
-  fromDate?: string;
-  toDate?: string;
-}): Promise<{ rows: PaymentTableRow[]; meta: PaymentsListMeta }> {
-  const qs = new URLSearchParams({
-    hospitalId: params.hospitalId,
-    page: String(params.page),
-    limit: String(params.limit),
-  });
-  if (params.fromDate?.trim()) qs.set("fromDate", params.fromDate.trim());
-  if (params.toDate?.trim()) qs.set("toDate", params.toDate.trim());
-  const raw = await authFetch(`/api/payments?${qs.toString()}`, {
-    method: "GET",
-  });
+export type PaymentListDateFilter = "all" | "today" | "tomorrow";
+
+function assertPaymentsOk(raw: unknown): void {
   const root = asDict(raw);
   if (root && root.success === false) {
     throw new Error(
@@ -243,5 +236,58 @@ export async function fetchPaymentsPage(params: {
         "Failed to load payments.",
     );
   }
+}
+
+export async function fetchPaymentsPage(params: {
+  hospitalId: string;
+  page: number;
+  limit: number;
+  /** `all` | `today` | `tomorrow` — server-side date window. */
+  filter?: PaymentListDateFilter;
+  /** YYYY-MM-DD — applied when `filter` is `all` (optional range). */
+  fromDate?: string;
+  toDate?: string;
+  /** Razorpay-style e.g. `captured`, `pending`, `failed`. */
+  paymentStatus?: string;
+}): Promise<{ rows: PaymentTableRow[]; meta: PaymentsListMeta }> {
+  const filter = params.filter ?? "all";
+  const qs = new URLSearchParams({
+    hospitalId: params.hospitalId,
+    page: String(params.page),
+    limit: String(params.limit),
+    filter,
+  });
+  if (filter === "all") {
+    if (params.fromDate?.trim()) qs.set("fromDate", params.fromDate.trim());
+    if (params.toDate?.trim()) qs.set("toDate", params.toDate.trim());
+  }
+  const ps = params.paymentStatus?.trim();
+  if (ps) qs.set("paymentStatus", ps);
+  const raw = await authFetch(`/api/payments?${qs.toString()}`, {
+    method: "GET",
+  });
+  assertPaymentsOk(raw);
+  return extractListAndMeta(raw, params.page, params.limit);
+}
+
+export async function fetchPaymentsSearch(params: {
+  hospitalId: string;
+  q: string;
+  page: number;
+  limit: number;
+  paymentStatus?: string;
+}): Promise<{ rows: PaymentTableRow[]; meta: PaymentsListMeta }> {
+  const qs = new URLSearchParams({
+    hospitalId: params.hospitalId,
+    q: params.q.trim(),
+    page: String(params.page),
+    limit: String(params.limit),
+  });
+  const ps = params.paymentStatus?.trim();
+  if (ps) qs.set("paymentStatus", ps);
+  const raw = await authFetch(`/api/payments/search?${qs.toString()}`, {
+    method: "GET",
+  });
+  assertPaymentsOk(raw);
   return extractListAndMeta(raw, params.page, params.limit);
 }

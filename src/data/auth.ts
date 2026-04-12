@@ -18,6 +18,45 @@ export const register = async (
   return response.json();
 };
 
+/**
+ * Register a hospital-scoped user (e.g. hospital_admin, doctor) after the hospital exists.
+ * Public POST /api/auth/register — does not send the admin Bearer token.
+ */
+export const registerUserWithHospital = async (params: {
+  email: string;
+  password: string;
+  name: string;
+  role: string;
+  hospitalId: string;
+}): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: params.email.trim(),
+      password: params.password,
+      name: params.name.trim(),
+      role: params.role,
+      hospital: params.hospitalId,
+      hospitalId: params.hospitalId,
+    }),
+  });
+  const data = (await response.json().catch(() => ({}))) as {
+    message?: string;
+    error?: string;
+    success?: boolean;
+  };
+  if (!response.ok || data.success === false) {
+    throw new Error(
+      typeof data.message === "string"
+        ? data.message
+        : typeof data.error === "string"
+          ? data.error
+          : "Failed to register hospital member",
+    );
+  }
+};
+
 export const login = async (email: string, password: string) => {
   const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: "POST",
@@ -138,6 +177,27 @@ export const updateCurrentUserProfile = async (
   throw new Error(
     String(data.message ?? data.error ?? "Failed to update profile"),
   );
+};
+
+/**
+ * POST /api/auth/me/profile-picture — multipart field `file` (same as curl).
+ */
+export const uploadProfilePicture = async (file: File) => {
+  const fd = new FormData();
+  fd.append("file", file, file.name);
+  const data = (await authFetch("/api/auth/me/profile-picture", {
+    method: "POST",
+    body: fd,
+  })) as {
+    success?: boolean;
+    message?: string;
+    error?: string;
+    data?: { user?: unknown };
+  };
+  if (data.success === false) {
+    throw new Error(String(data.message ?? data.error ?? "Upload failed"));
+  }
+  return data;
 };
 
 /**

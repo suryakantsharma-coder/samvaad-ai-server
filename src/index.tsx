@@ -10,7 +10,8 @@ import { Appointments } from "./screens/Appointments";
 import { Settings } from "./screens/Settings";
 import { Login } from "./screens/Login";
 import { Signup } from "./screens/Signup";
-import { AuthProvider } from "./contexts/AuthProvider";
+import { AuthProvider, useAuth } from "./contexts/AuthProvider";
+import { getHomePathForRole } from "./lib/userRole";
 import { DoctorProvider } from "./contexts/DoctorProvider";
 import { PatientProvider } from "./contexts/PatientProvider";
 import { AppointmentProvider } from "./contexts/AppointmentProvider";
@@ -19,6 +20,7 @@ import { PatientRecord } from "./screens/PatientRecord/PatientRecord";
 import { Hospitals } from "./screens/Hospitals";
 import { Medicines } from "./screens/Medicines";
 import { Payment } from "./screens/Payment";
+import { MainLayout } from "./components/layout";
 import { HospitalProvider } from "./contexts/HospitalProvider";
 import { PrescriptionProvider } from "./contexts/PrescriptionProvider";
 import { PublicPrescription } from "./screens/PublicPrescription";
@@ -80,6 +82,17 @@ function loadFacebookSdk(): void {
 loadFacebookSdk();
 ensureWhatsAppEmbeddedSignupListener();
 
+function RoleBasedHomeRedirect(): JSX.Element {
+  const { user, authHydrating } = useAuth();
+  if (authHydrating) {
+    return <div className="flex-1 min-h-[40vh]" aria-busy="true" />;
+  }
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  return <Navigate to={getHomePathForRole(user.role)} replace />;
+}
+
 /** Logged-in app: providers, toasts, and main routes (AuthProvider redirects if no token). */
 function AuthenticatedApp(): JSX.Element {
   return (
@@ -90,21 +103,23 @@ function AuthenticatedApp(): JSX.Element {
             <AppointmentProvider>
               <PrescriptionProvider>
                 <Routes>
-                  <Route path="/" element={<Navigate to="/patients" replace />} />
-                  <Route path="/prescriptions" element={<Prescriptions />} />
-                  <Route
-                    path="/prescriptions/patient/:patientId"
-                    element={<PatientRecord />}
-                  />
-                  <Route path="/hospitals" element={<Hospitals />} />
-                  <Route path="/medicines" element={<Medicines />} />
-                  <Route path="/payment" element={<Payment />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/signup" element={<Signup />} />
-                  <Route path="/patients" element={<Patients />} />
-                  <Route path="/doctors" element={<Doctors />} />
-                  <Route path="/appointments" element={<Appointments />} />
-                  <Route path="/settings" element={<Settings />} />
+                  <Route element={<MainLayout />}>
+                    <Route path="/" element={<RoleBasedHomeRedirect />} />
+                    <Route path="/prescriptions" element={<Prescriptions />} />
+                    <Route
+                      path="/prescriptions/patient/:patientId"
+                      element={<PatientRecord />}
+                    />
+                    <Route path="/hospitals" element={<Hospitals />} />
+                    <Route path="/medicines" element={<Medicines />} />
+                    <Route path="/payment" element={<Payment />} />
+                    <Route path="/patients" element={<Patients />} />
+                    <Route path="/doctors" element={<Doctors />} />
+                    <Route path="/appointments" element={<Appointments />} />
+                    <Route path="/settings" element={<Settings />} />
+                  </Route>
                 </Routes>
               </PrescriptionProvider>
             </AppointmentProvider>

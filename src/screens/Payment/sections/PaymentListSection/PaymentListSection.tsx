@@ -49,68 +49,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../../../components/ui/select";
-import { fetchPaymentsPage } from "../../../../data/payments";
+import {
+  fetchPaymentsPage,
+  fetchPaymentsSearch,
+} from "../../../../data/payments";
 import { formatTime12h } from "../../../../lib/dateTimeDisplay";
 import { showError, showSuccess } from "../../../../lib/toast";
 import type { PaymentTableRow } from "../../../../types/payment.type";
 
 const PAGE_SIZE = 20;
 
-function toYMDLocal(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function startOfDayMs(d: Date): number {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x.getTime();
-}
-
-function endOfDayMs(d: Date): number {
-  const x = new Date(d);
-  x.setHours(23, 59, 59, 999);
-  return x.getTime();
-}
-
-function rowMatchesDateTab(
-  row: PaymentTableRow,
-  tab: "all" | "today" | "tomorrow",
-): boolean {
-  if (tab === "all") return true;
-  if (row.paymentAtMs == null) return false;
-  const now = new Date();
-  if (tab === "today") {
-    return (
-      row.paymentAtMs >= startOfDayMs(now) &&
-      row.paymentAtMs <= endOfDayMs(now)
-    );
-  }
-  const tmr = new Date(now);
-  tmr.setDate(tmr.getDate() + 1);
-  return (
-    row.paymentAtMs >= startOfDayMs(tmr) && row.paymentAtMs <= endOfDayMs(tmr)
-  );
-}
-
-function rowMatchesStatusFilter(
-  row: PaymentTableRow,
+/** Maps UI status filter to `paymentStatus` query (Razorpay: paid → captured). */
+function statusFilterToPaymentStatus(
   filter: "all" | "paid" | "pending" | "failed",
-): boolean {
-  if (filter === "all") return true;
-  const s = row.status.toLowerCase().trim();
-  if (filter === "paid") {
-    return ["paid", "success", "completed", "captured"].includes(s);
-  }
-  if (filter === "pending") {
-    return ["pending", "processing", "created"].includes(s);
-  }
-  if (filter === "failed") {
-    return ["failed", "cancelled", "canceled", "refunded"].includes(s);
-  }
-  return true;
+): string | undefined {
+  if (filter === "all") return undefined;
+  if (filter === "paid") return "captured";
+  if (filter === "pending") return "pending";
+  if (filter === "failed") return "failed";
+  return undefined;
 }
 
 function statusBadgeClass(status: string): string {
@@ -150,26 +107,6 @@ function dash(v: string | undefined): string {
 
 function formatPrice(price: string): string {
   return `₹ ${parseInt(price.replace("₹", "").replace(",", "")) / 100}`;
-}
-
-function rowMatchesSearch(row: PaymentTableRow, q: string): boolean {
-  const needle = q.trim().toLowerCase();
-  if (needle === "") return true;
-  const hay = [
-    row.patientName,
-    row.doctorName,
-    row.status,
-    displayPaymentStatus(row.status),
-    row.id,
-    row.patientPhone,
-    row.razorpayOrderId,
-    row.paymentDateLabel,
-    row.priceLabel,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  return hay.includes(needle);
 }
 
 function PaymentDateCell({ row }: { row: PaymentTableRow }): JSX.Element {
@@ -363,11 +300,16 @@ async function copyText(label: string, text: string): Promise<void> {
 
 export interface PaymentListSectionProps {
   hospitalId: string;
-  onRecordsMeta?: (meta: { total: number }) => void;
+  /** YYYY-MM-DD — bounds the list when the “All” tab is selected. */
+  listFromDate: string;
+  listToDate: string;
+  onRecordsMeta?: (meta: { total: number; totalDoctors?: number }) => void;
 }
 
 export const PaymentListSection = ({
   hospitalId,
+  listFromDate,
+  listToDate,
   onRecordsMeta,
 }: PaymentListSectionProps): JSX.Element => {
   const navigate = useNavigate();
@@ -382,6 +324,7 @@ export const PaymentListSection = ({
   const [detailRow, setDetailRow] = useState<PaymentTableRow | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<
     "all" | "paid" | "pending" | "failed"
   >("all");
@@ -389,38 +332,39 @@ export const PaymentListSection = ({
   const onRecordsMetaRef = useRef(onRecordsMeta);
   onRecordsMetaRef.current = onRecordsMeta;
 
-  const listFromTo = useMemo(() => {
-    if (dateTab === "all") {
-      return { fromDate: undefined as string | undefined, toDate: undefined as string | undefined };
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => window.clearTimeout(t);
+  }, [searchQuery]);
+
+  const orderedListRange = useMemo(() => {
+    const a = listFromDate.trim();
+    const b = listToDate.trim();
+    if (!a || !b) {
+      return { fromYmd: undefined as string | undefined, toYmd: undefined as string | undefined };
     }
-    const now = new Date();
-    if (dateTab === "today") {
-      const ymd = toYMDLocal(now);
-      return { fromDate: ymd, toDate: ymd };
+    if (a <= b) return { fromYmd: a, toYmd: b };
+    return { fromYmd: b, toYmd: a };
+  }, [listFromDate, listToDate]);
+
+  /** Header date range applies only to the “All” tab; today/tomorrow use `filter` on the API. */
+  const listRangeForAllTab = useMemo(() => {
+    if (orderedListRange.fromYmd && orderedListRange.toYmd) {
+      return {
+        fromDate: orderedListRange.fromYmd,
+        toDate: orderedListRange.toYmd,
+      };
     }
-    const tmr = new Date(now);
-    tmr.setDate(tmr.getDate() + 1);
-    const ymd = toYMDLocal(tmr);
-    return { fromDate: ymd, toDate: ymd };
-  }, [dateTab]);
+    return { fromDate: undefined as string | undefined, toDate: undefined as string | undefined };
+  }, [orderedListRange.fromYmd, orderedListRange.toYmd]);
 
-  const afterDateTab = useMemo(
-    () => rows.filter((r) => rowMatchesDateTab(r, dateTab)),
-    [rows, dateTab],
+  const paymentStatusForApi = useMemo(
+    () => statusFilterToPaymentStatus(statusFilter),
+    [statusFilter],
   );
-
-  const afterStatus = useMemo(
-    () => afterDateTab.filter((r) => rowMatchesStatusFilter(r, statusFilter)),
-    [afterDateTab, statusFilter],
-  );
-
-  const afterSearch = useMemo(() => {
-    if (searchQuery.trim() === "") return afterStatus;
-    return afterStatus.filter((r) => rowMatchesSearch(r, searchQuery));
-  }, [afterStatus, searchQuery]);
 
   const displayRows = useMemo(() => {
-    return [...afterSearch].sort((a, b) => {
+    return [...rows].sort((a, b) => {
       const ta = a.paymentAtMs ?? 0;
       const tb = b.paymentAtMs ?? 0;
       if (ta === 0 && tb === 0) return 0;
@@ -428,7 +372,7 @@ export const PaymentListSection = ({
       if (tb === 0) return -1;
       return dateSort === "newest" ? tb - ta : ta - tb;
     });
-  }, [afterSearch, dateSort]);
+  }, [rows, dateSort]);
 
   const dateTabLabels = useMemo(
     () => [
@@ -440,20 +384,28 @@ export const PaymentListSection = ({
   );
 
   const emptyStateMessage = useMemo(() => {
-    if (afterDateTab.length === 0) {
-      if (dateTab === "today") return "No payments for today.";
-      if (dateTab === "tomorrow") return "No payments for tomorrow.";
-      return "No payments found for this hospital.";
-    }
-    if (afterStatus.length === 0) {
+    if (rows.length > 0) return "";
+    if (debouncedSearch.trim()) return "No payments match your search.";
+    if (statusFilter !== "all") {
       return "No payments match the selected status.";
     }
-    return "No payments match your search.";
+    if (dateTab === "today") return "No payments for today.";
+    if (dateTab === "tomorrow") return "No payments for tomorrow.";
+    if (
+      dateTab === "all" &&
+      orderedListRange.fromYmd &&
+      orderedListRange.toYmd
+    ) {
+      return "No payments in the selected date range.";
+    }
+    return "No payments found for this hospital.";
   }, [
+    rows.length,
+    debouncedSearch,
+    statusFilter,
     dateTab,
-    afterDateTab.length,
-    afterStatus.length,
-    afterSearch.length,
+    orderedListRange.fromYmd,
+    orderedListRange.toYmd,
   ]);
 
   const openDetails = (row: PaymentTableRow) => {
@@ -466,31 +418,62 @@ export const PaymentListSection = ({
       setLoading(false);
       setRows([]);
       setTotalPages(1);
-      onRecordsMetaRef.current?.({ total: 0 });
+      onRecordsMetaRef.current?.({ total: 0, totalDoctors: undefined });
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const { rows: nextRows, meta } = await fetchPaymentsPage({
-        hospitalId: hospitalId.trim(),
-        page,
-        limit: PAGE_SIZE,
-        fromDate: listFromTo.fromDate,
-        toDate: listFromTo.toDate,
-      });
-      setRows(nextRows);
-      setTotalPages(meta.totalPages);
-      onRecordsMetaRef.current?.({ total: meta.total });
+      const q = debouncedSearch.trim();
+      if (q) {
+        const { rows: nextRows, meta } = await fetchPaymentsSearch({
+          hospitalId: hospitalId.trim(),
+          q,
+          page,
+          limit: PAGE_SIZE,
+          paymentStatus: paymentStatusForApi,
+        });
+        setRows(nextRows);
+        setTotalPages(meta.totalPages);
+        onRecordsMetaRef.current?.({
+          total: meta.total,
+          totalDoctors: meta.totalDoctors,
+        });
+      } else {
+        const { rows: nextRows, meta } = await fetchPaymentsPage({
+          hospitalId: hospitalId.trim(),
+          page,
+          limit: PAGE_SIZE,
+          filter: dateTab,
+          fromDate:
+            dateTab === "all" ? listRangeForAllTab.fromDate : undefined,
+          toDate: dateTab === "all" ? listRangeForAllTab.toDate : undefined,
+          paymentStatus: paymentStatusForApi,
+        });
+        setRows(nextRows);
+        setTotalPages(meta.totalPages);
+        onRecordsMetaRef.current?.({
+          total: meta.total,
+          totalDoctors: meta.totalDoctors,
+        });
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load payments.");
       setRows([]);
       setTotalPages(1);
-      onRecordsMetaRef.current?.({ total: 0 });
+      onRecordsMetaRef.current?.({ total: 0, totalDoctors: undefined });
     } finally {
       setLoading(false);
     }
-  }, [hospitalId, page, listFromTo.fromDate, listFromTo.toDate]);
+  }, [
+    hospitalId,
+    page,
+    debouncedSearch,
+    dateTab,
+    listRangeForAllTab.fromDate,
+    listRangeForAllTab.toDate,
+    paymentStatusForApi,
+  ]);
 
   useEffect(() => {
     void load();
@@ -503,6 +486,18 @@ export const PaymentListSection = ({
   useEffect(() => {
     setPage(1);
   }, [dateTab]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [listFromDate, listToDate]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter]);
 
   if (!hospitalId.trim()) {
     return (
@@ -548,7 +543,7 @@ export const PaymentListSection = ({
           <div className="flex min-w-0 flex-1 max-w-[372px] items-center gap-2.5 px-2 py-2 bg-grey-light rounded-[100px] h-[38px]">
             <SearchIcon className="w-6 h-6 shrink-0 text-black opacity-70" />
             <Input
-              placeholder="Search by patient, doctor, status, ID..."
+              placeholder="Search payments (e.g. pay_, order id)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="min-w-0 flex-1 border-0 bg-transparent opacity-70 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] focus-visible:ring-0 focus-visible:ring-offset-0 p-0"

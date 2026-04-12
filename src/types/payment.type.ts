@@ -25,4 +25,6 @@ export type PaymentsListMeta = {
   page: number;
   limit: number;
   totalPages: number;
+  /** From `data.overall.totalDoctors` when the API includes it. */
+  totalDoctors?: number;
 };

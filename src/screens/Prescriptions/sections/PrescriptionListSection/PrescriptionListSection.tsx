@@ -3,7 +3,7 @@ import {
   Search as SearchIcon,
   MoreVertical as ThreeDotsVerticalIcon,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Button } from "../../../../components/ui/button";
 import {
   DropdownMenu,
@@ -96,7 +96,7 @@ export const PrescriptionListSection = ({
   listEndDate?: string;
 }): JSX.Element => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchPage, setSearchPage] = useState(1);
+  const hadSearchRef = useRef(false);
   const {
     prescriptions,
     searchedPrescriptions,
@@ -112,13 +112,10 @@ export const PrescriptionListSection = ({
   } = usePrescription();
 
   const isSearching = searchQuery.trim() !== "";
+  /** Search uses GET /api/prescriptions/search — server-paginated page in `searchedPrescriptions`. */
   const listToShow = isSearching
     ? (searchedPrescriptions ?? [])
     : prescriptions;
-  const searchTotalPages = Math.max(1, Math.ceil(listToShow.length / limit));
-  const pagedSearchList = isSearching
-    ? listToShow.slice((searchPage - 1) * limit, searchPage * limit)
-    : listToShow;
 
   useEffect(() => {
     handleGetPrescriptions(1, limit, {
@@ -126,20 +123,32 @@ export const PrescriptionListSection = ({
       endDate: listEndDate,
       ...(currentStatusFilter != null ? { status: currentStatusFilter } : {}),
     });
-  }, [limit, listStartDate, listEndDate]);
+  }, [limit, listStartDate, listEndDate, currentStatusFilter]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchQuery.trim()) {
-        setSearchPage(1);
-        handleSearchPrescriptions(searchQuery);
+    const timer = window.setTimeout(() => {
+      const q = searchQuery.trim();
+      if (q) {
+        hadSearchRef.current = true;
+        void handleSearchPrescriptions(q, 1, limit);
       } else {
-        setSearchPage(1);
         resetSearchedPrescriptions();
+        if (hadSearchRef.current) {
+          hadSearchRef.current = false;
+          void handleGetPrescriptions(1, limit, {
+            startDate: listStartDate,
+            endDate: listEndDate,
+            ...(currentStatusFilter != null
+              ? { status: currentStatusFilter }
+              : {}),
+          });
+        }
       }
     }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+    return () => window.clearTimeout(timer);
+    // Intentionally omit handler identities — provider recreates them each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce only on query / list scope
+  }, [searchQuery, limit, listStartDate, listEndDate, currentStatusFilter]);
 
   const tableLoading = loading && listToShow.length === 0;
   const showError = error && !loading;
@@ -210,7 +219,7 @@ export const PrescriptionListSection = ({
               <TableBody>
                 {tableLoading ? (
                   <TableLoadingRow colSpan={7} />
-                ) : pagedSearchList.length === 0 ? (
+                ) : listToShow.length === 0 ? (
                   <TableRow className="border-b border-[#dedee1]">
                     <TableCell
                       colSpan={7}
@@ -220,7 +229,7 @@ export const PrescriptionListSection = ({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  pagedSearchList.map((prescription) => (
+                  listToShow.map((prescription) => (
                     <TableRow
                       key={prescription._id}
                       className="border-b border-[#dedee1] hover:bg-grey-light/50"
@@ -305,12 +314,12 @@ export const PrescriptionListSection = ({
         </div>
       </div>
       <Pagination
-        currentPage={isSearching ? searchPage : currentPage}
-        totalPages={isSearching ? searchTotalPages : totalPages}
+        currentPage={currentPage}
+        totalPages={totalPages}
         onPageChange={(page) =>
           isSearching
-            ? setSearchPage(page)
-            : handleGetPrescriptions(page, limit, {
+            ? void handleSearchPrescriptions(searchQuery.trim(), page, limit)
+            : void handleGetPrescriptions(page, limit, {
                 startDate: listStartDate,
                 endDate: listEndDate,
                 ...(currentStatusFilter != null

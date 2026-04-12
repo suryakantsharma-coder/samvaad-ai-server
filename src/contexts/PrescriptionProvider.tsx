@@ -6,6 +6,8 @@ import {
   searchPrescriptions,
   updatePrescription,
 } from "../data/prescription";
+import type { ListOverallPatch } from "../lib/listOverallFromApi";
+import { pickOverallFromApiData } from "../lib/listOverallFromApi";
 import { showSuccess, showError } from "../lib/toast";
 import type { PrescriptionStatusFilter } from "../data/prescription";
 import {
@@ -25,6 +27,7 @@ interface PrescriptionListOptions {
 interface PrescriptionContextType {
   prescriptions: Prescription[];
   searchedPrescriptions: Prescription[] | null;
+  overall: ListOverallPatch;
   loading: boolean;
   error: string | null;
   totalPages: number;
@@ -36,7 +39,11 @@ interface PrescriptionContextType {
     limit: number,
     options?: PrescriptionListOptions,
   ) => Promise<void>;
-  handleSearchPrescriptions: (q: string) => Promise<void>;
+  handleSearchPrescriptions: (
+    q: string,
+    page?: number,
+    pageLimit?: number,
+  ) => Promise<void>;
   resetSearchedPrescriptions: () => void;
   handleCreatePrescription: (payload: CreatePrescriptionPayload) => Promise<void>;
   handleUpdatePrescription: (
@@ -56,6 +63,7 @@ export const PrescriptionProvider = ({
   children: React.ReactNode;
 }) => {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [overall, setOverall] = useState<ListOverallPatch>({});
   const [searchedPrescriptions, setSearchedPrescriptions] = useState<
     Prescription[] | null
   >(null);
@@ -107,6 +115,10 @@ export const PrescriptionProvider = ({
       });
       const list = response.data?.prescriptions ?? [];
       setPrescriptions(Array.isArray(list) ? list : []);
+      const overallPatch = pickOverallFromApiData(response.data);
+      if (Object.keys(overallPatch).length > 0) {
+        setOverall((prev) => ({ ...prev, ...overallPatch }));
+      }
       const pagination = response.data?.pagination;
       if (pagination) {
         setTotalPages(pagination.totalPages ?? 1);
@@ -120,7 +132,11 @@ export const PrescriptionProvider = ({
     }
   };
 
-  const handleSearchPrescriptions = async (q: string) => {
+  const handleSearchPrescriptions = async (
+    q: string,
+    page = 1,
+    pageLimit?: number,
+  ) => {
     try {
       if (!q.trim()) {
         setSearchedPrescriptions(null);
@@ -128,9 +144,23 @@ export const PrescriptionProvider = ({
       }
       setLoading(true);
       setError(null);
-      const response = await searchPrescriptions(q.trim(), 1, 10);
+      const lim = pageLimit ?? limit;
+      const response = await searchPrescriptions(q.trim(), page, lim);
       const list = response.data?.prescriptions ?? [];
       setSearchedPrescriptions(Array.isArray(list) ? list : []);
+      const overallPatch = pickOverallFromApiData(response.data);
+      if (Object.keys(overallPatch).length > 0) {
+        setOverall((prev) => ({ ...prev, ...overallPatch }));
+      }
+      const pagination = response.data?.pagination;
+      if (pagination) {
+        setTotalPages(pagination.totalPages ?? 1);
+        setCurrentPage(pagination.page ?? page);
+        setLimit(pagination.limit ?? lim);
+      } else {
+        setCurrentPage(page);
+        setTotalPages(1);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setSearchedPrescriptions([]);
@@ -192,6 +222,7 @@ export const PrescriptionProvider = ({
       value={{
         prescriptions,
         searchedPrescriptions,
+        overall,
         loading,
         error,
         totalPages,

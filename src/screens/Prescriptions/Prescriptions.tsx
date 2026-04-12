@@ -12,7 +12,6 @@ import type {
   CreatePrescriptionPayload,
   Prescription,
 } from "../../types/prescription.type";
-import { PatientSearchSection } from "../Patients/sections/PatientSearchSection";
 import { PrescriptionsHeaderSection } from "./sections/PrescriptionHeaderSection/ PrescriptionsHeaderSection";
 import { PrescriptionListSection } from "./sections/PrescriptionListSection/PrescriptionListSection";
 
@@ -84,6 +83,7 @@ export const Prescriptions = (): JSX.Element => {
     handleDeletePrescription: deletePrescriptionById,
     limit,
     currentStatusFilter,
+    overall,
   } = usePrescription();
 
   const modalOpen = showNewPrescriptionModal || editingPrescription !== null;
@@ -137,10 +137,11 @@ export const Prescriptions = (): JSX.Element => {
   };
 
   return (
-    <div className="bg-app-background w-full min-h-screen flex flex-col gap-[25px] p-4 md:p-6">
-      <PatientSearchSection />
+    <div className="w-full flex flex-col gap-[25px] p-4 md:p-6">
       <PrescriptionsHeaderSection
         onAddPrescription={() => setShowNewPrescriptionModal(true)}
+        totalPrescriptions={overall?.totalPrescriptions}
+        totalDoctors={overall?.totalDoctors}
         startDate={listStartDate}
         endDate={listEndDate}
         onStartDateChange={setListStartDate}

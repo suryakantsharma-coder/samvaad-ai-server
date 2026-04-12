@@ -9,7 +9,11 @@ import {
   register,
   updateUserRoleByHospitalId,
 } from "../data/auth";
-import { User, HospitalUser, HospitalUsersResponse } from "../types/auth.type";
+import {
+  User,
+  HospitalUser,
+  HospitalUsersResponse,
+} from "../types/auth.type";
 import { useNavigate } from "react-router-dom";
 
 export const AuthContext = createContext<{
@@ -39,7 +43,9 @@ export const AuthContext = createContext<{
   accessToken: null,
   setAccessToken: () => {},
   isAuthenticated: false,
-  handleLogin: async () => {},
+  handleLogin: async () => {
+    throw new Error("AuthProvider not mounted");
+  },
   handleLogout: async () => {},
   handleRegister: async () => {},
   user: null,
@@ -95,10 +101,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const handleLogin = async (email: string, password: string) => {
     const data = await login(email, password);
-    setUser(data.data.user);
+    const nextUser = data.data.user as User;
+    setUser(nextUser);
     setAccessToken(data.data.accessToken);
     setIsAuthenticated(true);
-    localStorage.setItem("user", JSON.stringify(data.data.user));
+    localStorage.setItem("user", JSON.stringify(nextUser));
+    return nextUser;
   };
 
   const handleLogout = async () => {

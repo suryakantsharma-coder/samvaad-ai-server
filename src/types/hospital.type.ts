@@ -29,7 +29,7 @@
 export interface Hospital {
   _id: string;
   name: string;
-  phoneCountryCode: string;
+  phoneCountryCode?: string;
   phoneNumber: string;
   email: string;
   contactPerson: string;
@@ -38,15 +38,21 @@ export interface Hospital {
   city: string;
   pincode: string;
   url: string;
-  logoUrl: string;
+  logoUrl?: string;
+  emergencyNumber?: string;
+  receptionistNumber?: string;
+  whatsappNumber?: string;
+   reviewUrls?: string[];
+  /** When false, hospital is deactivated (super admin list/filter). */
+  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
   __v: number;
 }
 
+/** POST /api/hospitals — all fields required by the API. */
 export interface CreateHospitalPayload {
   name: string;
-  phoneCountryCode: string;
   phoneNumber: string;
   email: string;
   contactPerson: string;
@@ -55,15 +61,29 @@ export interface CreateHospitalPayload {
   city: string;
   pincode: string;
   url: string;
-  logoUrl: string;
+  emergencyNumber: string;
+  receptionistNumber: string;
+  whatsappNumber: string;
+  reviewUrls: string[];
+  /** Optional: logo filename or URL after upload. */
+  logoUrl?: string;
 }
 
 /** Payload for PATCH /hospitals/:id */
 export interface UpdateHospitalPayload {
   name?: string;
   phoneNumber?: string;
+  phoneCountryCode?: string;
   email?: string;
+  contactPerson?: string;
+  registrationNumber?: string;
   address?: string;
   city?: string;
   pincode?: string;
+  url?: string;
+  emergencyNumber?: string;
+  receptionistNumber?: string;
+  whatsappNumber?: string;
+  reviewUrls?: string[];
+  isActive?: boolean;
 }

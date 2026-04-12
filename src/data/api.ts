@@ -113,8 +113,18 @@ export const authFetch = async (
   const key = requestKey(method, url, fetchBody);
 
   const run = async (): Promise<unknown> => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      throw new Error("Not authenticated. Please log in and try again.");
+    }
+    /** FormData must not use `Content-Type: application/json` — the browser sets multipart boundaries. */
     const headers: HeadersInit = {
-      ...getAuthHeaders(),
+      ...(fetchBody instanceof FormData
+        ? { Authorization: `Bearer ${token}` }
+        : {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          }),
       ...(init.headers as HeadersInit),
     };
     const response = await fetch(url, {
@@ -143,6 +153,11 @@ export const authFetch = async (
       throw err;
     }
   };
+
+  /** Skip deduplication for multipart bodies — different files would share the same cache key. */
+  if (fetchBody instanceof FormData) {
+    return execute();
+  }
 
   let promise = inFlight.get(key);
   if (promise) return promise;

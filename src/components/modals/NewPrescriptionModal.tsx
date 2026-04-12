@@ -4,10 +4,12 @@ import {
   ChevronUp,
   CircleCheck,
   FileText,
+  Loader2,
+  Search,
   Trash2,
   X,
 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
@@ -19,6 +21,8 @@ import {
   SelectValue,
 } from "../ui/select";
 import { formatTime12h } from "../../lib/dateTimeDisplay";
+import { searchMedicines } from "../../data/medicines";
+import type { MedicineCatalogRow } from "../../types/medicineCatalog.type";
 import { getAppointments } from "../../data/appointment";
 import { Appointments } from "../../types/appointment.type";
 import type {
@@ -37,6 +41,9 @@ import {
 
 const INTAKE_OPTIONS = ["Before", "After"];
 
+const MEDICINE_SEARCH_MIN_CHARS = 1;
+const MEDICINE_SEARCH_DEBOUNCE_MS = 320;
+
 export interface MedicineEntry {
   id: string;
   name: string;
@@ -50,6 +57,204 @@ export interface MedicineEntry {
   dinner: boolean;
   notes: string;
   expanded: boolean;
+}
+
+/** Map catalog `units` / `type` to prescription dosage unit options used in this form. */
+function catalogRowToDosageUnit(row: MedicineCatalogRow): string {
+  const u = row.units.trim().toLowerCase();
+  if (u === "mg" || u === "ml" || u === "g") return u;
+  if (u === "tablet" || u === "tablets") return "tablet";
+  if (u === "capsule" || u === "capsules") return "capsule";
+  const t = row.type.trim().toLowerCase();
+  if (t.includes("tablet")) return "tablet";
+  if (t.includes("capsule")) return "capsule";
+  if (
+    t.includes("syrup") ||
+    t.includes("suspension") ||
+    t.includes("liquid") ||
+    t.includes("injection") ||
+    t.includes("drops")
+  ) {
+    return "ml";
+  }
+  return "mg";
+}
+
+function tryParseDosageFromCatalogName(name: string): number | undefined {
+  const m = name.match(/\b(\d+(?:\.\d+)?)\s*(mg|ml|g|mcg|iu)\b/i);
+  if (!m) return undefined;
+  const n = parseFloat(m[1]);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function updatesFromCatalogRow(
+  row: MedicineCatalogRow,
+): Pick<MedicineEntry, "name" | "dosageUnit" | "dosage"> {
+  const dosageUnit = catalogRowToDosageUnit(row);
+  const parsed = tryParseDosageFromCatalogName(row.name);
+  return {
+    name: row.name,
+    dosageUnit,
+    ...(parsed != null ? { dosage: parsed } : {}),
+  };
+}
+
+interface PrescriptionMedicineNameSearchProps {
+  medicineRowId: string;
+  name: string;
+  expanded: boolean;
+  onNameChange: (value: string) => void;
+  onSelectCatalogRow: (row: MedicineCatalogRow) => void;
+}
+
+function PrescriptionMedicineNameSearch({
+  medicineRowId,
+  name,
+  expanded,
+  onNameChange,
+  onSelectCatalogRow,
+}: PrescriptionMedicineNameSearchProps): JSX.Element {
+  const [results, setResults] = useState<MedicineCatalogRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hadSearch, setHadSearch] = useState(false);
+  const [noMatchHintVisible, setNoMatchHintVisible] = useState(false);
+  /** After picking from the catalog, ignore the next empty search (name sync re-fetches and may return 0 rows). */
+  const skipNextEmptyResultHint = useRef(false);
+
+  useEffect(() => {
+    if (!expanded) {
+      setResults([]);
+      setHadSearch(false);
+      setLoading(false);
+      setNoMatchHintVisible(false);
+      return;
+    }
+    const q = name.trim();
+    if (q.length < MEDICINE_SEARCH_MIN_CHARS) {
+      setResults([]);
+      setHadSearch(false);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        setLoading(true);
+        setHadSearch(true);
+        try {
+          const { rows } = await searchMedicines(q, 1, 15);
+          if (!cancelled) setResults(rows);
+        } catch {
+          if (!cancelled) setResults([]);
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      })();
+    }, MEDICINE_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [name, expanded, medicineRowId]);
+
+  useEffect(() => {
+    if (loading) {
+      setNoMatchHintVisible(false);
+      return;
+    }
+    if (results.length > 0) {
+      setNoMatchHintVisible(false);
+      return;
+    }
+    if (
+      !hadSearch ||
+      !expanded ||
+      name.trim().length < MEDICINE_SEARCH_MIN_CHARS
+    ) {
+      return;
+    }
+    if (skipNextEmptyResultHint.current) {
+      skipNextEmptyResultHint.current = false;
+      return;
+    }
+    setNoMatchHintVisible(true);
+    const id = window.setTimeout(() => setNoMatchHintVisible(false), 2000);
+    return () => window.clearTimeout(id);
+  }, [loading, hadSearch, results.length, expanded, name]);
+
+  const showDropdown =
+    expanded && name.trim().length >= MEDICINE_SEARCH_MIN_CHARS;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="font-title-4m text-black text-sm">
+        Medicine name<span className="text-red-500">*</span>
+      </label>
+      <p className="font-title-5l text-x-70 text-xs -mt-1">
+        Search the hospital catalog or type any name — if nothing matches, your
+        text is used as the medicine name.
+      </p>
+      <div className="relative z-10">
+        <div className="relative flex h-[38px] w-full items-center rounded-[10px] border border-[#dedee1] bg-white pr-10 focus-within:ring-1 focus-within:ring-ring">
+          <span
+            className="flex h-full w-11 shrink-0 items-center justify-center text-x-70"
+            aria-hidden
+          >
+            <Search className="h-4 w-4" strokeWidth={2} />
+          </span>
+          <Input
+            placeholder="Search or type medicine name"
+            value={name}
+            onChange={(e) => onNameChange(e.target.value)}
+            className="h-full min-w-0 flex-1 border-0 bg-transparent py-2 pl-0 pr-2 shadow-none focus-visible:ring-0 rounded-none font-title-4r md:text-sm"
+            autoComplete="off"
+          />
+          {loading ? (
+            <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-x-70 pointer-events-none" />
+          ) : null}
+        </div>
+
+        {showDropdown && (results.length > 0 || noMatchHintVisible) ? (
+          <div
+            className="absolute left-0 right-0 top-[calc(100%+4px)] z-[100] max-h-48 overflow-auto rounded-[10px] border border-[#dedee1] bg-white shadow-md"
+            role="listbox"
+            aria-label="Medicine catalog matches"
+          >
+            {results.map((row) => (
+              <button
+                key={row._id}
+                type="button"
+                role="option"
+                className="flex w-full flex-col items-start gap-0.5 px-3 py-2.5 text-left hover:bg-grey-light/80 border-b border-[#dedee1] last:border-b-0"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  skipNextEmptyResultHint.current = true;
+                  onSelectCatalogRow(row);
+                  setResults([]);
+                }}
+              >
+                <span className="font-title-4m text-black text-sm">
+                  {row.name}
+                </span>
+                <span className="font-title-5l text-x-70 text-xs">
+                  {row.type} · {row.units}
+                  {row.medicineId ? ` · ${row.medicineId}` : ""}
+                </span>
+              </button>
+            ))}
+            {noMatchHintVisible && results.length === 0 ? (
+              <div className="px-3 py-2.5 font-title-5l text-x-70 text-xs">
+                No catalog match — continuing with &quot;{name.trim()}&quot; as
+                the medicine name.
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export interface NewPrescriptionPayload {
@@ -532,19 +737,17 @@ export const NewPrescriptionModal = ({
 
                   {med.expanded && (
                     <div className="px-4 pb-4 pt-0 border-t border-[#dedee1] space-y-4">
-                      <div className="flex flex-col gap-2">
-                        <label className="font-title-4m text-black text-sm">
-                          Medicine Name<span className="text-red-500">*</span>
-                        </label>
-                        <Input
-                          placeholder="Type name"
-                          value={med.name}
-                          onChange={(e) =>
-                            updateMedicine(med.id, { name: e.target.value })
-                          }
-                          className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r"
-                        />
-                      </div>
+                      <PrescriptionMedicineNameSearch
+                        medicineRowId={med.id}
+                        name={med.name}
+                        expanded={med.expanded}
+                        onNameChange={(value) =>
+                          updateMedicine(med.id, { name: value })
+                        }
+                        onSelectCatalogRow={(row) =>
+                          updateMedicine(med.id, updatesFromCatalogRow(row))
+                        }
+                      />
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-2">

@@ -1,19 +1,17 @@
 import React, { useState } from "react";
 import { AddHospitalModal } from "../../components/modals";
-import { PatientSearchSection } from "../Patients/sections/PatientSearchSection";
+import { useHospital } from "../../contexts/HospitalProvider";
 import { HospitalHeaderSection } from "./sections/HospitalHeaderSection";
 import { HospitalListSection } from "./sections/HospitalListSection";
 
-const TOTAL_HOSPITALS = 20;
-
 export const Hospitals = (): JSX.Element => {
+  const { hospitals, totalHospitalCount } = useHospital();
   const [showAddHospitalModal, setShowAddHospitalModal] = useState(false);
 
   return (
-    <div className="bg-app-background w-full min-h-screen flex flex-col gap-[25px] p-4 md:p-6">
-      <PatientSearchSection />
+    <div className="w-full flex flex-col gap-[25px] p-4 md:p-6">
       <HospitalHeaderSection
-        totalHospitals={TOTAL_HOSPITALS}
+        totalHospitals={totalHospitalCount ?? hospitals.length}
         onAddHospital={() => setShowAddHospitalModal(true)}
       />
       <HospitalListSection />

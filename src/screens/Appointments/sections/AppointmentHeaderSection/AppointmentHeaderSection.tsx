@@ -1,6 +1,7 @@
-import { CalendarIcon, ClockIcon, PlusIcon } from "lucide-react";
+import { Briefcase, CalendarIcon, ClockIcon, PlusIcon } from "lucide-react";
 import { Button } from "../../../../components/ui/button";
 
+/*
 function formatRangeLabel(from: string, to: string): string {
   if (!from.trim() || !to.trim()) return "Date range";
   try {
@@ -18,11 +19,13 @@ function formatRangeLabel(from: string, to: string): string {
     return "Date range";
   }
 }
+*/
 
 export interface AppointmentHeaderSectionProps {
   onAddAppointment: () => void;
   totalAppointments?: number;
   totalPatients?: number;
+  totalDoctors?: number;
   todayCount?: number;
   tomorrowCount?: number;
   fromDate: string;
@@ -34,12 +37,13 @@ export interface AppointmentHeaderSectionProps {
 export const AppointmentHeaderSection = ({
   onAddAppointment,
   totalAppointments = 0,
+  totalDoctors,
   fromDate,
   toDate,
   onFromDateChange,
   onToDateChange,
 }: AppointmentHeaderSectionProps): JSX.Element => {
-  const rangeLabel = formatRangeLabel(fromDate, toDate);
+  // const rangeLabel = formatRangeLabel(fromDate, toDate);
 
   return (
     <header className="flex flex-col lg:flex-row w-full items-start justify-between gap-4">
@@ -72,12 +76,26 @@ export const AppointmentHeaderSection = ({
           </div>
         </div>
 
+        {typeof totalDoctors === "number" && (
+          <div className="inline-flex items-center gap-2.5 px-[15px] py-[6px] bg-white rounded-[50px] h-[36px]">
+            <Briefcase className="w-5 h-5 shrink-0 text-black" aria-hidden />
+            <div className="inline-flex items-center gap-[5px]">
+              <span className="mt-[-1.00px] font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] whitespace-nowrap [font-style:var(--title-3m-font-style)]">
+                {totalDoctors.toLocaleString("en-IN")}
+              </span>
+              <span className="mt-[-0.50px] font-title-4r font-[number:var(--title-4r-font-weight)] text-x-70 text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
+                Total Doctors
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="inline-flex flex-wrap items-center gap-2 sm:gap-[10px] px-[12px] sm:px-[15px] py-[6px] bg-white rounded-[50px] min-h-[36px]">
           <CalendarIcon className="w-5 h-5 shrink-0 text-black" aria-hidden />
 
-          <span className="hidden sm:inline text-[13px] leading-[18px] font-title-4r text-x-70 max-w-[200px] truncate sm:max-w-none">
+          {/* <span className="hidden sm:inline text-[13px] leading-[18px] font-title-4r text-x-70 max-w-[200px] truncate sm:max-w-none">
             {rangeLabel}
-          </span>
+          </span> */}
 
           <div className="inline-flex items-center gap-1.5">
             <label className="sr-only" htmlFor="appointment-filter-from">

@@ -1,6 +1,7 @@
-import { CalendarIcon, ClockIcon, PlusIcon } from "lucide-react";
+import { Briefcase, CalendarIcon, ClockIcon, PlusIcon } from "lucide-react";
 import { Button } from "../../../../components/ui/button";
 
+/*
 function formatRangeLabel(start: string, end: string): string {
   if (!start.trim() || !end.trim()) return "Date range";
   try {
@@ -18,9 +19,12 @@ function formatRangeLabel(start: string, end: string): string {
     return "Date range";
   }
 }
+*/
 
 export interface PrescriptionsHeaderSectionProps {
   onAddPrescription: () => void;
+  totalPrescriptions?: number;
+  totalDoctors?: number;
   startDate: string;
   endDate: string;
   onStartDateChange: (value: string) => void;
@@ -29,12 +33,14 @@ export interface PrescriptionsHeaderSectionProps {
 
 export const PrescriptionsHeaderSection = ({
   onAddPrescription,
+  totalPrescriptions,
+  totalDoctors,
   startDate,
   endDate,
   onStartDateChange,
   onEndDateChange,
 }: PrescriptionsHeaderSectionProps): JSX.Element => {
-  const rangeLabel = formatRangeLabel(startDate, endDate);
+  // const rangeLabel = formatRangeLabel(startDate, endDate);
 
   return (
     <header className="flex flex-col lg:flex-row w-full items-start justify-between gap-4">
@@ -56,6 +62,11 @@ export const PrescriptionsHeaderSection = ({
             <ClockIcon className="w-5 h-5" aria-hidden />
 
             <div className="inline-flex items-center gap-[5px]">
+              <span className="mt-[-1.00px] font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] whitespace-nowrap [font-style:var(--title-3m-font-style)]">
+                {typeof totalPrescriptions === "number"
+                  ? totalPrescriptions.toLocaleString("en-IN")
+                  : "—"}
+              </span>
               <span className="mt-[-0.50px] font-title-4r font-[number:var(--title-4r-font-weight)] text-x-70 text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
                 Total Prescriptions
               </span>
@@ -63,12 +74,26 @@ export const PrescriptionsHeaderSection = ({
           </div>
         </div>
 
+        {typeof totalDoctors === "number" && (
+          <div className="inline-flex items-center gap-2.5 px-[15px] py-[6px] bg-white rounded-[50px] h-[36px]">
+            <Briefcase className="w-5 h-5 shrink-0 text-black" aria-hidden />
+            <div className="inline-flex items-center gap-[5px]">
+              <span className="mt-[-1.00px] font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] whitespace-nowrap [font-style:var(--title-3m-font-style)]">
+                {totalDoctors.toLocaleString("en-IN")}
+              </span>
+              <span className="mt-[-0.50px] font-title-4r font-[number:var(--title-4r-font-weight)] text-x-70 text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
+                Total Doctors
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="inline-flex flex-wrap items-center gap-2 sm:gap-[10px] px-[12px] sm:px-[15px] py-[6px] bg-white rounded-[50px] min-h-[36px]">
           <CalendarIcon className="w-5 h-5 shrink-0 text-black" aria-hidden />
 
-          <span className="hidden sm:inline text-[13px] leading-[18px] font-title-4r text-x-70 max-w-[200px] truncate sm:max-w-none">
+          {/* <span className="hidden sm:inline text-[13px] leading-[18px] font-title-4r text-x-70 max-w-[200px] truncate sm:max-w-none">
             {rangeLabel}
-          </span>
+          </span> */}
 
           <div className="inline-flex items-center gap-1.5">
             <label className="sr-only" htmlFor="prescription-filter-start">
