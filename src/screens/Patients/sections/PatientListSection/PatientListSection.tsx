@@ -5,7 +5,6 @@ import {
   SearchIcon,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { Badge } from "../../../../components/ui/badge";
 import { Button } from "../../../../components/ui/button";
 import {
   DropdownMenu,
@@ -396,10 +395,10 @@ export const PatientListSection = ({
                 Doctor Assigned
               </TableHead>
               <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                Status
+                Appointment Date and Time
               </TableHead>
               <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                Appointment Date and Time
+                Created at
               </TableHead>
               <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
                 Action
@@ -430,7 +429,7 @@ export const PatientListSection = ({
                         {patient.fullName}
                       </span>
                       <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
-                        {patient.age}
+                        Age: {patient.age}
                       </span>
                     </div>
                   </TableCell>
@@ -474,39 +473,6 @@ export const PatientListSection = ({
                     </span>
                   </TableCell>
                   <TableCell className="p-[0px]">
-                    <Badge
-                      className={`${
-                        patient?.appointments?.length &&
-                        patient?.appointments?.length > 0
-                          ? patient?.appointments[0]?.status === "Completed"
-                            ? "bg-[#dffff2] text-[#00955b]"
-                            : patient?.appointments[0]?.status === "Cancelled"
-                              ? "bg-[#ffe9e9] text-[#ff0004]"
-                              : patient?.appointments[0]?.status === "Upcoming"
-                                ? "bg-[#fff1e0] text-[#ff9000]"
-                                : "bg-[#fff1e0] text-[#ff9000]"
-                          : "bg-[#fff1e0] text-[#ff9000]"
-                      } rounded-[100px] px-[10px] py-[5px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] hover:${
-                        patient?.appointments?.length &&
-                        patient?.appointments?.length > 0
-                          ? patient?.appointments[0]?.status === "Completed"
-                            ? "bg-[#dffff2] text-[#00955b]"
-                            : patient?.appointments[0]?.status === "Cancelled"
-                              ? "bg-[#ffe9e9] text-[#ff0004]"
-                              : patient?.appointments[0]?.status === "Upcoming"
-                                ? "bg-[#fff1e0] text-[#ff9000]"
-                                : "bg-[#fff1e0] text-[#ff9000]"
-                          : "bg-[#fff1e0] text-[#ff9000]"
-                      }`}
-                    >
-                      {/* {patient.status || "Upcoming"} */}
-                      {patient?.appointments?.length &&
-                      patient?.appointments?.length > 0
-                        ? patient?.appointments[0]?.status || "Upcoming"
-                        : "Upcoming"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="p-[0px]">
                     <div className="flex flex-col gap-[3px] px-[20px] py-[15px]">
                       <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
                         {patient.appointments?.length &&
@@ -524,6 +490,20 @@ export const PatientListSection = ({
                               patient.appointments[0]?.appointmentDateTime,
                             ) || "No appointment date and time"
                           : "No appointment date and time"}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="p-[0px]">
+                    <div className="flex flex-col gap-[3px] px-[20px] py-[15px]">
+                      <span className="font-title-4l font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
+                        {patient.createdAt
+                          ? new Date(patient.createdAt).toLocaleDateString()
+                          : "—"}
+                      </span>
+                      <span className="font-title-5l font-[number:var(--title-5l-font-weight)] text-x-70 text-[length:var(--title-5l-font-size)] tracking-[var(--title-5l-letter-spacing)] leading-[var(--title-5l-line-height)] [font-style:var(--title-5l-font-style)]">
+                        {patient.createdAt
+                          ? formatTime12h(patient.createdAt)
+                          : "—"}
                       </span>
                     </div>
                   </TableCell>

@@ -15,7 +15,7 @@ const AVAILABILITY_LINE_SEP = "&#x2F;n";
 
 function doctorDataToPayload(doctor: DoctorData): CreateDoctorPayload {
   const timing = `${doctor.morningStart} - ${doctor.morningEnd}${AVAILABILITY_LINE_SEP}${doctor.eveningStart} - ${doctor.eveningEnd}`;
-  return {
+  const payload: CreateDoctorPayload = {
     fullName: doctor.name,
     phoneNumber: `${doctor.countryCode} ${doctor.phone}`.trim(),
     designation: doctor.designation,
@@ -23,6 +23,10 @@ function doctorDataToPayload(doctor: DoctorData): CreateDoctorPayload {
     status: doctor.status,
     email: doctor.email,
   };
+  if (doctor.holidays !== undefined) {
+    payload.holidays = doctor.holidays;
+  }
+  return payload;
 }
 
 export const Doctors = (): JSX.Element => {

@@ -24,44 +24,44 @@ export function AuthSplitLayout({
   const year = new Date().getFullYear();
 
   return (
-    <div className="min-h-screen w-full bg-[var(--app-background)] font-[family-name:var(--title-3l-font-family)]">
-      <div className="flex min-h-screen items-stretch justify-center md:items-center md:p-6 lg:p-8">
-        <div className="flex min-h-screen w-full max-w-[1100px] flex-col overflow-hidden bg-white md:min-h-[min(880px,calc(100vh-3rem))] md:max-h-[calc(100vh-3rem)] md:flex-row md:rounded-3xl md:shadow-[0_8px_40px_-12px_rgba(17,17,28,0.08)]">
+    <div className="min-h-screen min-h-[100dvh] w-full bg-[var(--app-background)] font-[family-name:var(--title-3l-font-family)]">
+      <div className="flex min-h-screen min-h-[100dvh] w-full items-stretch justify-stretch p-0">
+        <div className="flex min-h-screen min-h-[100dvh] w-full flex-1 flex-col overflow-hidden bg-white md:h-screen md:min-h-0 md:flex-row">
           {/* Left half: form */}
-          <section className="flex min-h-0 w-full shrink-0 flex-col justify-between bg-white md:h-auto md:w-1/2 md:min-w-0 md:max-w-[50%]">
-            <div className="flex flex-1 flex-col px-5 py-8 sm:px-8 sm:py-10 md:px-10 md:py-12 lg:px-12">
-              <Link
-                to="/login"
-                className="inline-flex w-fit transition-opacity hover:opacity-80"
-              >
-                <img
-                  src="/Logo-light-bg.svg"
-                  alt="Samvaad AI"
-                  className="h-9 w-auto max-w-[200px] object-contain object-left"
-                />
-              </Link>
+          <section className="flex min-h-0 w-full shrink-0 flex-col justify-between bg-white md:h-full md:w-1/2 md:min-w-0 md:max-w-[50%]">
+            <div className="flex flex-1 flex-col items-center justify-center px-5 py-8 sm:px-8 sm:py-10 md:px-10 md:py-12 lg:px-12">
+              <div className="flex w-full max-w-[400px] flex-col items-center">
+                <Link
+                  to="/login"
+                  className="inline-flex transition-opacity hover:opacity-80"
+                >
+                  <img
+                    src="/Logo-light-bg.svg"
+                    alt="Samvaad AI"
+                    className="h-9 w-auto max-w-[200px] object-contain"
+                  />
+                </Link>
 
-              <div className="mx-auto mt-10 w-full max-w-[400px] md:mx-0 md:mt-12">
-                <h1 className="text-[28px] font-semibold leading-tight tracking-tight text-x-70 sm:text-[32px]">
+                <h1 className="mt-10 text-center text-[28px] font-semibold leading-tight tracking-tight text-x-70 sm:mt-12 sm:text-[32px]">
                   {title}
                 </h1>
-                <p className="mt-2 text-[15px] leading-relaxed text-x-70/85">
+                <p className="mt-2 text-center text-[15px] leading-relaxed text-x-70/85">
                   {subtitle}
                 </p>
-                <div className="mt-8">{children}</div>
+                <div className="mt-8 w-full text-left">{children}</div>
                 {authSwitch ? (
-                  <div className="mt-8 text-center text-sm text-x-70/90 md:text-left">
+                  <div className="mt-8 w-full text-center text-sm text-x-70/90">
                     {authSwitch}
                   </div>
                 ) : null}
               </div>
             </div>
 
-            <footer className="flex w-full flex-col gap-2 border-t border-stroke/80 px-5 py-6 text-xs text-x-70/80 sm:flex-row sm:items-center sm:justify-between sm:px-8 md:px-10 lg:px-12">
+            <footer className="flex w-full flex-col items-center justify-between gap-2 border-t border-stroke/80 px-5 py-6 text-center text-xs text-x-70/80 sm:flex-row sm:gap-6 sm:px-8 md:px-10 lg:px-12">
               <span>Copyright © {year} Samvaad AI</span>
               <button
                 type="button"
-                className="text-left text-primary-2 hover:underline sm:text-right"
+                className="text-primary-2 hover:underline"
                 onClick={(e) => {
                   window.open("https://www.samvaadai.com/privacy", "_blank");
                 }}
@@ -73,7 +73,7 @@ export function AuthSplitLayout({
 
           {/* Right half: hero (no card UI — typography only) */}
           <section
-            className="relative flex min-h-[260px] w-full shrink-0 flex-col justify-center overflow-hidden md:h-auto md:w-1/2 md:min-w-0 md:max-w-[50%] md:min-h-0"
+            className="relative flex min-h-[260px] w-full shrink-0 flex-col justify-center overflow-hidden md:h-full md:w-1/2 md:min-w-0 md:max-w-[50%] md:min-h-0"
             aria-label="Welcome"
           >
             <div
@@ -99,11 +99,11 @@ export function AuthSplitLayout({
               aria-hidden
             />
 
-            <div className="relative z-[1] flex flex-col justify-center px-8 py-10 md:h-full md:px-10 md:py-12 lg:px-12">
-              <h2 className="max-w-lg text-2xl font-semibold leading-tight tracking-tight text-white sm:text-3xl lg:text-[32px] lg:leading-tight">
+            <div className="relative z-[1] flex h-full flex-col items-center justify-center px-8 py-10 text-center md:px-10 md:py-12 lg:px-12">
+              <h2 className="max-w-lg font-semibold leading-tight tracking-tight text-white sm:text-2xl lg:text-[34px] lg:leading-tight">
                 {heroTitle}
               </h2>
-              <p className="mt-4 max-w-md text-[15px] leading-relaxed text-[rgba(255,255,255,0.8)]">
+              <p className="mt-4 max-w-md text-[18px] leading-relaxed text-[rgba(255,255,255,0.8)]">
                 {heroSubtitle}
               </p>
             </div>

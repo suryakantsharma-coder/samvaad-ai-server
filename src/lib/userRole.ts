@@ -15,7 +15,6 @@ export function getHomePathForRole(role: string | undefined | null): string {
   if (isSuperAdminRole(role)) return "/hospitals";
   const k = normalizeRoleKey(role);
   if (k === "admin") return "/hospitals";
-  if (k === "doctor") return "/dashboard";
   if (k === "hospital_admin") return "/dashboard";
   return "/patients";
 }

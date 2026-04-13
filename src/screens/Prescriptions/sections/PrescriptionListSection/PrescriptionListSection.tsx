@@ -24,6 +24,7 @@ import {
 import { ListError } from "../../../../components/ui/list-error";
 import { Pagination } from "../../../../components/ui/pagination";
 import { usePrescription } from "../../../../contexts/PrescriptionProvider";
+import { openPrescriptionReportPdfInNewTab } from "../../../../lib/prescriptionPdf";
 import {
   type PrescriptionDuration,
   Prescription,
@@ -284,7 +285,17 @@ export const PrescriptionListSection = ({
                               <ThreeDotsVerticalIcon className="h-6 w-6" />
                             </Button>
                           </DropdownMenuTrigger>
+
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() =>
+                                void openPrescriptionReportPdfInNewTab(
+                                  prescription,
+                                )
+                              }
+                            >
+                              View prescription
+                            </DropdownMenuItem>
                             {onViewRecord && (
                               <DropdownMenuItem
                                 onClick={() => onViewRecord(prescription)}
@@ -292,6 +303,7 @@ export const PrescriptionListSection = ({
                                 View record
                               </DropdownMenuItem>
                             )}
+
                             <DropdownMenuItem
                               onClick={() => onEditPrescription(prescription)}
                             >

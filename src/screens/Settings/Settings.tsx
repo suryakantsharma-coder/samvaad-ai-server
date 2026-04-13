@@ -27,6 +27,8 @@ import {
   KeyRound,
   EyeIcon,
   EyeOffIcon,
+  CalendarDays,
+  Plus,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthProvider";
 import { useHospital } from "../../contexts/HospitalProvider";
@@ -35,6 +37,7 @@ import { isSuperAdminRole } from "../../lib/userRole";
 import { connectWhatsAppEmbeddedSignup } from "../../lib/whatsappConnect";
 import {
   getHospitalUsers,
+  linkHospitalUserToDoctor,
   updateCurrentUserProfile,
   uploadProfilePicture,
 } from "../../data/auth";
@@ -57,15 +60,81 @@ import {
 } from "../../data/googleCalendar";
 import type { User } from "../../types/auth.type";
 import { API_BASE_URL } from "../../config";
-import {
-  validateSettingsHospitalForm,
-} from "../../lib/hospitalValidation";
+import { validateSettingsHospitalForm } from "../../lib/hospitalValidation";
 import { indianStatesForSelect } from "../../lib/indianStates";
 import {
   loadOrCreateHospitalSettings,
   patchHospitalSettingsMe,
 } from "../../data/hospitalSettings";
 import type { HospitalSettings } from "../../types/hospitalSettings.type";
+import {
+  findDoctorForHospitalUserEmail,
+  updateDoctor,
+} from "../../data/doctor";
+import type { Doctor, DoctorHoliday } from "../../types/doctor.type";
+
+/** Settings personal tab: only on/off are offered; API still uses full doctor status strings. */
+type DoctorSettingsShiftStatus = "On Duty" | "Off Duty";
+
+function normalizeDoctorShiftStatus(
+  raw: string | undefined,
+): DoctorSettingsShiftStatus {
+  const st = String(raw ?? "").trim();
+  if (st === "Off Duty") return "Off Duty";
+  return "On Duty";
+}
+
+type HolidayFormRow = { startDate: string; endDate: string };
+
+function toDateInputValue(iso: string | undefined): string {
+  if (!iso) return "";
+  const s = String(iso).trim();
+  const day = s.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : "";
+}
+
+/** One leave at a time: use the first range from the API if present. */
+function holidaysToSingleDraft(
+  holidays: DoctorHoliday[] | undefined,
+): HolidayFormRow {
+  if (!Array.isArray(holidays) || holidays.length === 0) {
+    return { startDate: "", endDate: "" };
+  }
+  const h = holidays[0];
+  return {
+    startDate: toDateInputValue(h.startDate),
+    endDate: toDateInputValue(h.endDate),
+  };
+}
+
+function draftToHolidayPayload(draft: HolidayFormRow): DoctorHoliday[] {
+  const startDate = draft.startDate.trim();
+  const endDate = draft.endDate.trim();
+  if (!startDate || !endDate) return [];
+  return [{ startDate, endDate }];
+}
+
+function holidayDraftHasBothDates(draft: HolidayFormRow): boolean {
+  return Boolean(draft.startDate.trim() && draft.endDate.trim());
+}
+
+/** Backend-linked doctor id from /me (string id or populated `{ _id }`). */
+function resolveLinkedDoctorId(user: User | null): string | null {
+  if (!user) return null;
+  const u = user as User & {
+    linkedDoctor?: unknown;
+    doctorId?: unknown;
+  };
+  const candidates = [u.doctor, u.linkedDoctor, u.doctorId];
+  for (const raw of candidates) {
+    if (typeof raw === "string" && raw.trim()) return raw.trim();
+    if (raw && typeof raw === "object" && "_id" in (raw as object)) {
+      const id = (raw as { _id: unknown })._id;
+      if (typeof id === "string" && id.trim()) return id.trim();
+    }
+  }
+  return null;
+}
 
 /** Split stored phone (e.g. "+91 9876543210" or "9876543210") for the personal form. */
 function splitPhoneForForm(raw: string | undefined | null): {
@@ -125,8 +194,7 @@ function resolvePersonalAvatarSrc(
   u: User | null | undefined,
 ): string | undefined {
   if (draftPreview) return draftPreview;
-  const raw =
-    u?.profilePicUrl ?? u?.profilePictureUrl ?? u?.profilePicture;
+  const raw = u?.profilePicUrl ?? u?.profilePictureUrl ?? u?.profilePicture;
   return hospitalLogoImageSrc(raw);
 }
 
@@ -140,6 +208,7 @@ export const Settings = (): JSX.Element => {
     updateHospitalById,
   } = useHospital();
   const isHospitalAdmin = user?.role === "hospital_admin";
+  const isDoctorUser = user?.role === "doctor";
   /** Hospital + Integrations & Notifications tab (admin / hospital_admin). */
   const canManageHospitalIntegrations =
     user?.role === "admin" ||
@@ -302,7 +371,9 @@ export const Settings = (): JSX.Element => {
     if (currentHospital) {
       const wa = splitWhatsappDigitsForForm(currentHospital.whatsappNumber);
       const em = splitWhatsappDigitsForForm(currentHospital.emergencyNumber);
-      const rec = splitWhatsappDigitsForForm(currentHospital.receptionistNumber);
+      const rec = splitWhatsappDigitsForForm(
+        currentHospital.receptionistNumber,
+      );
       const reviews = currentHospital.reviewUrls ?? [];
       setFormData((prev) => ({
         ...prev,
@@ -314,9 +385,9 @@ export const Settings = (): JSX.Element => {
         pincode: currentHospital.pincode ?? prev.pincode,
         teleCallerPrice:
           currentHospital.teleCallerPrice != null &&
-          Number.isFinite(currentHospital.teleCallerPrice) ?
-            String(currentHospital.teleCallerPrice)
-          : prev.teleCallerPrice,
+          Number.isFinite(currentHospital.teleCallerPrice)
+            ? String(currentHospital.teleCallerPrice)
+            : prev.teleCallerPrice,
         phoneRouting: currentHospital.phoneNumber ?? prev.phoneRouting,
         phoneRoutingCountryCode:
           currentHospital.phoneCountryCode?.trim() || "+91",
@@ -331,10 +402,7 @@ export const Settings = (): JSX.Element => {
         receptionistPhone: rec.national,
         whatsappCountryCode: "+91",
         whatsappNumber: wa.national,
-        reviewUrls: [
-          reviews[0] ?? "",
-          reviews[1] ?? "",
-        ] as [string, string],
+        reviewUrls: [reviews[0] ?? "", reviews[1] ?? ""] as [string, string],
       }));
     }
   }, [currentHospital]);
@@ -364,6 +432,27 @@ export const Settings = (): JSX.Element => {
   }, [hospitalLogoDraft]);
 
   const [personalSaveLoading, setPersonalSaveLoading] = useState(false);
+  const [myDoctorId, setMyDoctorId] = useState<string | null>(null);
+  const [doctorShiftStatus, setDoctorShiftStatus] =
+    useState<DoctorSettingsShiftStatus>("On Duty");
+  const [doctorProfileLoading, setDoctorProfileLoading] = useState(false);
+  const [doctorStatusSaving, setDoctorStatusSaving] = useState(false);
+  const [linkCandidateDoctor, setLinkCandidateDoctor] = useState<Doctor | null>(
+    null,
+  );
+  const [linkCandidateSearching, setLinkCandidateSearching] = useState(false);
+  const [linkDoctorLoading, setLinkDoctorLoading] = useState(false);
+  /** If GET /me omits `doctor` immediately after link, keep this id for PATCH until profile updates. */
+  const lastLinkedDoctorIdRef = useRef<string | null>(null);
+  const [holidayDraft, setHolidayDraft] = useState<HolidayFormRow>({
+    startDate: "",
+    endDate: "",
+  });
+  /** True once a holiday exists from the API or after a successful save (controls Delete visibility). */
+  const [holidaySaved, setHolidaySaved] = useState(false);
+  /** When false and linked, show "Create holiday" only; when true, show date fields. */
+  const [holidayFormOpen, setHolidayFormOpen] = useState(false);
+  const [holidaySaveLoading, setHolidaySaveLoading] = useState(false);
   const profileAvatarInputRef = useRef<HTMLInputElement>(null);
   const [profilePictureDraft, setProfilePictureDraft] = useState<File | null>(
     null,
@@ -385,6 +474,237 @@ export const Settings = (): JSX.Element => {
     () => resolvePersonalAvatarSrc(draftProfilePicturePreviewUrl, user),
     [draftProfilePicturePreviewUrl, user],
   );
+
+  useEffect(() => {
+    if (activeTab !== "personal" || !isDoctorUser || !user?.email?.trim()) {
+      return;
+    }
+    let cancelled = false;
+    setDoctorProfileLoading(true);
+    const fromProfile = resolveLinkedDoctorId(user);
+    if (fromProfile) {
+      lastLinkedDoctorIdRef.current = null;
+    }
+    const linkedDoctorId =
+      fromProfile ?? lastLinkedDoctorIdRef.current;
+    setMyDoctorId(linkedDoctorId);
+
+    findDoctorForHospitalUserEmail(user.email)
+      .then((d) => {
+        if (cancelled) return;
+        if (linkedDoctorId) {
+          setLinkCandidateDoctor(null);
+        }
+        if (!d) {
+          if (!linkedDoctorId) {
+            setHolidayDraft({ startDate: "", endDate: "" });
+            setHolidaySaved(false);
+            setHolidayFormOpen(false);
+          }
+          return;
+        }
+
+        if (!linkedDoctorId) {
+          setLinkCandidateDoctor(d);
+          setDoctorShiftStatus(
+            normalizeDoctorShiftStatus(d.status),
+          );
+          setHolidayDraft({ startDate: "", endDate: "" });
+          setHolidaySaved(false);
+          setHolidayFormOpen(false);
+          return;
+        }
+
+        if (d._id !== linkedDoctorId) {
+          return;
+        }
+
+        const nextDraft = holidaysToSingleDraft(d.holidays);
+        const hasSaved = holidayDraftHasBothDates(nextDraft);
+        setDoctorShiftStatus(normalizeDoctorShiftStatus(d.status));
+        setHolidayDraft(nextDraft);
+        setHolidaySaved(hasSaved);
+        setHolidayFormOpen(hasSaved);
+      })
+      .finally(() => {
+        if (!cancelled) setDoctorProfileLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, isDoctorUser, user?.email, user?.doctor]);
+
+  useEffect(() => {
+    if (!isDoctorUser || activeTab !== "personal") {
+      setLinkCandidateDoctor(null);
+      setLinkCandidateSearching(false);
+      return;
+    }
+    if (myDoctorId) {
+      setLinkCandidateDoctor(null);
+      setLinkCandidateSearching(false);
+      return;
+    }
+    if (doctorProfileLoading) {
+      setLinkCandidateDoctor(null);
+      setLinkCandidateSearching(false);
+      return;
+    }
+
+    const email = formData.email.trim();
+    if (!email) {
+      setLinkCandidateDoctor(null);
+      setLinkCandidateSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLinkCandidateSearching(true);
+    const tid = window.setTimeout(() => {
+      findDoctorForHospitalUserEmail(email)
+        .then((d) => {
+          if (!cancelled) setLinkCandidateDoctor(d ?? null);
+        })
+        .finally(() => {
+          if (!cancelled) setLinkCandidateSearching(false);
+        });
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(tid);
+      setLinkCandidateSearching(false);
+    };
+  }, [
+    isDoctorUser,
+    activeTab,
+    myDoctorId,
+    doctorProfileLoading,
+    formData.email,
+  ]);
+
+  const handleLinkDoctorProfile = async () => {
+    if (!user?._id || !linkCandidateDoctor) return;
+    const linkedName = linkCandidateDoctor.fullName;
+    const linkedId = linkCandidateDoctor._id;
+    const linkedStatus: DoctorSettingsShiftStatus = normalizeDoctorShiftStatus(
+      linkCandidateDoctor.status,
+    );
+    setLinkDoctorLoading(true);
+    try {
+      await linkHospitalUserToDoctor(user._id, linkedId);
+      lastLinkedDoctorIdRef.current = linkedId;
+      setMyDoctorId(linkedId);
+      setDoctorShiftStatus(linkedStatus);
+      const linkDraft = holidaysToSingleDraft(linkCandidateDoctor.holidays);
+      const linkHas = holidayDraftHasBothDates(linkDraft);
+      setHolidayDraft(linkDraft);
+      setHolidaySaved(linkHas);
+      setHolidayFormOpen(linkHas);
+      setLinkCandidateDoctor(null);
+      await refreshUser();
+      showSuccess(
+        "Profile linked",
+        `Your account is linked to ${linkedName}. You can update your shift status above.`,
+      );
+    } catch (e) {
+      showError(
+        "Could not link",
+        e instanceof Error
+          ? e.message
+          : "Linking failed. Ask a hospital admin.",
+      );
+    } finally {
+      setLinkDoctorLoading(false);
+    }
+  };
+
+  const handleDoctorShiftStatusChange = async (v: string) => {
+    if (!myDoctorId || doctorStatusSaving) return;
+    if (v !== "On Duty" && v !== "Off Duty") return;
+    const next = v as DoctorSettingsShiftStatus;
+    if (next === doctorShiftStatus) return;
+    setDoctorStatusSaving(true);
+    try {
+      await updateDoctor(myDoctorId, { status: next });
+      setDoctorShiftStatus(next);
+      showSuccess(
+        "Status updated",
+        `You are now marked as ${next === "Off Duty" ? "off duty" : "on duty"}.`,
+      );
+    } catch (e) {
+      showError(
+        "Error",
+        e instanceof Error ? e.message : "Could not update your status.",
+      );
+    } finally {
+      setDoctorStatusSaving(false);
+    }
+  };
+
+  const handleSaveHolidays = async () => {
+    if (!myDoctorId || holidaySaveLoading) return;
+    const s = holidayDraft.startDate.trim();
+    const e = holidayDraft.endDate.trim();
+    if ((s && !e) || (!s && e)) {
+      showWarning(
+        "Holiday dates",
+        "Enter both start and end date, or delete the holiday first.",
+      );
+      return;
+    }
+    const complete = draftToHolidayPayload(holidayDraft);
+    if (complete.length === 0) {
+      showWarning(
+        "Holiday dates",
+        "Enter a start and end date to save, or use Delete holiday to clear a saved leave.",
+      );
+      return;
+    }
+    if (complete[0].startDate > complete[0].endDate) {
+      showWarning(
+        "Holiday dates",
+        "Start date must be on or before end date.",
+      );
+      return;
+    }
+    setHolidaySaveLoading(true);
+    try {
+      await updateDoctor(myDoctorId, { holidays: complete });
+      setHolidaySaved(true);
+      setHolidayFormOpen(true);
+      showSuccess("Holiday saved", "Your time away has been updated.");
+    } catch (err) {
+      showError(
+        "Error",
+        err instanceof Error ? err.message : "Could not save holiday.",
+      );
+    } finally {
+      setHolidaySaveLoading(false);
+    }
+  };
+
+  const handleDeleteHoliday = async () => {
+    if (!myDoctorId || holidaySaveLoading) return;
+    setHolidaySaveLoading(true);
+    try {
+      await updateDoctor(myDoctorId, { holidays: [] });
+      setHolidayDraft({ startDate: "", endDate: "" });
+      setHolidaySaved(false);
+      setHolidayFormOpen(false);
+      showSuccess(
+        "Holiday deleted",
+        "You can add a new leave period when you are ready.",
+      );
+    } catch (err) {
+      showError(
+        "Error",
+        err instanceof Error ? err.message : "Could not delete holiday.",
+      );
+    } finally {
+      setHolidaySaveLoading(false);
+    }
+  };
 
   const [hospitalSettings, setHospitalSettings] =
     useState<HospitalSettings | null>(null);
@@ -410,9 +730,9 @@ export const Settings = (): JSX.Element => {
         if (!opts?.quiet) {
           showError(
             "Hospital settings",
-            e instanceof Error ?
-              e.message
-            : "Could not load integrations and notification settings.",
+            e instanceof Error
+              ? e.message
+              : "Could not load integrations and notification settings.",
           );
           setHospitalSettings(null);
         }
@@ -794,14 +1114,13 @@ export const Settings = (): JSX.Element => {
           state: formData.state || undefined,
           pincode: formData.pincode || undefined,
           teleCallerPrice:
-            formData.teleCallerPrice.trim() === "" ?
-              undefined
-            : Number(formData.teleCallerPrice.trim()),
+            formData.teleCallerPrice.trim() === ""
+              ? undefined
+              : Number(formData.teleCallerPrice.trim()),
           emergencyNumber: emergencyDigits || undefined,
           receptionistNumber: receptionistDigits || undefined,
           whatsappNumber: waDigits || undefined,
-          reviewUrls:
-            r0 || r1 ? [r0, r1] : undefined,
+          reviewUrls: r0 || r1 ? [r0, r1] : undefined,
         },
         logo ? { logo } : undefined,
       );
@@ -933,29 +1252,30 @@ export const Settings = (): JSX.Element => {
           activeTab === "auth") && (
           <div className="lg:col-span-3 flex flex-col gap-6">
             {activeTab === "personal" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-                <div className="bg-white rounded-[10px] p-[25px] flex flex-col gap-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-full bg-grey-light flex items-center justify-center overflow-hidden shrink-0 border border-[#dedee1]">
-                      {personalAvatarDisplayUrl ? (
-                        <img
-                          src={personalAvatarDisplayUrl}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="font-title-4m font-semibold text-black text-sm">
-                          {getFirstCharacterAfterSpace(formData.fullName)}
-                        </span>
-                      )}
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                  <div className="bg-white rounded-[10px] p-[25px] flex flex-col gap-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-full bg-grey-light flex items-center justify-center overflow-hidden shrink-0 border border-[#dedee1]">
+                        {personalAvatarDisplayUrl ? (
+                          <img
+                            src={personalAvatarDisplayUrl}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="font-title-4m font-semibold text-black text-sm">
+                            {getFirstCharacterAfterSpace(formData.fullName)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <UserIcon className="w-5 h-5 shrink-0" />
+                        <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
+                          Personal Information
+                        </h3>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <UserIcon className="w-5 h-5 shrink-0" />
-                      <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
-                        Personal Information
-                      </h3>
-                    </div>
-                  </div>
 
                   <div className="flex flex-col gap-[10px] mt-[5px]">
                     <div className="flex flex-col gap-[10px]">
@@ -1009,9 +1329,7 @@ export const Settings = (): JSX.Element => {
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={() =>
-                            profileAvatarInputRef.current?.click()
-                          }
+                          onClick={() => profileAvatarInputRef.current?.click()}
                           className="inline-flex items-center gap-2 px-4 py-2 h-[38px] border border-[#dedee1] rounded-[10px] bg-white hover:bg-grey-light"
                         >
                           <UploadIcon className="w-4 h-4" />
@@ -1101,6 +1419,91 @@ export const Settings = (): JSX.Element => {
                         />
                       </div>
                     </div>
+
+                    {isDoctorUser ? (
+                      <div className="flex flex-col gap-2.5 pt-2 border-t border-[#eeeeef]">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {/* <Circle className="w-4 h-4 shrink-0 text-x-70" /> */}
+                          <span className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                            Doctor status
+                          </span>
+                          {doctorProfileLoading || doctorStatusSaving ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-x-70" />
+                          ) : null}
+                        </div>
+                        <p className="font-title-5l text-x-70 text-sm leading-snug">
+                          Shown on the hospital dashboard schedule. Changes save
+                          immediately.
+                        </p>
+                        {!doctorProfileLoading && !myDoctorId ? (
+                          <div className="flex flex-col gap-3">
+                            {linkCandidateSearching ? (
+                              <p className="font-title-5l text-x-70 text-sm leading-snug flex items-center gap-2">
+                                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                                Looking for a doctor profile with the email in
+                                this form…
+                              </p>
+                            ) : linkCandidateDoctor ? (
+                              <>
+                                <p className="font-title-5l text-emerald-900 text-sm leading-snug">
+                                  A doctor profile matches this email (
+                                  {linkCandidateDoctor.fullName}). Link your
+                                  account to update shift status on the
+                                  schedule.
+                                </p>
+                                <Button
+                                  type="button"
+                                  onClick={() => void handleLinkDoctorProfile()}
+                                  loading={linkDoctorLoading}
+                                  disabled={linkDoctorLoading}
+                                  className="w-fit px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
+                                >
+                                  Link doctor profile
+                                </Button>
+                              </>
+                            ) : (
+                              <p className="font-title-5l text-amber-800 text-sm leading-snug">
+                                No doctor profile matched your login email. Set{" "}
+                                <span className="font-medium">
+                                  Email Address
+                                </span>{" "}
+                                above to the same address as your hospital
+                                doctor record; if a match is found, a{" "}
+                                <span className="font-medium">
+                                  Link doctor profile
+                                </span>{" "}
+                                button will appear here. You can also ask a
+                                hospital admin for help.
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-2 max-w-[320px]">
+                            <Select
+                              value={doctorShiftStatus}
+                              onValueChange={(val) =>
+                                void handleDoctorShiftStatusChange(val)
+                              }
+                              disabled={
+                                doctorProfileLoading ||
+                                doctorStatusSaving ||
+                                !myDoctorId
+                              }
+                            >
+                              <SelectTrigger className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] w-full font-title-4r text-black">
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="On Duty">On duty</SelectItem>
+                                <SelectItem value="Off Duty">
+                                  Off duty
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
 
                     <div className="flex justify-end">
                       <Button
@@ -1219,6 +1622,124 @@ export const Settings = (): JSX.Element => {
                   </div>
                 </div>
               </div>
+
+              {isDoctorUser ? (
+                <div className="bg-white rounded-[10px] p-[25px] flex flex-col gap-5 w-full max-w-3xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-full bg-grey-light flex items-center justify-center shrink-0 border border-[#dedee1]">
+                      <CalendarDays className="w-5 h-5 text-x-70" />
+                    </div>
+                    <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
+                      Holiday
+                    </h3>
+                  </div>
+                  <p className="font-title-5l text-x-70 text-sm leading-relaxed max-w-prose">
+                    One leave period at a time. Saved separately from your
+                    profile (Save above).
+                  </p>
+                  {doctorProfileLoading ? (
+                    <p className="font-title-5l text-x-70 text-sm flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                      Loading your doctor profile…
+                    </p>
+                  ) : !myDoctorId ? (
+                    <p className="font-title-5l text-amber-800 text-sm leading-snug max-w-prose">
+                      Link your doctor profile in Personal Information to save
+                      holidays.
+                    </p>
+                  ) : !holidayFormOpen ? (
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-[10px] border border-dashed border-[#dedee1] bg-[#f9f9fa] p-5">
+                      <p className="font-title-5l text-x-70 text-sm leading-snug max-w-md">
+                        You don&apos;t have a holiday scheduled yet. Create one
+                        to set your leave dates.
+                      </p>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setHolidayDraft({ startDate: "", endDate: "" });
+                          setHolidayFormOpen(true);
+                        }}
+                        disabled={holidaySaveLoading}
+                        leadingIcon={<Plus className="w-4 h-4" />}
+                        className="shrink-0 px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
+                      >
+                        Create holiday
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex flex-col sm:flex-row gap-3 sm:items-end sm:flex-wrap">
+                        <div className="flex flex-col gap-2 flex-1 min-w-[160px]">
+                          <label
+                            htmlFor="settings-holiday-start"
+                            className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)]"
+                          >
+                            Start date
+                          </label>
+                          <Input
+                            id="settings-holiday-start"
+                            type="date"
+                            value={holidayDraft.startDate}
+                            onChange={(e) =>
+                              setHolidayDraft((prev) => ({
+                                ...prev,
+                                startDate: e.target.value,
+                              }))
+                            }
+                            disabled={holidaySaveLoading}
+                            className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-2 flex-1 min-w-[160px]">
+                          <label
+                            htmlFor="settings-holiday-end"
+                            className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)]"
+                          >
+                            End date
+                          </label>
+                          <Input
+                            id="settings-holiday-end"
+                            type="date"
+                            value={holidayDraft.endDate}
+                            onChange={(e) =>
+                              setHolidayDraft((prev) => ({
+                                ...prev,
+                                endDate: e.target.value,
+                              }))
+                            }
+                            disabled={holidaySaveLoading}
+                            className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
+                        {holidaySaved ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => void handleDeleteHoliday()}
+                            loading={holidaySaveLoading}
+                            disabled={holidaySaveLoading}
+                            className="px-6 py-2 border border-[#dedee1] rounded-[10px] h-[44px] text-red-600 hover:bg-red-50 hover:text-red-700"
+                            leadingIcon={<Trash2Icon className="w-4 h-4" />}
+                          >
+                            Delete holiday
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          onClick={() => void handleSaveHolidays()}
+                          loading={holidaySaveLoading}
+                          className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
+                        >
+                          Save holiday
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : null}
+              </>
             )}
 
             {activeTab === "auth" && isHospitalAdmin && (
@@ -1499,9 +2020,7 @@ export const Settings = (): JSX.Element => {
                               <img
                                 src={
                                   draftHospitalLogoPreviewUrl ??
-                                  hospitalLogoImageSrc(
-                                    currentHospital?.logoUrl,
-                                  )
+                                  hospitalLogoImageSrc(currentHospital?.logoUrl)
                                 }
                                 alt=""
                                 className="w-full h-full object-cover"
@@ -1974,11 +2493,11 @@ export const Settings = (): JSX.Element => {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="font-title-4r text-x-70 text-sm whitespace-nowrap max-sm:hidden">
-                    {hospitalSettingsLoading ?
-                      "…"
-                    : hospitalSettings?.whatsapp.isEnabled ?
-                      "Enabled"
-                    : "Disabled"}
+                    {hospitalSettingsLoading
+                      ? "…"
+                      : hospitalSettings?.whatsapp.isEnabled
+                        ? "Enabled"
+                        : "Disabled"}
                   </span>
                   <Switch
                     checked={hospitalSettings?.whatsapp.isEnabled ?? false}
@@ -1996,97 +2515,94 @@ export const Settings = (): JSX.Element => {
                   />
                 </div>
               </div>
-                <p className="font-title-4r font-[number:var(--title-4r-font-weight)] text-x-70 text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
-                  Connect your WhatsApp Business Account to enable automated
-                  patient communication, prescription sharing, and follow-up
-                  reminders.
-                </p>
-                <div className="flex flex-col gap-4">
-                  <div className="flex flex-wrap items-center gap-3">
-                    {whatsappCredsLoading ? (
-                      <p className="font-title-5r font-[number:var(--title-5r-font-weight)] text-x-70 text-[length:var(--title-5r-font-size)] tracking-[var(--title-5r-letter-spacing)] leading-[var(--title-5r-line-height)] [font-style:var(--title-5r-font-style)]">
-                        Checking WhatsApp connection…
-                      </p>
-                    ) : whatsappCredsLinked && whatsappOnboardingComplete ? (
-                      <p className="font-title-4r font-[number:var(--title-4r-font-weight)] text-[#00955C] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
-                        WhatsApp connected — all Graph onboarding steps finished
-                        successfully.
-                      </p>
-                    ) : whatsappCredsLinked ? (
+              <p className="font-title-4r font-[number:var(--title-4r-font-weight)] text-x-70 text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
+                Connect your WhatsApp Business Account to enable automated
+                patient communication, prescription sharing, and follow-up
+                reminders.
+              </p>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  {whatsappCredsLoading ? (
+                    <p className="font-title-5r font-[number:var(--title-5r-font-weight)] text-x-70 text-[length:var(--title-5r-font-size)] tracking-[var(--title-5r-letter-spacing)] leading-[var(--title-5r-line-height)] [font-style:var(--title-5r-font-style)]">
+                      Checking WhatsApp connection…
+                    </p>
+                  ) : whatsappCredsLinked && whatsappOnboardingComplete ? (
+                    <p className="font-title-4r font-[number:var(--title-4r-font-weight)] text-[#00955C] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
+                      WhatsApp connected — all Graph onboarding steps finished
+                      successfully.
+                    </p>
+                  ) : whatsappCredsLinked ? (
+                    <Button
+                      type="button"
+                      onClick={() => void handleWhatsappStartOnboarding()}
+                      loading={whatsappOnboardingRunning}
+                      className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px] w-fit font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] text-white disabled:opacity-60"
+                    >
+                      Start onboarding
+                    </Button>
+                  ) : (
+                    <>
                       <Button
                         type="button"
-                        onClick={() => void handleWhatsappStartOnboarding()}
-                        loading={whatsappOnboardingRunning}
-                        className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px] w-fit font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] text-white disabled:opacity-60"
+                        onClick={handleWhatsAppConnect}
+                        disabled={!hospitalSettings?.whatsapp.isEnabled}
+                        className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px] w-fit font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] text-white"
                       >
-                        Start onboarding
+                        Connect WhatsApp
                       </Button>
-                    ) : (
-                      <>
-                        <Button
-                          type="button"
-                          onClick={handleWhatsAppConnect}
-                          disabled={!hospitalSettings?.whatsapp.isEnabled}
-                          className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px] w-fit font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] text-white"
-                        >
-                          Connect WhatsApp
-                        </Button>
-                        {!hospitalSettings?.whatsapp.isEnabled && (
-                          <p className="font-title-5r font-[number:var(--title-5r-font-weight)] text-x-70 text-[length:var(--title-5r-font-size)] tracking-[var(--title-5r-letter-spacing)] leading-[var(--title-5r-line-height)] [font-style:var(--title-5r-font-style)]">
-                            Turn on the switch above to connect.
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                  {whatsappCredsLinked && !whatsappOnboardingComplete && (
-                    <ol className="flex flex-col gap-2 pl-0 list-none border border-[#dedee1] rounded-[10px] p-4 bg-grey-light/30">
-                      {whatsappOnboardingSteps.map((step) => (
-                        <li
-                          key={step.id}
-                          className="flex items-start gap-3 font-title-5r text-[length:var(--title-5r-font-size)] text-black"
-                        >
-                          <span className="shrink-0 mt-0.5" aria-hidden>
-                            {step.status === "running" && (
-                              <Loader2 className="w-5 h-5 text-primary-2 animate-spin" />
-                            )}
-                            {step.status === "success" && (
-                              <CheckCircle2
-                                className="w-5 h-5 text-[#00955C]"
-                                aria-hidden
-                              />
-                            )}
-                            {step.status === "failed" && (
-                              <XCircle
-                                className="w-5 h-5 text-[#dc2626]"
-                                aria-hidden
-                              />
-                            )}
-                            {step.status === "idle" && (
-                              <Circle
-                                className="w-5 h-5 text-x-70"
-                                aria-hidden
-                              />
-                            )}
-                          </span>
-                          <span className="flex flex-col gap-0.5 min-w-0">
-                            <span>{step.label}</span>
-                            {step.status === "failed" && step.errorMessage && (
-                              <span className="text-[#dc2626] text-xs break-words">
-                                {step.errorMessage}
-                              </span>
-                            )}
-                            {step.httpStatus != null && (
-                              <span className="text-x-70 text-xs">
-                                HTTP {step.httpStatus}
-                              </span>
-                            )}
-                          </span>
-                        </li>
-                      ))}
-                    </ol>
+                      {!hospitalSettings?.whatsapp.isEnabled && (
+                        <p className="font-title-5r font-[number:var(--title-5r-font-weight)] text-x-70 text-[length:var(--title-5r-font-size)] tracking-[var(--title-5r-letter-spacing)] leading-[var(--title-5r-line-height)] [font-style:var(--title-5r-font-style)]">
+                          Turn on the switch above to connect.
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
+                {whatsappCredsLinked && !whatsappOnboardingComplete && (
+                  <ol className="flex flex-col gap-2 pl-0 list-none border border-[#dedee1] rounded-[10px] p-4 bg-grey-light/30">
+                    {whatsappOnboardingSteps.map((step) => (
+                      <li
+                        key={step.id}
+                        className="flex items-start gap-3 font-title-5r text-[length:var(--title-5r-font-size)] text-black"
+                      >
+                        <span className="shrink-0 mt-0.5" aria-hidden>
+                          {step.status === "running" && (
+                            <Loader2 className="w-5 h-5 text-primary-2 animate-spin" />
+                          )}
+                          {step.status === "success" && (
+                            <CheckCircle2
+                              className="w-5 h-5 text-[#00955C]"
+                              aria-hidden
+                            />
+                          )}
+                          {step.status === "failed" && (
+                            <XCircle
+                              className="w-5 h-5 text-[#dc2626]"
+                              aria-hidden
+                            />
+                          )}
+                          {step.status === "idle" && (
+                            <Circle className="w-5 h-5 text-x-70" aria-hidden />
+                          )}
+                        </span>
+                        <span className="flex flex-col gap-0.5 min-w-0">
+                          <span>{step.label}</span>
+                          {step.status === "failed" && step.errorMessage && (
+                            <span className="text-[#dc2626] text-xs break-words">
+                              {step.errorMessage}
+                            </span>
+                          )}
+                          {step.httpStatus != null && (
+                            <span className="text-x-70 text-xs">
+                              HTTP {step.httpStatus}
+                            </span>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
 
               {settingsHospitalId ? (
                 <div className="flex flex-col gap-3 pt-4 mt-1 border-t border-[#dedee1]">
@@ -2176,134 +2692,134 @@ export const Settings = (): JSX.Element => {
             </div>
 
             <div className="bg-white rounded-[10px] p-6 flex flex-col gap-4 border border-[#dedee1] shadow-sm">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Video
-                    className="w-5 h-5 shrink-0 text-primary-2"
-                    aria-hidden
-                  />
-                  <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
-                    Tele-caller Google Meet
-                  </h3>
-                </div>
-                <p className="font-title-4r text-x-70 text-[length:var(--title-4r-font-size)] leading-relaxed">
-                  Connect your hospital&apos;s Google account so tele-caller
-                  flows can create Google Meet links from Calendar. Use{" "}
-                  <span className="font-medium text-black">Check status</span>{" "}
-                  to refresh the connection state after signing in.
-                </p>
-
-                {settingsHospitalId ? (
-                  <div className="flex items-center justify-between gap-4 rounded-[10px] border border-[#dedee1] px-4 py-3 bg-[#f9fafb]">
-                    <div className="min-w-0 pr-2">
-                      <span className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
-                        Tele-caller
-                      </span>
-                      <p className="font-title-5r text-x-70 text-sm mt-0.5 leading-snug">
-                        Enable tele-caller features for this hospital (server
-                        permissions).
-                      </p>
-                    </div>
-                    <Switch
-                      checked={hospitalSettings?.teleCaller.isEnabled ?? false}
-                      disabled={
-                        hospitalSettingsLoading ||
-                        hospitalSettingsSaving ||
-                        !hospitalSettings
-                      }
-                      onCheckedChange={(isEnabled) =>
-                        void patchHospitalIntegrationSettings({
-                          teleCaller: { isEnabled },
-                        })
-                      }
-                      aria-label="Enable tele-caller"
-                    />
-                  </div>
-                ) : null}
-
-                {!settingsHospitalId ? (
-                  <p className="font-title-4r text-x-70">
-                    Link your account to a hospital to manage this integration.
-                  </p>
-                ) : (
-                  <>
-                    {googleMeetCal.loading && !googleMeetCal.error ? (
-                      <p className="font-title-4r text-x-70 inline-flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                        Checking Google Calendar status…
-                      </p>
-                    ) : null}
-                    {googleMeetCal.error ? (
-                      <p className="font-title-4r text-red-600 text-sm">
-                        {googleMeetCal.error}
-                      </p>
-                    ) : null}
-                    {!googleMeetCal.loading &&
-                    googleMeetCal.connected !== null &&
-                    !googleMeetCal.error ? (
-                      <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-[#dedee1] bg-[#f9fafb] px-4 py-3">
-                        {googleMeetCal.connected ? (
-                          <>
-                            <CheckCircle2
-                              className="w-5 h-5 text-[#00955C] shrink-0"
-                              aria-hidden
-                            />
-                            <span className="font-title-4m text-[#00955C]">
-                              Google Calendar connected — Meet setup enabled
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <XCircle
-                              className="w-5 h-5 text-x-70 shrink-0"
-                              aria-hidden
-                            />
-                            <span className="font-title-4m text-x-70">
-                              Not connected — sign in with Google to enable Meet
-                            </span>
-                          </>
-                        )}
-                        {googleMeetCal.detail ? (
-                          <span className="w-full font-title-5r text-x-70 text-sm mt-1">
-                            {googleMeetCal.detail}
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : null}
-
-                    <div className="flex flex-wrap items-center gap-3 pt-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => void refreshGoogleCalendarStatus()}
-                        disabled={!settingsHospitalId}
-                        loading={googleMeetCal.loading}
-                        className="h-[44px] px-5 rounded-[10px] border-[#dedee1] bg-white hover:bg-grey-light font-title-4r"
-                      >
-                        Check status
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={() => void handleGoogleCalendarConnect()}
-                        disabled={
-                          !settingsHospitalId ||
-                          googleMeetCal.connected === true ||
-                          googleMeetCal.loading
-                        }
-                        className="h-[44px] px-6 rounded-[10px] bg-primary-2 hover:bg-primary-2/90 text-white font-title-4r disabled:opacity-60"
-                      >
-                        Connect Google Calendar
-                      </Button>
-                    </div>
-                    {googleMeetCal.connected === true ? (
-                      <p className="font-title-5r text-x-70 text-sm">
-                        Connect is disabled while Calendar is linked. To use a
-                        different account, revoke access in Google Account
-                        settings, then check status and connect again.
-                      </p>
-                    ) : null}
-                  </>
-                )}
+              <div className="flex items-center gap-2 min-w-0">
+                <Video
+                  className="w-5 h-5 shrink-0 text-primary-2"
+                  aria-hidden
+                />
+                <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
+                  Tele-caller Google Meet
+                </h3>
               </div>
+              <p className="font-title-4r text-x-70 text-[length:var(--title-4r-font-size)] leading-relaxed">
+                Connect your hospital&apos;s Google account so tele-caller flows
+                can create Google Meet links from Calendar. Use{" "}
+                <span className="font-medium text-black">Check status</span> to
+                refresh the connection state after signing in.
+              </p>
+
+              {settingsHospitalId ? (
+                <div className="flex items-center justify-between gap-4 rounded-[10px] border border-[#dedee1] px-4 py-3 bg-[#f9fafb]">
+                  <div className="min-w-0 pr-2">
+                    <span className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                      Tele-caller
+                    </span>
+                    <p className="font-title-5r text-x-70 text-sm mt-0.5 leading-snug">
+                      Enable tele-caller features for this hospital (server
+                      permissions).
+                    </p>
+                  </div>
+                  <Switch
+                    checked={hospitalSettings?.teleCaller.isEnabled ?? false}
+                    disabled={
+                      hospitalSettingsLoading ||
+                      hospitalSettingsSaving ||
+                      !hospitalSettings
+                    }
+                    onCheckedChange={(isEnabled) =>
+                      void patchHospitalIntegrationSettings({
+                        teleCaller: { isEnabled },
+                      })
+                    }
+                    aria-label="Enable tele-caller"
+                  />
+                </div>
+              ) : null}
+
+              {!settingsHospitalId ? (
+                <p className="font-title-4r text-x-70">
+                  Link your account to a hospital to manage this integration.
+                </p>
+              ) : (
+                <>
+                  {googleMeetCal.loading && !googleMeetCal.error ? (
+                    <p className="font-title-4r text-x-70 inline-flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                      Checking Google Calendar status…
+                    </p>
+                  ) : null}
+                  {googleMeetCal.error ? (
+                    <p className="font-title-4r text-red-600 text-sm">
+                      {googleMeetCal.error}
+                    </p>
+                  ) : null}
+                  {!googleMeetCal.loading &&
+                  googleMeetCal.connected !== null &&
+                  !googleMeetCal.error ? (
+                    <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-[#dedee1] bg-[#f9fafb] px-4 py-3">
+                      {googleMeetCal.connected ? (
+                        <>
+                          <CheckCircle2
+                            className="w-5 h-5 text-[#00955C] shrink-0"
+                            aria-hidden
+                          />
+                          <span className="font-title-4m text-[#00955C]">
+                            Google Calendar connected — Meet setup enabled
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle
+                            className="w-5 h-5 text-x-70 shrink-0"
+                            aria-hidden
+                          />
+                          <span className="font-title-4m text-x-70">
+                            Not connected — sign in with Google to enable Meet
+                          </span>
+                        </>
+                      )}
+                      {googleMeetCal.detail ? (
+                        <span className="w-full font-title-5r text-x-70 text-sm mt-1">
+                          {googleMeetCal.detail}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void refreshGoogleCalendarStatus()}
+                      disabled={!settingsHospitalId}
+                      loading={googleMeetCal.loading}
+                      className="h-[44px] px-5 rounded-[10px] border-[#dedee1] bg-white hover:bg-grey-light font-title-4r"
+                    >
+                      Check status
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => void handleGoogleCalendarConnect()}
+                      disabled={
+                        !settingsHospitalId ||
+                        googleMeetCal.connected === true ||
+                        googleMeetCal.loading
+                      }
+                      className="h-[44px] px-6 rounded-[10px] bg-primary-2 hover:bg-primary-2/90 text-white font-title-4r disabled:opacity-60"
+                    >
+                      Connect Google Calendar
+                    </Button>
+                  </div>
+                  {googleMeetCal.connected === true ? (
+                    <p className="font-title-5r text-x-70 text-sm">
+                      Connect is disabled while Calendar is linked. To use a
+                      different account, revoke access in Google Account
+                      settings, then check status and connect again.
+                    </p>
+                  ) : null}
+                </>
+              )}
+            </div>
           </div>
         )}
 

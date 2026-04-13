@@ -1,3 +1,9 @@
+/** One holiday range. API/JSON uses ISO date strings; server may store as Date. */
+export type DoctorHoliday = {
+  startDate: string;
+  endDate: string;
+};
+
 export type CreateDoctorPayload = {
   fullName: string;
   phoneNumber: string;
@@ -5,6 +11,7 @@ export type CreateDoctorPayload = {
   designation: string;
   availability: string;
   status: "Off Duty" | "On Duty" | "On Break" | "On Leave";
+  holidays?: DoctorHoliday[];
 };
 
 /** PATCH body — all fields optional. */
@@ -21,6 +28,7 @@ export type Doctor = {
   status: string;
   utilization: number;
   profileImage: string;
+  holidays?: DoctorHoliday[];
   createdAt: string;
   updatedAt: string;
   __v: number;

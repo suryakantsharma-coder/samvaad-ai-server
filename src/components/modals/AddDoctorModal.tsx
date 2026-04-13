@@ -1,6 +1,6 @@
 import { BriefcaseIcon, CircleCheck, MailIcon, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import type { Doctor } from "../../types/doctor.type";
+import type { Doctor, DoctorHoliday } from "../../types/doctor.type";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
@@ -46,6 +46,7 @@ export interface DoctorData {
   eveningStart: string;
   eveningEnd: string;
   status: "Off Duty" | "On Duty" | "On Break" | "On Leave";
+  holidays?: DoctorHoliday[];
 }
 
 const DEFAULT_FORM: DoctorData = {
@@ -127,6 +128,7 @@ function doctorToFormData(d: Doctor): DoctorData {
     designation: d.designation,
     ...times,
     status,
+    holidays: Array.isArray(d.holidays) ? d.holidays : undefined,
   };
 }
 

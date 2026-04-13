@@ -4,6 +4,11 @@ export type User = {
   email: string;
   name: string;
   role: string;
+  /**
+   * Mongo id of the linked hospital doctor record (GET/PATCH /api/auth/me).
+   * When missing, the doctor user should use “Link doctor profile” in Settings.
+   */
+  doctor?: string | null;
   /** National or E.164-style number from API (GET/PATCH /api/auth/me). */
   phoneNumber?: string;
   /** Some responses may use `phone` instead of `phoneNumber`. */

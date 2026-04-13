@@ -267,3 +267,24 @@ export const updateUserRoleByHospitalId = async (
     body: { role, hospitalId } as object,
   });
 };
+
+/** POST /api/admin/users/:userId/link-doctor — associate a hospital user with a doctor record. */
+export const linkHospitalUserToDoctor = async (
+  userId: string,
+  doctorId: string,
+) => {
+  const data = (await authFetch(`/api/admin/users/${userId}/link-doctor`, {
+    method: "POST",
+    body: { doctorId } as object,
+  })) as {
+    success?: boolean;
+    message?: string;
+    error?: string;
+  };
+  if (data.success === false) {
+    throw new Error(
+      String(data.message ?? data.error ?? "Failed to link doctor profile"),
+    );
+  }
+  return data;
+};

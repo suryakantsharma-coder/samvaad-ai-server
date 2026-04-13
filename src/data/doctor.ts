@@ -1,8 +1,19 @@
 import {
   CreateDoctorPayload,
   UpdateDoctorPayload,
+  Doctor,
 } from "../types/doctor.type";
 import { authFetch } from "./api";
+
+function doctorsFromListResponse(response: unknown): Doctor[] {
+  const root = response as Record<string, unknown> | undefined;
+  const data =
+    root && typeof root.data === "object" && root.data !== null
+      ? (root.data as Record<string, unknown>)
+      : {};
+  const arr = data.doctors;
+  return Array.isArray(arr) ? (arr as Doctor[]) : [];
+}
 
 export const addDoctor = async (doctor: CreateDoctorPayload) => {
   return authFetch("/api/doctors", {
@@ -87,3 +98,33 @@ export const searchDoctors = async (q: string, page: number, limit: number) => {
     method: "GET",
   });
 };
+
+/**
+ * Resolves the hospital `Doctor` row for a logged-in staff user (match by email).
+ * Tries search first, then a single page with a high limit.
+ */
+export async function findDoctorForHospitalUserEmail(
+  email: string,
+): Promise<Doctor | null> {
+  const want = email.trim().toLowerCase();
+  if (!want) return null;
+
+  const matchIn = (list: Doctor[]) =>
+    list.find((d) => String(d.email ?? "").trim().toLowerCase() === want) ??
+    null;
+
+  try {
+    const searchRes = await searchDoctors(want, 1, 50);
+    const fromSearch = matchIn(doctorsFromListResponse(searchRes));
+    if (fromSearch) return fromSearch;
+  } catch {
+    /* continue */
+  }
+
+  try {
+    const listRes = await getDoctors(1, 200);
+    return matchIn(doctorsFromListResponse(listRes));
+  } catch {
+    return null;
+  }
+}
