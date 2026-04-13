@@ -11,6 +11,15 @@ function getString(v: unknown): string | undefined {
   return typeof v === "string" && v.trim() ? v.trim() : undefined;
 }
 
+function parseNonNegativeNumber(v: unknown): number | undefined {
+  if (typeof v === "number" && Number.isFinite(v) && v >= 0) return v;
+  if (typeof v === "string" && v.trim()) {
+    const n = Number(v.trim());
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return undefined;
+}
+
 function parsePatient(node: unknown): PublicTelecallerPayload["patient"] | null {
   const p = asDict(node);
   if (!p) return null;
@@ -39,6 +48,7 @@ function parseHospital(node: unknown): PublicTelecallerPayload["hospital"] {
   const _id = getString(h._id) ?? getString(h.id);
   const name = getString(h.name);
   if (!_id || !name) return undefined;
+  const teleCallerPrice = parseNonNegativeNumber(h.teleCallerPrice);
   return {
     _id,
     name,
@@ -48,6 +58,7 @@ function parseHospital(node: unknown): PublicTelecallerPayload["hospital"] {
     address: getString(h.address),
     city: getString(h.city),
     pincode: getString(h.pincode),
+    ...(teleCallerPrice != null ? { teleCallerPrice } : {}),
   };
 }
 
@@ -239,9 +250,18 @@ export async function fetchPublicTelecallerDetails(
       }
     }
     const hospitalId = getString(data.hospitalId) ?? hospital?._id;
+    const priceFromRoot = parseNonNegativeNumber(data.teleCallerPrice);
+    let hospitalOut = hospital;
+    if (
+      hospitalOut &&
+      hospitalOut.teleCallerPrice == null &&
+      priceFromRoot != null
+    ) {
+      hospitalOut = { ...hospitalOut, teleCallerPrice: priceFromRoot };
+    }
     return {
       patient,
-      hospital,
+      hospital: hospitalOut,
       appointmentId,
       hospitalId,
       lastAppointment,

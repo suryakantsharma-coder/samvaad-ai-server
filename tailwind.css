@@ -28,6 +28,18 @@
   --title-3m-font-weight: 500;
   --title-3m-letter-spacing: 0px;
   --title-3m-line-height: 20px;
+  --title-3r-font-family: "Archivo", Helvetica;
+  --title-3r-font-size: 16px;
+  --title-3r-font-style: normal;
+  --title-3r-font-weight: 400;
+  --title-3r-letter-spacing: 0px;
+  --title-3r-line-height: 20px;
+  --title-1-font-family: "Archivo", Helvetica;
+  --title-1-font-size: 28px;
+  --title-1-font-style: normal;
+  --title-1-font-weight: 500;
+  --title-1-letter-spacing: 0px;
+  --title-1-line-height: 32px;
   --title-4m-font-family: "Archivo", Helvetica;
   --title-4m-font-size: 14px;
   --title-4m-font-style: normal;

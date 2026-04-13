@@ -36,13 +36,16 @@ export interface Hospital {
   registrationNumber: string;
   address: string;
   city: string;
+  state?: string;
   pincode: string;
   url: string;
   logoUrl?: string;
   emergencyNumber?: string;
   receptionistNumber?: string;
   whatsappNumber?: string;
-   reviewUrls?: string[];
+  /** Price in account currency (e.g. INR) for tele-caller service. */
+  teleCallerPrice?: number;
+  reviewUrls?: string[];
   /** When false, hospital is deactivated (super admin list/filter). */
   isActive?: boolean;
   createdAt: string;
@@ -53,18 +56,21 @@ export interface Hospital {
 /** POST /api/hospitals — all fields required by the API. */
 export interface CreateHospitalPayload {
   name: string;
+  phoneCountryCode: string;
   phoneNumber: string;
   email: string;
   contactPerson: string;
   registrationNumber: string;
   address: string;
   city: string;
+  state: string;
   pincode: string;
   url: string;
   emergencyNumber: string;
   receptionistNumber: string;
   whatsappNumber: string;
   reviewUrls: string[];
+  teleCallerPrice: number;
   /** Optional: logo filename or URL after upload. */
   logoUrl?: string;
 }
@@ -79,11 +85,13 @@ export interface UpdateHospitalPayload {
   registrationNumber?: string;
   address?: string;
   city?: string;
+  state?: string;
   pincode?: string;
   url?: string;
   emergencyNumber?: string;
   receptionistNumber?: string;
   whatsappNumber?: string;
   reviewUrls?: string[];
+  teleCallerPrice?: number;
   isActive?: boolean;
 }

@@ -60,22 +60,12 @@ import { API_BASE_URL } from "../../config";
 import {
   validateSettingsHospitalForm,
 } from "../../lib/hospitalValidation";
-
-/** Per-hospital WhatsApp notification toggles (localStorage until API exists). */
-const WHATSAPP_NOTIFICATION_PREFS_PREFIX = "samvaad-whatsapp-notification-prefs:";
-const LEGACY_REMINDER_PREFS_PREFIX = "samvaad-reminder-prefs:";
-
-type ReminderPrefsState = {
-  appointmentReminder: boolean;
-  prescriptionReminder: boolean;
-  medicineReminder: boolean;
-};
-
-const defaultReminderPrefs = (): ReminderPrefsState => ({
-  appointmentReminder: true,
-  prescriptionReminder: true,
-  medicineReminder: true,
-});
+import { indianStatesForSelect } from "../../lib/indianStates";
+import {
+  loadOrCreateHospitalSettings,
+  patchHospitalSettingsMe,
+} from "../../data/hospitalSettings";
+import type { HospitalSettings } from "../../types/hospitalSettings.type";
 
 /** Split stored phone (e.g. "+91 9876543210" or "9876543210") for the personal form. */
 function splitPhoneForForm(raw: string | undefined | null): {
@@ -263,7 +253,9 @@ export const Settings = (): JSX.Element => {
     address: "",
     hospitalId: "",
     city: "",
+    state: "",
     pincode: "",
+    teleCallerPrice: "",
     workingHours: "8:00 AM - 9:00 PM",
     phoneRouting: "",
     phoneRoutingCountryCode: "+91",
@@ -318,9 +310,16 @@ export const Settings = (): JSX.Element => {
         address: currentHospital.address ?? prev.address,
         hospitalId: currentHospital._id ?? prev.hospitalId,
         city: currentHospital.city ?? prev.city,
+        state: currentHospital.state ?? prev.state,
         pincode: currentHospital.pincode ?? prev.pincode,
+        teleCallerPrice:
+          currentHospital.teleCallerPrice != null &&
+          Number.isFinite(currentHospital.teleCallerPrice) ?
+            String(currentHospital.teleCallerPrice)
+          : prev.teleCallerPrice,
         phoneRouting: currentHospital.phoneNumber ?? prev.phoneRouting,
-        phoneRoutingCountryCode: "+91",
+        phoneRoutingCountryCode:
+          currentHospital.phoneCountryCode?.trim() || "+91",
         officialEmail: currentHospital.email ?? prev.officialEmail,
         contactPerson: currentHospital.contactPerson ?? prev.contactPerson,
         registrationNumber:
@@ -339,6 +338,11 @@ export const Settings = (): JSX.Element => {
       }));
     }
   }, [currentHospital]);
+
+  const hospitalStateSelectOptions = useMemo(
+    () => indianStatesForSelect(formData.state),
+    [formData.state],
+  );
 
   const [hospitalSaveLoading, setHospitalSaveLoading] = useState(false);
   const [hospitalSaveError, setHospitalSaveError] = useState<string | null>(
@@ -382,66 +386,67 @@ export const Settings = (): JSX.Element => {
     [draftProfilePicturePreviewUrl, user],
   );
 
-  const [integrations, setIntegrations] = useState({
-    whatsapp: true,
-  });
+  const [hospitalSettings, setHospitalSettings] =
+    useState<HospitalSettings | null>(null);
+  const [hospitalSettingsLoading, setHospitalSettingsLoading] = useState(false);
+  const [hospitalSettingsSaving, setHospitalSettingsSaving] = useState(false);
 
   const settingsHospitalId = useMemo(
     () => (typeof user?.hospital === "string" ? user.hospital.trim() : ""),
     [user?.hospital],
   );
 
-  const [reminderPrefs, setReminderPrefs] = useState<ReminderPrefsState>(
-    defaultReminderPrefs,
-  );
-
-  useEffect(() => {
-    if (!settingsHospitalId) {
-      setReminderPrefs(defaultReminderPrefs());
-      return;
-    }
-    try {
-      const keyNew = `${WHATSAPP_NOTIFICATION_PREFS_PREFIX}${settingsHospitalId}`;
-      const keyLegacy = `${LEGACY_REMINDER_PREFS_PREFIX}${settingsHospitalId}`;
-      const raw =
-        localStorage.getItem(keyNew) ?? localStorage.getItem(keyLegacy);
-      if (raw) {
-        const p = JSON.parse(raw) as Partial<ReminderPrefsState>;
-        setReminderPrefs({
-          appointmentReminder: p.appointmentReminder !== false,
-          prescriptionReminder: p.prescriptionReminder !== false,
-          medicineReminder: p.medicineReminder !== false,
-        });
-        if (!localStorage.getItem(keyNew) && localStorage.getItem(keyLegacy)) {
-          localStorage.setItem(keyNew, raw);
-        }
-      } else {
-        setReminderPrefs(defaultReminderPrefs());
+  const refreshHospitalSettings = useCallback(
+    async (opts?: { quiet?: boolean }) => {
+      if (!settingsHospitalId) {
+        setHospitalSettings(null);
+        return;
       }
-    } catch {
-      setReminderPrefs(defaultReminderPrefs());
-    }
-  }, [settingsHospitalId]);
-
-  const patchReminderPrefs = useCallback(
-    (partial: Partial<ReminderPrefsState>) => {
-      setReminderPrefs((prev) => {
-        const next = { ...prev, ...partial };
-        if (settingsHospitalId) {
-          try {
-            localStorage.setItem(
-              `${WHATSAPP_NOTIFICATION_PREFS_PREFIX}${settingsHospitalId}`,
-              JSON.stringify(next),
-            );
-          } catch {
-            /* ignore quota / private mode */
-          }
+      if (!opts?.quiet) setHospitalSettingsLoading(true);
+      try {
+        const s = await loadOrCreateHospitalSettings();
+        setHospitalSettings(s);
+      } catch (e) {
+        if (!opts?.quiet) {
+          showError(
+            "Hospital settings",
+            e instanceof Error ?
+              e.message
+            : "Could not load integrations and notification settings.",
+          );
+          setHospitalSettings(null);
         }
-        return next;
-      });
+      } finally {
+        if (!opts?.quiet) setHospitalSettingsLoading(false);
+      }
     },
     [settingsHospitalId],
   );
+
+  const patchHospitalIntegrationSettings = useCallback(
+    async (patch: Parameters<typeof patchHospitalSettingsMe>[0]) => {
+      if (!settingsHospitalId) return;
+      setHospitalSettingsSaving(true);
+      try {
+        await patchHospitalSettingsMe(patch);
+        await refreshHospitalSettings({ quiet: true });
+      } catch (e) {
+        showError(
+          "Hospital settings",
+          e instanceof Error ? e.message : "Could not update settings.",
+        );
+        await refreshHospitalSettings({ quiet: true });
+      } finally {
+        setHospitalSettingsSaving(false);
+      }
+    },
+    [settingsHospitalId, refreshHospitalSettings],
+  );
+
+  useEffect(() => {
+    if (activeTab !== "integrations" || !settingsHospitalId) return;
+    void refreshHospitalSettings();
+  }, [activeTab, settingsHospitalId, refreshHospitalSettings]);
 
   const [whatsappCredsLinked, setWhatsappCredsLinked] = useState(false);
   const [whatsappCredsLoading, setWhatsappCredsLoading] = useState(false);
@@ -580,7 +585,7 @@ export const Settings = (): JSX.Element => {
   }, [settingsHospitalId]);
 
   const handleWhatsAppConnect = () => {
-    if (!integrations.whatsapp) return;
+    if (!hospitalSettings?.whatsapp.isEnabled) return;
     const result = connectWhatsAppEmbeddedSignup(
       typeof user?.hospital === "string" ? user.hospital : undefined,
     );
@@ -786,7 +791,12 @@ export const Settings = (): JSX.Element => {
           url: formData.hospitalUrl || undefined,
           address: formData.address || undefined,
           city: formData.city || undefined,
+          state: formData.state || undefined,
           pincode: formData.pincode || undefined,
+          teleCallerPrice:
+            formData.teleCallerPrice.trim() === "" ?
+              undefined
+            : Number(formData.teleCallerPrice.trim()),
           emergencyNumber: emergencyDigits || undefined,
           receptionistNumber: receptionistDigits || undefined,
           whatsappNumber: waDigits || undefined,
@@ -1639,12 +1649,35 @@ export const Settings = (): JSX.Element => {
                             onChange={(e) =>
                               setFormData({ ...formData, city: e.target.value })
                             }
+                            placeholder="e.g. Mumbai"
                             className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
                           />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            State
+                          </label>
+                          <Select
+                            value={formData.state || undefined}
+                            onValueChange={(v) =>
+                              setFormData({ ...formData, state: v })
+                            }
+                          >
+                            <SelectTrigger className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]">
+                              <SelectValue placeholder="Select state" />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-[min(280px,50vh)]">
+                              {hospitalStateSelectOptions.map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  {s}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <div className="flex flex-col gap-2">
                           <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
                             Pincode
@@ -1660,7 +1693,26 @@ export const Settings = (): JSX.Element => {
                             className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
                           />
                         </div>
+                      </div>
 
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Tele caller price
+                          </label>
+                          <Input
+                            inputMode="decimal"
+                            value={formData.teleCallerPrice}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                teleCallerPrice: e.target.value,
+                              })
+                            }
+                            placeholder="499"
+                            className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                          />
+                        </div>
                         <div className="flex flex-col gap-[15px]">
                           <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
                             Working Hours
@@ -1922,12 +1974,23 @@ export const Settings = (): JSX.Element => {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="font-title-4r text-x-70 text-sm whitespace-nowrap max-sm:hidden">
-                    {integrations.whatsapp ? "Enabled" : "Disabled"}
+                    {hospitalSettingsLoading ?
+                      "…"
+                    : hospitalSettings?.whatsapp.isEnabled ?
+                      "Enabled"
+                    : "Disabled"}
                   </span>
                   <Switch
-                    checked={integrations.whatsapp}
-                    onCheckedChange={(whatsapp) =>
-                      setIntegrations((prev) => ({ ...prev, whatsapp }))
+                    checked={hospitalSettings?.whatsapp.isEnabled ?? false}
+                    disabled={
+                      hospitalSettingsLoading ||
+                      hospitalSettingsSaving ||
+                      !settingsHospitalId
+                    }
+                    onCheckedChange={(isEnabled) =>
+                      void patchHospitalIntegrationSettings({
+                        whatsapp: { isEnabled },
+                      })
                     }
                     aria-label="Enable WhatsApp integration"
                   />
@@ -1963,12 +2026,12 @@ export const Settings = (): JSX.Element => {
                         <Button
                           type="button"
                           onClick={handleWhatsAppConnect}
-                          disabled={!integrations.whatsapp}
+                          disabled={!hospitalSettings?.whatsapp.isEnabled}
                           className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px] w-fit font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] text-white"
                         >
                           Connect WhatsApp
                         </Button>
-                        {!integrations.whatsapp && (
+                        {!hospitalSettings?.whatsapp.isEnabled && (
                           <p className="font-title-5r font-[number:var(--title-5r-font-weight)] text-x-70 text-[length:var(--title-5r-font-size)] tracking-[var(--title-5r-letter-spacing)] leading-[var(--title-5r-line-height)] [font-style:var(--title-5r-font-style)]">
                             Turn on the switch above to connect.
                           </p>
@@ -2037,7 +2100,7 @@ export const Settings = (): JSX.Element => {
                       integration above is enabled.
                     </p>
                   </div>
-                  {!integrations.whatsapp ? (
+                  {!hospitalSettings?.whatsapp.isEnabled ? (
                     <p className="font-title-5r text-x-70 text-sm">
                       Turn on WhatsApp integration above before messages can be
                       delivered.
@@ -2049,9 +2112,18 @@ export const Settings = (): JSX.Element => {
                         Send appointment reminder
                       </span>
                       <Switch
-                        checked={reminderPrefs.appointmentReminder}
-                        onCheckedChange={(appointmentReminder) =>
-                          patchReminderPrefs({ appointmentReminder })
+                        checked={
+                          hospitalSettings?.whatsapp.appointment ?? false
+                        }
+                        disabled={
+                          hospitalSettingsLoading ||
+                          hospitalSettingsSaving ||
+                          !hospitalSettings
+                        }
+                        onCheckedChange={(appointment) =>
+                          void patchHospitalIntegrationSettings({
+                            whatsapp: { appointment },
+                          })
                         }
                         aria-label="WhatsApp: send appointment reminder"
                       />
@@ -2061,9 +2133,18 @@ export const Settings = (): JSX.Element => {
                         Send prescription reminder
                       </span>
                       <Switch
-                        checked={reminderPrefs.prescriptionReminder}
-                        onCheckedChange={(prescriptionReminder) =>
-                          patchReminderPrefs({ prescriptionReminder })
+                        checked={
+                          hospitalSettings?.whatsapp.prescription ?? false
+                        }
+                        disabled={
+                          hospitalSettingsLoading ||
+                          hospitalSettingsSaving ||
+                          !hospitalSettings
+                        }
+                        onCheckedChange={(prescription) =>
+                          void patchHospitalIntegrationSettings({
+                            whatsapp: { prescription },
+                          })
                         }
                         aria-label="WhatsApp: send prescription reminder"
                       />
@@ -2073,9 +2154,18 @@ export const Settings = (): JSX.Element => {
                         Send reminders to take medicine
                       </span>
                       <Switch
-                        checked={reminderPrefs.medicineReminder}
-                        onCheckedChange={(medicineReminder) =>
-                          patchReminderPrefs({ medicineReminder })
+                        checked={
+                          hospitalSettings?.whatsapp.medicinesReminder ?? false
+                        }
+                        disabled={
+                          hospitalSettingsLoading ||
+                          hospitalSettingsSaving ||
+                          !hospitalSettings
+                        }
+                        onCheckedChange={(medicinesReminder) =>
+                          void patchHospitalIntegrationSettings({
+                            whatsapp: { medicinesReminder },
+                          })
                         }
                         aria-label="WhatsApp: send reminders to take medicine"
                       />
@@ -2101,6 +2191,34 @@ export const Settings = (): JSX.Element => {
                   <span className="font-medium text-black">Check status</span>{" "}
                   to refresh the connection state after signing in.
                 </p>
+
+                {settingsHospitalId ? (
+                  <div className="flex items-center justify-between gap-4 rounded-[10px] border border-[#dedee1] px-4 py-3 bg-[#f9fafb]">
+                    <div className="min-w-0 pr-2">
+                      <span className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                        Tele-caller
+                      </span>
+                      <p className="font-title-5r text-x-70 text-sm mt-0.5 leading-snug">
+                        Enable tele-caller features for this hospital (server
+                        permissions).
+                      </p>
+                    </div>
+                    <Switch
+                      checked={hospitalSettings?.teleCaller.isEnabled ?? false}
+                      disabled={
+                        hospitalSettingsLoading ||
+                        hospitalSettingsSaving ||
+                        !hospitalSettings
+                      }
+                      onCheckedChange={(isEnabled) =>
+                        void patchHospitalIntegrationSettings({
+                          teleCaller: { isEnabled },
+                        })
+                      }
+                      aria-label="Enable tele-caller"
+                    />
+                  </div>
+                ) : null}
 
                 {!settingsHospitalId ? (
                   <p className="font-title-4r text-x-70">

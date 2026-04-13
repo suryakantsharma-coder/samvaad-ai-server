@@ -14,6 +14,7 @@ import {
   ChevronDownIcon,
   LogOutIcon,
   SettingsIcon,
+  Stethoscope,
 } from "lucide-react";
 import type { User } from "../../types/auth.type";
 import { API_BASE_URL } from "../../config";
@@ -22,19 +23,33 @@ import { isSuperAdminRole } from "../../lib/userRole";
 type NavItem = {
   id: string;
   label: string;
+  /** Image path under `/public` when `iconMode` is `asset` (default). */
   icon: string;
   path: string;
+  /** Dashboard uses an inline doctor (stethoscope) SVG instead of `icon`. */
+  iconMode?: "asset" | "doctor" | "doctors";
 };
 
 const DEFAULT_NAV_ITEMS: NavItem[] = [
-  { id: "dashboard", label: "Dashboard", icon: "/home.svg", path: "/" },
+  // {
+  //   id: "dashboard",
+  //   label: "Dashboard",
+  //   icon: "/home.svg",
+  //   path: "/dashboard",
+  // },
   {
     id: "hospitals",
     label: "Hospitals",
     icon: "/building.svg",
     path: "/hospitals",
   },
-  { id: "doctors", label: "Doctors", icon: "/pill.svg", path: "/doctors" },
+  {
+    id: "doctors",
+    label: "Doctors",
+    icon: "/pill.svg",
+    path: "/doctors",
+    iconMode: "doctors",
+  },
   {
     id: "medicines",
     label: "Medicines",
@@ -48,7 +63,12 @@ function navigationItemsForUser(user: User | null): NavItem[] {
   if (!user) return [];
   if (isSuperAdminRole(user.role)) {
     return [
-      { id: "dashboard", label: "Dashboard", icon: "/home.svg", path: "/" },
+      {
+        id: "dashboard",
+        label: "Dashboard",
+        icon: "/home.svg",
+        path: "/dashboard",
+      },
       {
         id: "hospitals",
         label: "Hospitals",
@@ -72,7 +92,7 @@ function navigationItemsForUser(user: User | null): NavItem[] {
   }
   if (user.role === "doctor") {
     return [
-      { id: "dashboard", label: "Dashboard", icon: "/home.svg", path: "/" },
+      // { id: "dashboard", label: "Dashboard", icon: "/home.svg", path: "/dashboard" },
       {
         id: "patients",
         label: "Patients",
@@ -111,7 +131,12 @@ function navigationItemsForUser(user: User | null): NavItem[] {
   }
   if (user.role === "hospital_admin") {
     return [
-      { id: "dashboard", label: "Dashboard", icon: "/home.svg", path: "/" },
+      {
+        id: "dashboard",
+        label: "Dashboard",
+        icon: "/home.svg",
+        path: "/dashboard",
+      },
       {
         id: "patients",
         label: "Patients",
@@ -121,8 +146,9 @@ function navigationItemsForUser(user: User | null): NavItem[] {
       {
         id: "doctors",
         label: "Doctors",
-        icon: "/pill.svg",
+        icon: "/dashboard.svg",
         path: "/doctors",
+        iconMode: "doctors",
       },
       {
         id: "appointments",
@@ -204,8 +230,6 @@ function AppHeaderNavTabs(): JSX.Element {
     return <HeaderNavTabsShimmer />;
   }
 
-  console.log("navigationItems", navigationItems);
-
   return (
     <nav className="inline-flex flex-wrap items-center justify-center gap-[16px] md:gap-4 p-1 bg-white rounded-[50px] h-[42px]">
       {navigationItems.map((item) => {
@@ -223,14 +247,22 @@ function AppHeaderNavTabs(): JSX.Element {
                 : "hover:bg-transparent"
             }`}
           >
-            <img
-              className="w-5 h-5"
-              alt={item.label}
-              src={item.icon}
-              style={{
-                filter: isActive ? "brightness(0) invert(1)" : "none",
-              }}
-            />
+            {item.iconMode === "doctor" || item.iconMode === "doctors" ? (
+              <Stethoscope
+                className={`h-5 w-5 shrink-0 ${isActive ? "text-white" : "text-black"}`}
+                strokeWidth={1.75}
+                aria-hidden
+              />
+            ) : (
+              <img
+                className="h-5 w-5"
+                alt=""
+                src={item.icon}
+                style={{
+                  filter: isActive ? "brightness(0) invert(1)" : "none",
+                }}
+              />
+            )}
             <span
               className={`mt-[-0.50px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)] ${
                 isActive ? "text-white" : "text-black"

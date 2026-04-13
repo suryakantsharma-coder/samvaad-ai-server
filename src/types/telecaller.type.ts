@@ -15,6 +15,8 @@ export interface PublicTelecallerHospital {
   address?: string;
   city?: string;
   pincode?: string;
+  /** INR amount for tele-caller booking (from hospital `teleCallerPrice`). */
+  teleCallerPrice?: number;
 }
 
 export interface PublicTelecallerPayload {

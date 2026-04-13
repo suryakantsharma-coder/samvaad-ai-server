@@ -8,7 +8,9 @@ export const MainLayout = (): JSX.Element => {
   return (
     <div className="bg-app-background w-full min-h-screen flex flex-col">
       <AppHeader />
-      <Outlet />
+      <div className="flex flex-1 min-h-0 min-w-0 flex-col">
+        <Outlet />
+      </div>
     </div>
   );
 };

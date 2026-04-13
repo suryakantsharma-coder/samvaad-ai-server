@@ -21,6 +21,7 @@ import { Hospitals } from "./screens/Hospitals";
 import { Medicines } from "./screens/Medicines";
 import { Payment } from "./screens/Payment";
 import { MainLayout } from "./components/layout";
+import { Dashboard } from "./screens/Dashboard";
 import { HospitalProvider } from "./contexts/HospitalProvider";
 import { PrescriptionProvider } from "./contexts/PrescriptionProvider";
 import { PublicPrescription } from "./screens/PublicPrescription";
@@ -115,6 +116,7 @@ function AuthenticatedApp(): JSX.Element {
                     <Route path="/hospitals" element={<Hospitals />} />
                     <Route path="/medicines" element={<Medicines />} />
                     <Route path="/payment" element={<Payment />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/patients" element={<Patients />} />
                     <Route path="/doctors" element={<Doctors />} />
                     <Route path="/appointments" element={<Appointments />} />

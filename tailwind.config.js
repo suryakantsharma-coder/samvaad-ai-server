@@ -50,6 +50,8 @@ module.exports = {
         },
       },
       fontFamily: {
+        "title-1": "var(--title-1-font-family)",
+        "title-3r": "var(--title-3r-font-family)",
         "title-3l": "var(--title-3l-font-family)",
         "title-3m": "var(--title-3m-font-family)",
         "title-4m": "var(--title-4m-font-family)",

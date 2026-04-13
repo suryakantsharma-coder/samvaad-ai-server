@@ -1,5 +1,5 @@
 import { Building2, CircleCheck, Upload, UserPlus, X } from "lucide-react";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
@@ -13,6 +13,7 @@ import {
 import { registerUserWithHospital } from "../../data/auth";
 import { useHospital } from "../../contexts/HospitalProvider";
 import { showSuccess, showError, showWarning } from "../../lib/toast";
+import { indianStatesForSelect } from "../../lib/indianStates";
 import { validateCreateHospitalForm } from "../../lib/hospitalValidation";
 import { CreateHospitalPayload } from "../../types/hospital.type";
 import {
@@ -24,13 +25,16 @@ import {
 
 export interface AddHospitalData {
   hospitalName: string;
+  phoneCountryCode: string;
   phone: string;
   email: string;
   contactPerson: string;
   gstRegistration: string;
   address: string;
   city: string;
+  state: string;
   pincode: string;
+  teleCallerPrice: string;
   hospitalUrl: string;
   emergencyCountryCode: string;
   emergencyPhone: string;
@@ -56,13 +60,16 @@ interface AddHospitalModalProps {
 function createEmptyForm(): AddHospitalData {
   return {
     hospitalName: "",
+    phoneCountryCode: "+91",
     phone: "",
     email: "",
     contactPerson: "",
     gstRegistration: "",
     address: "",
     city: "",
+    state: "",
     pincode: "",
+    teleCallerPrice: "",
     hospitalUrl: "",
     emergencyCountryCode: "+91",
     emergencyPhone: "",
@@ -78,45 +85,6 @@ function createEmptyForm(): AddHospitalData {
     memberRole: "hospital_admin",
   };
 }
-
-const CITIES = [
-  "Mumbai",
-  "Delhi",
-  "Bangalore",
-  "Hyderabad",
-  "Chennai",
-  "Kolkata",
-  "Pune",
-  "Ahmedabad",
-  "Jaipur",
-  "Lucknow",
-  "Surat",
-  "Indore",
-  "Bhopal",
-  "Vadodara",
-  "Kochi",
-  "Bengaluru",
-  "Nashik",
-  "Thane",
-  "Navi Mumbai",
-  "Pimpri-Chinchwad",
-  "Aurangabad",
-  "Noida",
-  "Faridabad",
-  "Gurgaon",
-  "Jalandhar",
-  "Ludhiana",
-  "Patna",
-  "Ranchi",
-  "Bhubaneswar",
-  "Visakhapatnam",
-  "Vijayawada",
-  "Thiruvananthapuram",
-  "Coimbatore",
-  "Madurai",
-  "Tiruchirappalli",
-  "Salem",
-];
 
 const MAX_FILE_SIZE_MB = 5;
 const MIN_MEMBER_PASSWORD_LEN = 8;
@@ -165,6 +133,11 @@ export const AddHospitalModal = ({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { handleCreateHospital } = useHospital();
 
+  const stateOptions = useMemo(
+    () => indianStatesForSelect(formData.state),
+    [formData.state],
+  );
+
   const handleClose = useCallback(() => {
     setFormData(createEmptyForm());
     setSubmitError(null);
@@ -189,8 +162,10 @@ export const AddHospitalModal = ({
       gstRegistration: formData.gstRegistration,
       address: formData.address,
       city: formData.city,
+      state: formData.state,
       pincode: formData.pincode,
       hospitalUrl: formData.hospitalUrl,
+      phoneCountryCode: formData.phoneCountryCode,
       phone: formData.phone,
       whatsappCountryCode: formData.whatsappCountryCode,
       whatsappPhone: formData.whatsappPhone,
@@ -199,6 +174,7 @@ export const AddHospitalModal = ({
       receptionistCountryCode: formData.receptionistCountryCode,
       receptionistPhone: formData.receptionistPhone,
       reviewUrls: formData.reviewUrls,
+      teleCallerPrice: formData.teleCallerPrice,
     });
     if (validationError) {
       setSubmitError(validationError);
@@ -217,16 +193,20 @@ export const AddHospitalModal = ({
       return;
     }
 
+    const priceNum = Number(formData.teleCallerPrice.trim());
     const payload: CreateHospitalPayload = {
       name: formData.hospitalName.trim(),
+      phoneCountryCode: formData.phoneCountryCode.trim() || "+91",
       phoneNumber: mainDigits,
       email: formData.email.trim(),
       contactPerson: formData.contactPerson.trim(),
       registrationNumber: formData.gstRegistration.trim(),
       address: formData.address.trim(),
       city: formData.city.trim(),
+      state: formData.state.trim(),
       pincode: formData.pincode.trim(),
       url: formData.hospitalUrl.trim(),
+      teleCallerPrice: priceNum,
       emergencyNumber: buildDialDigits(
         formData.emergencyCountryCode,
         formData.emergencyPhone,
@@ -359,15 +339,30 @@ export const AddHospitalModal = ({
               <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
                 Phone number<span className="text-red-500">*</span>
               </label>
-              <Input
-                type="tel"
-                value={formData.phone}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
-                placeholder="9876543210"
-                className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
-              />
+              <div className="flex gap-2">
+                <Select
+                  value={formData.phoneCountryCode}
+                  onValueChange={(v) =>
+                    setFormData({ ...formData, phoneCountryCode: v })
+                  }
+                >
+                  <SelectTrigger className="h-[38px] w-[90px] shrink-0 px-3 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="+91">+91</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
+                  placeholder="9876543210"
+                  className="h-[38px] flex-1 px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
+                />
+              </div>
             </div>
             <div className="flex flex-col gap-2">
               <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
@@ -430,28 +425,47 @@ export const AddHospitalModal = ({
             />
           </div>
 
-          {/* City | Pincode */}
+          {/* City | State */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
               <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
                 City<span className="text-red-500">*</span>
               </label>
+              <Input
+                value={formData.city}
+                onChange={(e) =>
+                  setFormData({ ...formData, city: e.target.value })
+                }
+                placeholder="e.g. Mumbai"
+                className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                State<span className="text-red-500">*</span>
+              </label>
               <Select
-                value={formData.city || undefined}
-                onValueChange={(v) => setFormData({ ...formData, city: v })}
+                value={formData.state || undefined}
+                onValueChange={(v) =>
+                  setFormData({ ...formData, state: v })
+                }
               >
                 <SelectTrigger className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r">
-                  <SelectValue placeholder="Select city" />
+                  <SelectValue placeholder="Select state" />
                 </SelectTrigger>
-                <SelectContent>
-                  {CITIES.map((city) => (
-                    <SelectItem key={city} value={city}>
-                      {city}
+                <SelectContent className="max-h-[min(280px,50vh)]">
+                  {stateOptions.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Pincode | Tele caller price */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="flex flex-col gap-2">
               <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
                 Pincode<span className="text-red-500">*</span>
@@ -462,6 +476,24 @@ export const AddHospitalModal = ({
                   setFormData({ ...formData, pincode: e.target.value })
                 }
                 placeholder="400001"
+                className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                Tele caller price<span className="text-red-500">*</span>
+              </label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={formData.teleCallerPrice}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    teleCallerPrice: e.target.value,
+                  })
+                }
+                placeholder="499"
                 className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r placeholder:text-x-70"
               />
             </div>

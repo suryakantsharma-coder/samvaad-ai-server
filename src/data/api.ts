@@ -154,8 +154,13 @@ export const authFetch = async (
     }
   };
 
-  /** Skip deduplication for multipart bodies — different files would share the same cache key. */
-  if (fetchBody instanceof FormData) {
+  /**
+   * Skip deduplication for multipart bodies — different files would share the same cache key.
+   * Skip when `signal` is set: callers (e.g. React effects) each own an AbortController. Reusing
+   * one promise makes the first abort reject the in-flight fetch while a later effect still awaits
+   * the same promise with a fresh signal — surfacing spurious "signal is aborted" errors.
+   */
+  if (fetchBody instanceof FormData || init.signal != null) {
     return execute();
   }
 

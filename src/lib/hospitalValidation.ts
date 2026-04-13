@@ -56,6 +56,16 @@ export function validateNonEmpty(value: string, label: string): string | null {
   return null;
 }
 
+export function validateTeleCallerPrice(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return "Tele caller price is required.";
+  const n = Number(t);
+  if (!Number.isFinite(n) || n < 0) {
+    return "Enter a valid tele caller price (0 or greater).";
+  }
+  return null;
+}
+
 export function validateHospitalReviewUrls(
   a: string,
   b: string,
@@ -73,6 +83,7 @@ export type SettingsHospitalFormInput = {
   hospitalName: string;
   address: string;
   city: string;
+  state: string;
   pincode: string;
   officialEmail: string;
   contactPerson: string;
@@ -87,6 +98,7 @@ export type SettingsHospitalFormInput = {
   receptionistCountryCode: string;
   receptionistPhone: string;
   reviewUrls: readonly [string, string];
+  teleCallerPrice: string;
 };
 
 export function validateSettingsHospitalForm(
@@ -98,6 +110,8 @@ export function validateSettingsHospitalForm(
   err = validateNonEmpty(f.address, "Address");
   if (err) return err;
   err = validateNonEmpty(f.city, "City");
+  if (err) return err;
+  err = validateNonEmpty(f.state, "State");
   if (err) return err;
   err = validateIndiaPincode(f.pincode);
   if (err) return err;
@@ -126,6 +140,8 @@ export function validateSettingsHospitalForm(
   if (err) return err;
   err = validateIndianMobileNational(f.receptionistPhone);
   if (err) return err;
+  err = validateTeleCallerPrice(f.teleCallerPrice);
+  if (err) return err;
   return validateHospitalReviewUrls(f.reviewUrls[0], f.reviewUrls[1]);
 }
 
@@ -136,8 +152,10 @@ export type CreateHospitalFormInput = {
   gstRegistration: string;
   address: string;
   city: string;
+  state: string;
   pincode: string;
   hospitalUrl: string;
+  phoneCountryCode: string;
   phone: string;
   whatsappCountryCode: string;
   whatsappPhone: string;
@@ -146,6 +164,7 @@ export type CreateHospitalFormInput = {
   receptionistCountryCode: string;
   receptionistPhone: string;
   reviewUrls: readonly [string, string];
+  teleCallerPrice: string;
 };
 
 export function validateCreateHospitalForm(
@@ -153,6 +172,8 @@ export function validateCreateHospitalForm(
 ): string | null {
   let err: string | null;
   err = validateNonEmpty(f.hospitalName, "Hospital name");
+  if (err) return err;
+  err = requirePlus91(f.phoneCountryCode);
   if (err) return err;
   err = validateIndianMobileNational(f.phone);
   if (err) return err;
@@ -165,6 +186,8 @@ export function validateCreateHospitalForm(
   err = validateNonEmpty(f.address, "Address");
   if (err) return err;
   err = validateNonEmpty(f.city, "City");
+  if (err) return err;
+  err = validateNonEmpty(f.state, "State");
   if (err) return err;
   err = validateIndiaPincode(f.pincode);
   if (err) return err;
@@ -182,6 +205,8 @@ export function validateCreateHospitalForm(
   err = requirePlus91(f.receptionistCountryCode);
   if (err) return err;
   err = validateIndianMobileNational(f.receptionistPhone);
+  if (err) return err;
+  err = validateTeleCallerPrice(f.teleCallerPrice);
   if (err) return err;
   return validateHospitalReviewUrls(f.reviewUrls[0], f.reviewUrls[1]);
 }

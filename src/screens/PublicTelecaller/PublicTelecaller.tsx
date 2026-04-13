@@ -16,8 +16,7 @@ import {
 import { API_BASE_URL } from "../../config";
 import { authFetch } from "../../data/api";
 import type { PublicTelecallerPayload } from "../../types/telecaller.type";
-
-const TELECALLER_AMOUNT_INR = 400;
+import { resolveTelecallerBookingAmountInr } from "../../lib/telecallerPricing";
 
 type RazorpayOrder = {
   id: string;
@@ -464,7 +463,15 @@ export const PublicTelecaller = (): JSX.Element => {
     }
   }, [availableTimes, selectedTime]);
 
-  const amountLabel = useMemo(() => `₹${TELECALLER_AMOUNT_INR}`, []);
+  const telecallerAmountInr = useMemo(
+    () => resolveTelecallerBookingAmountInr(details),
+    [details],
+  );
+  const amountLabel = useMemo(
+    () =>
+      `₹${telecallerAmountInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`,
+    [telecallerAmountInr],
+  );
   const normalizedEmail = email.trim().toLowerCase();
   const hasValidEmail = isValidEmail(normalizedEmail);
 
@@ -504,7 +511,7 @@ export const PublicTelecaller = (): JSX.Element => {
 
       const { order, keyId } = await createRazorpayOrder(
         id,
-        TELECALLER_AMOUNT_INR,
+        telecallerAmountInr,
         {
           bookVideoAppointment: true,
           patient: details.patient._id,
@@ -514,6 +521,7 @@ export const PublicTelecaller = (): JSX.Element => {
           doctorEmail: selectedDoctor?.email?.trim() ?? "",
           appointmentDateTime: toIstDateTime(selectedDate, selectedTime),
           hospitalId: details.hospitalId ?? details.hospital?._id ?? "",
+          teleCallerPriceInr: telecallerAmountInr,
           videoUrl: details.appointmentId
             ? makeMeetUrl(details.appointmentId)
             : "",
@@ -523,7 +531,7 @@ export const PublicTelecaller = (): JSX.Element => {
         keyId ||
         import.meta.env.VITE_RAZORPAY_KEY_ID ||
         "rzp_test_1DP5mmOlF5G5ag";
-      const amountPaise = order?.amount ?? TELECALLER_AMOUNT_INR * 100;
+      const amountPaise = order?.amount ?? telecallerAmountInr * 100;
       const currency = order?.currency ?? "INR";
       const displayName = details.hospital?.name || "Samvaad";
 
