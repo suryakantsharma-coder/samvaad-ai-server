@@ -1,6 +1,7 @@
-import React, { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useAuth } from "../../contexts/AuthProvider";
 import { PaymentHeaderSection } from "./sections/PaymentHeaderSection";
+import { PaymentDateRangeBar } from "./sections/PaymentDateRangeBar";
 import { PaymentListSection } from "./sections/PaymentListSection";
 
 function toYMDLocal(d: Date): string {
@@ -40,15 +41,24 @@ export const Payment = (): JSX.Element => {
     [],
   );
 
+  const setListDateRange = useCallback(
+    (range: { start: string; end: string }) => {
+      setListFromDate(range.start);
+      setListToDate(range.end);
+    },
+    [],
+  );
+
   return (
     <div className="w-full flex flex-col gap-[25px] p-4 md:p-6">
       <PaymentHeaderSection
         totalRecords={totalRecords}
         totalDoctors={totalDoctors}
-        fromDate={listFromDate}
-        toDate={listToDate}
-        onFromDateChange={setListFromDate}
-        onToDateChange={setListToDate}
+      />
+      <PaymentDateRangeBar
+        start={listFromDate}
+        end={listToDate}
+        onRangeChange={setListDateRange}
       />
       <PaymentListSection
         hospitalId={hospitalId}

@@ -20,7 +20,7 @@ export const AuthContext = createContext<{
   accessToken: string | null;
   setAccessToken: (token: string | null) => void;
   isAuthenticated: boolean;
-  handleLogin: (email: string, password: string) => Promise<void>;
+  handleLogin: (email: string, password: string) => Promise<User>;
   handleLogout: () => Promise<void>;
   handleRegister: (
     email: string,
@@ -43,7 +43,7 @@ export const AuthContext = createContext<{
   accessToken: null,
   setAccessToken: () => {},
   isAuthenticated: false,
-  handleLogin: async () => {
+  handleLogin: async (): Promise<User> => {
     throw new Error("AuthProvider not mounted");
   },
   handleLogout: async () => {},

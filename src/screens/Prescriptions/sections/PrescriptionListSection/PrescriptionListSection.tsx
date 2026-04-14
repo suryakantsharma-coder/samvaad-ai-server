@@ -176,7 +176,7 @@ export const PrescriptionListSection = ({
             />
           </div>
 
-          <Button
+          {/* <Button
             variant="ghost"
             className="inline-flex items-center gap-[5px] px-2.5 py-1.5 bg-grey-light rounded-[100px] hover:bg-grey-light"
           >
@@ -184,7 +184,7 @@ export const PrescriptionListSection = ({
             <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
               Filter
             </span>
-          </Button>
+          </Button> */}
         </div>
       </div>
 

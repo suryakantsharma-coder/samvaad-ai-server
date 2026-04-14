@@ -288,3 +288,52 @@ export const linkHospitalUserToDoctor = async (
   }
   return data;
 };
+
+/** Public POST /api/auth/forgot-password */
+export async function requestPasswordResetEmail(email: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email.trim() }),
+  });
+  const data = (await response.json().catch(() => ({}))) as {
+    success?: boolean;
+    message?: string;
+    error?: string;
+  };
+  if (!response.ok || data.success === false) {
+    throw new Error(
+      typeof data.message === "string"
+        ? data.message
+        : typeof data.error === "string"
+          ? data.error
+          : "Could not send reset email.",
+    );
+  }
+}
+
+/** Public POST /api/auth/reset-password */
+export async function resetPasswordWithToken(
+  token: string,
+  password: string,
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: token.trim(), password }),
+  });
+  const data = (await response.json().catch(() => ({}))) as {
+    success?: boolean;
+    message?: string;
+    error?: string;
+  };
+  if (!response.ok || data.success === false) {
+    throw new Error(
+      typeof data.message === "string"
+        ? data.message
+        : typeof data.error === "string"
+          ? data.error
+          : "Could not reset password.",
+    );
+  }
+}

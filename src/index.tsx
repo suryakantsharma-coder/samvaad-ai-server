@@ -26,6 +26,8 @@ import { HospitalProvider } from "./contexts/HospitalProvider";
 import { PrescriptionProvider } from "./contexts/PrescriptionProvider";
 import { PublicPrescription } from "./screens/PublicPrescription";
 import { PublicTelecaller } from "./screens/PublicTelecaller";
+import { ForgotPassword } from "./screens/ForgotPassword";
+import { ResetPassword } from "./screens/ResetPassword";
 import { ensureWhatsAppEmbeddedSignupListener } from "./lib/whatsappConnect";
 
 declare global {
@@ -119,7 +121,7 @@ function AuthenticatedApp(): JSX.Element {
             <AppointmentProvider>
               <PrescriptionProvider>
                 <Routes>
-                  <Route path="/login" element={<Login />} />
+                                   <Route path="/login" element={<Login />} />
                   <Route path="/signup" element={<Signup />} />
                   <Route element={<MainLayout />}>
                     <Route path="/" element={<RoleBasedHomeRedirect />} />
@@ -160,6 +162,8 @@ createRoot(document.getElementById("app") as HTMLElement).render(
           element={<PublicPrescription />}
         />
         <Route path="/telecaller/:patientId" element={<PublicTelecaller />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/auth/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<AuthenticatedApp />} />
       </Routes>
     </BrowserRouter>

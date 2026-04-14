@@ -6,7 +6,7 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { useAuth } from "../../contexts/AuthProvider";
 import { getHomePathForRole } from "../../lib/userRole";
-import { showError, showWarning } from "../../lib/toast";
+import { showError } from "../../lib/toast";
 import { cn } from "../../lib/utils";
 
 const REMEMBER_EMAIL_KEY = "samvaad_login_email";
@@ -138,18 +138,12 @@ export const Login = (): JSX.Element => {
             />
             Remember me
           </label> */}
-          <button
-            type="button"
+          <Link
+            to="/forgot-password"
             className="font-medium text-primary-2 hover:underline"
-            onClick={() =>
-              showWarning(
-                "Forgot password",
-                "Please contact your hospital administrator to reset your password.",
-              )
-            }
           >
             Forgot password?
-          </button>
+          </Link>
         </div>
 
         <Button

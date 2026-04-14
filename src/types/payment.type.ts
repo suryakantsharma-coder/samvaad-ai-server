@@ -1,6 +1,19 @@
-/** Normalized row for the Payments table UI. */
+/** List item from `GET /api/payouts` (hospital payout period) vs transaction row from search. */
+export type PaymentRowKind = "payout" | "transaction";
+
+/** Normalized row for the Payments / Payouts table UI. */
 export type PaymentTableRow = {
+  /** Primary key for React lists — prefers Mongo `_id`. */
   id: string;
+  /** `GET /api/payouts` summary rows; omit for Razorpay transaction lines. */
+  rowKind?: PaymentRowKind;
+  /** From payout list item when present. */
+  hospitalId?: string;
+  /** Payout billing window (`startDate` / `endDate` from API). */
+  payoutStartAtMs?: number;
+  payoutEndAtMs?: number;
+  /** Mongo id for `PATCH /api/payouts/transactions/:id/status`. */
+  transactionMongoId?: string;
   /** When present, "View patient" can open the patient record. */
   patientId?: string;
   patientName: string;
@@ -14,8 +27,9 @@ export type PaymentTableRow = {
   appointmentTimeLabel: string;
   priceLabel: string;
   paymentDateLabel: string;
-  /** Local-time instant for All / Today / Tomorrow filters (ms since epoch). */
+  /** Local-time instant for sorting (ms since epoch). */
   paymentAtMs?: number;
+  /** Raw Razorpay-style status e.g. `captured`, `created`. */
   status: string;
   razorpayOrderId?: string;
 };

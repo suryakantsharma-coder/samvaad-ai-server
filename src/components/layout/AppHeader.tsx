@@ -76,12 +76,12 @@ function navigationItemsForUser(user: User | null): NavItem[] {
         icon: "/pill.svg",
         path: "/medicines",
       },
-      // {
-      //   id: "payments",
-      //   label: "Payments",
-      //   icon: "/payment.svg",
-      //   path: "/payment",
-      // },
+      {
+        id: "payments",
+        label: "Payments",
+        icon: "/payment.svg",
+        path: "/payment",
+      },
     ];
   }
   if (user.role === "doctor") {
