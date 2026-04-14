@@ -51,7 +51,11 @@ const DonutChart = ({
   const centerLabel = total.toLocaleString();
 
   return (
-    <svg viewBox="0 0 230 230" className="w-[231px] h-[231px]">
+    <svg
+      viewBox="0 0 230 230"
+      className="w-[231px] h-[231px] pointer-events-none"
+      aria-hidden
+    >
       {slices.map((slice, i) => (
         <path key={i} d={slice.d} fill={slice.color} />
       ))}

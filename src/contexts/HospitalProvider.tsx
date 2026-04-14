@@ -106,6 +106,7 @@ interface HospitalContextType {
   ) => Promise<void>;
   resetSearchedHospitals: () => void;
   handleDeactivateHospital: (hospitalId: string) => Promise<void>;
+  handleActivateHospital: (hospitalId: string) => Promise<void>;
   /** Fetch a single hospital by ID and set as currentHospital. */
   fetchHospitalById: (hospitalId: string) => Promise<void>;
   /** Update hospital by ID and refresh currentHospital if it's the same. */
@@ -113,6 +114,15 @@ interface HospitalContextType {
     hospitalId: string,
     payload: UpdateHospitalPayload,
     options?: { logo?: File | null },
+  ) => Promise<void>;
+  /**
+   * PATCH hospital and merge into list/search/current hospital (e.g. hospitals table).
+   * Does not toggle global `isLoading` or `currentHospitalLoading`.
+   */
+  patchHospital: (
+    hospitalId: string,
+    payload: UpdateHospitalPayload,
+    logo?: File | null,
   ) => Promise<void>;
   clearCurrentHospital: () => void;
 }
@@ -123,8 +133,10 @@ export const HospitalContext = createContext<HospitalContextType>({
   handleSearchHospitals: async () => {},
   resetSearchedHospitals: () => {},
   handleDeactivateHospital: async () => {},
+  handleActivateHospital: async () => {},
   fetchHospitalById: async () => {},
   updateHospitalById: async () => {},
+  patchHospital: async () => {},
   clearCurrentHospital: () => {},
   hospitals: [],
   searchedHospitals: null,
@@ -286,6 +298,29 @@ export const HospitalProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
 
+  const handleActivateHospital = useCallback(async (hospitalId: string) => {
+    setIsLoading(true);
+    try {
+      await updateHospital(hospitalId, { isActive: true });
+      setHospitals((prev) =>
+        prev.map((h) =>
+          h._id === hospitalId ? { ...h, isActive: true } : h,
+        ),
+      );
+      setSearchedHospitals((prev) =>
+        prev
+          ? prev.map((h) =>
+              h._id === hospitalId ? { ...h, isActive: true } : h,
+            )
+          : prev,
+      );
+    } catch (err) {
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const fetchHospitalById = async (hospitalId: string) => {
     if (!hospitalId) return;
     setCurrentHospitalLoading(true);
@@ -308,6 +343,25 @@ export const HospitalProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const mergeHospitalRowAfterPatch = useCallback(
+    (
+      hospitalId: string,
+      res: unknown,
+      payload: UpdateHospitalPayload,
+    ): ((h: Hospital) => Hospital) => {
+      const full = hospitalFromPatchResponse(res, hospitalId);
+      const newLogoUrl = logoUrlFromPatchResponse(res);
+      return (h: Hospital) => {
+        if (h._id !== hospitalId) return h;
+        if (full) return full;
+        const next = { ...h, ...payload } as Hospital;
+        if (newLogoUrl) next.logoUrl = newLogoUrl;
+        return next;
+      };
+    },
+    [],
+  );
+
   const updateHospitalById = async (
     hospitalId: string,
     payload: UpdateHospitalPayload,
@@ -321,15 +375,8 @@ export const HospitalProvider = ({ children }: { children: ReactNode }) => {
         payload,
         options?.logo ?? undefined,
       );
-      const full = hospitalFromPatchResponse(res, hospitalId);
-      const newLogoUrl = logoUrlFromPatchResponse(res);
-      setCurrentHospital((prev) => {
-        if (full && full._id === hospitalId) return full;
-        if (prev?._id === hospitalId && newLogoUrl) {
-          return { ...prev, logoUrl: newLogoUrl };
-        }
-        return prev;
-      });
+      const apply = mergeHospitalRowAfterPatch(hospitalId, res, payload);
+      setCurrentHospital((prev) => (prev ? apply(prev) : prev));
     } catch (err) {
       setCurrentHospitalError(
         err instanceof Error ? err.message : "Failed to update hospital",
@@ -339,6 +386,23 @@ export const HospitalProvider = ({ children }: { children: ReactNode }) => {
       setCurrentHospitalLoading(false);
     }
   };
+
+  const patchHospital = useCallback(
+    async (
+      hospitalId: string,
+      payload: UpdateHospitalPayload,
+      logo?: File | null,
+    ) => {
+      const res = await updateHospital(hospitalId, payload, logo ?? undefined);
+      const apply = mergeHospitalRowAfterPatch(hospitalId, res, payload);
+      setHospitals((prev) => prev.map(apply));
+      setSearchedHospitals((prev) => (prev ? prev.map(apply) : prev));
+      setCurrentHospital((prev) =>
+        prev && prev._id === hospitalId ? apply(prev) : prev,
+      );
+    },
+    [mergeHospitalRowAfterPatch],
+  );
 
   const clearCurrentHospital = () => {
     setCurrentHospital(null);
@@ -364,8 +428,10 @@ export const HospitalProvider = ({ children }: { children: ReactNode }) => {
         handleSearchHospitals,
         resetSearchedHospitals,
         handleDeactivateHospital,
+        handleActivateHospital,
         fetchHospitalById,
         updateHospitalById,
+        patchHospital,
         clearCurrentHospital,
       }}
     >

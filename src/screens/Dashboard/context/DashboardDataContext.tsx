@@ -7,7 +7,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { fetchHospitalAdminDashboard } from "../../../data/dashboard";
+import {
+  DASHBOARD_PATIENT_PREVIEW_LIMIT,
+  fetchHospitalAdminDashboard,
+} from "../../../data/dashboard";
 import { showError } from "../../../lib/toast";
 import type { HospitalAdminDashboardPreset } from "../../../types/hospitalAdminDashboard.type";
 import {
@@ -34,8 +37,6 @@ export type DashboardDataContextValue = {
   applyThisMonth: () => void;
   /** Active API preset when using Last 7 / Last 30 / This month; `null` when using custom From/To. */
   dashboardPreset: HospitalAdminDashboardPreset | null;
-  patientOverviewPage: number;
-  setPatientOverviewPage: (page: number) => void;
   response: DashboardResponse;
   loading: boolean;
   error: string | null;
@@ -73,7 +74,6 @@ export function DashboardDataProvider({
   );
   const [dashboardPreset, setDashboardPreset] =
     useState<HospitalAdminDashboardPreset | null>("last_30_days");
-  const [patientOverviewPage, setPatientOverviewPageState] = useState(1);
   const [response, setResponse] = useState<DashboardResponse>(
     emptyDashboardPlaceholder,
   );
@@ -82,24 +82,20 @@ export function DashboardDataProvider({
 
   const setDateRange = useCallback((r: DashboardDateRange) => {
     setDashboardPreset(null);
-    setPatientOverviewPageState(1);
     setDateRangeState(normalizeRange(r));
   }, []);
 
   const setStartDate = useCallback((start: string) => {
     setDashboardPreset(null);
-    setPatientOverviewPageState(1);
     setDateRangeState((prev) => normalizeRange({ ...prev, start }));
   }, []);
 
   const setEndDate = useCallback((end: string) => {
     setDashboardPreset(null);
-    setPatientOverviewPageState(1);
     setDateRangeState((prev) => normalizeRange({ ...prev, end }));
   }, []);
 
   const applyPresetDays = useCallback((days: number) => {
-    setPatientOverviewPageState(1);
     if (days === 7) {
       setDashboardPreset("last_7_days");
       return;
@@ -120,12 +116,7 @@ export function DashboardDataProvider({
   }, []);
 
   const applyThisMonth = useCallback(() => {
-    setPatientOverviewPageState(1);
     setDashboardPreset("this_month");
-  }, []);
-
-  const setPatientOverviewPage = useCallback((page: number) => {
-    setPatientOverviewPageState(Math.max(1, page));
   }, []);
 
   const customRangeFetchKey =
@@ -145,7 +136,8 @@ export function DashboardDataProvider({
           preset: dashboardPreset ?? undefined,
           fromDate: dashboardPreset ? undefined : dateRange.start,
           toDate: dashboardPreset ? undefined : dateRange.end,
-          patientPage: patientOverviewPage,
+          patientPage: 1,
+          patientLimit: DASHBOARD_PATIENT_PREVIEW_LIMIT,
           signal: ac.signal,
         });
         if (!cancelled) {
@@ -170,7 +162,7 @@ export function DashboardDataProvider({
       cancelled = true;
       ac.abort();
     };
-  }, [dashboardPreset, customRangeFetchKey, patientOverviewPage]);
+  }, [dashboardPreset, customRangeFetchKey]);
 
   const value = useMemo(
     () => ({
@@ -181,8 +173,6 @@ export function DashboardDataProvider({
       applyPresetDays,
       applyThisMonth,
       dashboardPreset,
-      patientOverviewPage,
-      setPatientOverviewPage,
       response,
       loading,
       error,
@@ -195,8 +185,6 @@ export function DashboardDataProvider({
       applyPresetDays,
       applyThisMonth,
       dashboardPreset,
-      patientOverviewPage,
-      setPatientOverviewPage,
       response,
       loading,
       error,

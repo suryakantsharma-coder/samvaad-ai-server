@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import type { User } from "../../types/auth.type";
 import { API_BASE_URL } from "../../config";
-import { isSuperAdminRole } from "../../lib/userRole";
+import { isHospitalAdminRole, isSuperAdminRole } from "../../lib/userRole";
 
 type NavItem = {
   id: string;
@@ -63,12 +63,6 @@ function navigationItemsForUser(user: User | null): NavItem[] {
   if (!user) return [];
   if (isSuperAdminRole(user.role)) {
     return [
-      {
-        id: "dashboard",
-        label: "Dashboard",
-        icon: "/home.svg",
-        path: "/dashboard",
-      },
       {
         id: "hospitals",
         label: "Hospitals",
@@ -129,7 +123,7 @@ function navigationItemsForUser(user: User | null): NavItem[] {
       },
     ];
   }
-  if (user.role === "hospital_admin") {
+  if (isHospitalAdminRole(user.role)) {
     return [
       {
         id: "dashboard",

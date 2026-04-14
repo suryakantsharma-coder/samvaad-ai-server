@@ -11,7 +11,7 @@ import { Settings } from "./screens/Settings";
 import { Login } from "./screens/Login";
 import { Signup } from "./screens/Signup";
 import { AuthProvider, useAuth } from "./contexts/AuthProvider";
-import { getHomePathForRole } from "./lib/userRole";
+import { getHomePathForRole, isHospitalAdminRole } from "./lib/userRole";
 import { DoctorProvider } from "./contexts/DoctorProvider";
 import { PatientProvider } from "./contexts/PatientProvider";
 import { AppointmentProvider } from "./contexts/AppointmentProvider";
@@ -94,6 +94,21 @@ function RoleBasedHomeRedirect(): JSX.Element {
   return <Navigate to={getHomePathForRole(user.role)} replace />;
 }
 
+/** Dashboard API and UI are hospital-admin only; others are sent to their home. */
+function HospitalAdminDashboardRoute(): JSX.Element {
+  const { user, authHydrating } = useAuth();
+  if (authHydrating) {
+    return <div className="flex-1 min-h-[40vh]" aria-busy="true" />;
+  }
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  if (!isHospitalAdminRole(user.role)) {
+    return <Navigate to={getHomePathForRole(user.role)} replace />;
+  }
+  return <Dashboard />;
+}
+
 /** Logged-in app: providers, toasts, and main routes (AuthProvider redirects if no token). */
 function AuthenticatedApp(): JSX.Element {
   return (
@@ -116,7 +131,10 @@ function AuthenticatedApp(): JSX.Element {
                     <Route path="/hospitals" element={<Hospitals />} />
                     <Route path="/medicines" element={<Medicines />} />
                     <Route path="/payment" element={<Payment />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route
+                      path="/dashboard"
+                      element={<HospitalAdminDashboardRoute />}
+                    />
                     <Route path="/patients" element={<Patients />} />
                     <Route path="/doctors" element={<Doctors />} />
                     <Route path="/appointments" element={<Appointments />} />

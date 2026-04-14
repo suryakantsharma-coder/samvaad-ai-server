@@ -10,11 +10,16 @@ export function isSuperAdminRole(role: string | undefined | null): boolean {
   return k === "super_admin" || k === "superadmin";
 }
 
+/** Hospital administrator — dashboard + hospital-scoped screens. */
+export function isHospitalAdminRole(role: string | undefined | null): boolean {
+  return normalizeRoleKey(role) === "hospital_admin";
+}
+
 /** First screen after login or when visiting `/` (aligned with `AppHeader` destinations). */
 export function getHomePathForRole(role: string | undefined | null): string {
   if (isSuperAdminRole(role)) return "/hospitals";
   const k = normalizeRoleKey(role);
   if (k === "admin") return "/hospitals";
-  if (k === "hospital_admin") return "/dashboard";
+  if (isHospitalAdminRole(role)) return "/dashboard";
   return "/patients";
 }

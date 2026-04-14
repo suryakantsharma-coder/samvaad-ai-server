@@ -38,7 +38,7 @@ export const AppointmentListSection = (): JSX.Element => {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 w-full overflow-x-auto overflow-y-auto overscroll-contain px-5 pb-5">
+        <div className="min-h-0 flex-1 w-full overflow-x-auto overflow-y-auto px-5 pb-5">
           <Table>
             <TableHeader>
               <TableRow className="bg-grey-dark hover:bg-grey-dark border-0">

@@ -8,6 +8,9 @@ import type { DashboardDateRange, DashboardResponse } from "../screens/Dashboard
 
 const DEFAULT_PATIENT_OVERVIEW_LIMIT = 10;
 
+/** Rows shown in dashboard Patient Overview preview; full list is on `/patients`. */
+export const DASHBOARD_PATIENT_PREVIEW_LIMIT = 5;
+
 export type FetchHospitalAdminDashboardParams = {
   /** When set, sends `preset=` and ignores from/to. */
   preset?: HospitalAdminDashboardPreset;

@@ -36,7 +36,7 @@ export const AppointmentStatsSection = (): JSX.Element => {
             />
           </div>
         </div>
-        <div className="mt-2.5 flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain">
+        <div className="mt-2.5 flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
           {doctors.map((doctor) => (
             <div
               key={doctor.id}

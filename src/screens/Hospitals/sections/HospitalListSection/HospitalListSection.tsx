@@ -40,7 +40,9 @@ import { useHospital } from "../../../../contexts/HospitalProvider";
 import { isSuperAdminRole } from "../../../../lib/userRole";
 import { showSuccess } from "../../../../lib/toast";
 import { Hospital } from "../../../../types/hospital.type";
+import { ActivateHospitalModal } from "../ActivateHospitalModal";
 import { DeactivateHospitalModal } from "../DeactivateHospitalModal";
+import { EditHospitalModal } from "../../../../components/modals/EditHospitalModal";
 
 export interface HospitalRow {
   id: string;
@@ -167,6 +169,9 @@ export const HospitalListSection = (): JSX.Element => {
   >("all");
   const [hospitalPendingDeactivate, setHospitalPendingDeactivate] =
     useState<Hospital | null>(null);
+  const [hospitalPendingActivate, setHospitalPendingActivate] =
+    useState<Hospital | null>(null);
+  const [hospitalToEdit, setHospitalToEdit] = useState<Hospital | null>(null);
   const {
     hospitals,
     searchedHospitals,
@@ -178,6 +183,7 @@ export const HospitalListSection = (): JSX.Element => {
     handleSearchHospitals,
     resetSearchedHospitals,
     handleDeactivateHospital,
+    handleActivateHospital,
   } = useHospital();
 
   const listToShow =
@@ -410,8 +416,16 @@ export const HospitalListSection = (): JSX.Element => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
-                        <DropdownMenuItem>Edit Hospital</DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setHospitalToEdit(hospital)}
+                        >
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setHospitalToEdit(hospital)}
+                        >
+                          Edit Hospital
+                        </DropdownMenuItem>
                         {isSuperAdmin && isActiveHospital(hospital) ? (
                           <>
                             <DropdownMenuSeparator />
@@ -422,6 +436,19 @@ export const HospitalListSection = (): JSX.Element => {
                               }
                             >
                               Deactivate hospital
+                            </DropdownMenuItem>
+                          </>
+                        ) : null}
+                        {isSuperAdmin && !isActiveHospital(hospital) ? (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-[#0D9488] focus:text-[#0D9488]"
+                              onClick={() =>
+                                setHospitalPendingActivate(hospital)
+                              }
+                            >
+                              Activate hospital
                             </DropdownMenuItem>
                           </>
                         ) : null}
@@ -458,6 +485,27 @@ export const HospitalListSection = (): JSX.Element => {
           showSuccess("Updated", "Hospital has been deactivated.");
         }}
       />
+      <ActivateHospitalModal
+        hospital={hospitalPendingActivate}
+        open={hospitalPendingActivate !== null}
+        onOpenChange={(open) => {
+          if (!open) setHospitalPendingActivate(null);
+        }}
+        activate={handleActivateHospital}
+        onActivated={() => {
+          showSuccess("Updated", "Hospital has been activated.");
+        }}
+      />
+      {hospitalToEdit ? (
+        <EditHospitalModal
+          key={hospitalToEdit._id}
+          hospital={hospitalToEdit}
+          open
+          onOpenChange={(next) => {
+            if (!next) setHospitalToEdit(null);
+          }}
+        />
+      ) : null}
     </section>
   );
 };

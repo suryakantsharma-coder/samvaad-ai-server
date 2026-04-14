@@ -33,7 +33,6 @@ import {
 import { useAuth } from "../../contexts/AuthProvider";
 import { useHospital } from "../../contexts/HospitalProvider";
 import { showSuccess, showError, showWarning } from "../../lib/toast";
-import { isSuperAdminRole } from "../../lib/userRole";
 import { connectWhatsAppEmbeddedSignup } from "../../lib/whatsappConnect";
 import {
   getHospitalUsers,
@@ -209,11 +208,9 @@ export const Settings = (): JSX.Element => {
   } = useHospital();
   const isHospitalAdmin = user?.role === "hospital_admin";
   const isDoctorUser = user?.role === "doctor";
-  /** Hospital + Integrations & Notifications tab (admin / hospital_admin). */
+  /** Hospital + Integrations & Notifications tab (admin / hospital_admin). Super admins only use Personal here. */
   const canManageHospitalIntegrations =
-    user?.role === "admin" ||
-    isSuperAdminRole(user?.role) ||
-    user?.role === "hospital_admin";
+    user?.role === "admin" || user?.role === "hospital_admin";
 
   const settingsTabs = useMemo(() => {
     const tabs: Array<{ id: string; label: string; icon: typeof UserIcon }> = [
@@ -485,8 +482,7 @@ export const Settings = (): JSX.Element => {
     if (fromProfile) {
       lastLinkedDoctorIdRef.current = null;
     }
-    const linkedDoctorId =
-      fromProfile ?? lastLinkedDoctorIdRef.current;
+    const linkedDoctorId = fromProfile ?? lastLinkedDoctorIdRef.current;
     setMyDoctorId(linkedDoctorId);
 
     findDoctorForHospitalUserEmail(user.email)
@@ -506,9 +502,7 @@ export const Settings = (): JSX.Element => {
 
         if (!linkedDoctorId) {
           setLinkCandidateDoctor(d);
-          setDoctorShiftStatus(
-            normalizeDoctorShiftStatus(d.status),
-          );
+          setDoctorShiftStatus(normalizeDoctorShiftStatus(d.status));
           setHolidayDraft({ startDate: "", endDate: "" });
           setHolidaySaved(false);
           setHolidayFormOpen(false);
@@ -662,10 +656,7 @@ export const Settings = (): JSX.Element => {
       return;
     }
     if (complete[0].startDate > complete[0].endDate) {
-      showWarning(
-        "Holiday dates",
-        "Start date must be on or before end date.",
-      );
+      showWarning("Holiday dates", "Start date must be on or before end date.");
       return;
     }
     setHolidaySaveLoading(true);
@@ -1277,468 +1268,478 @@ export const Settings = (): JSX.Element => {
                       </div>
                     </div>
 
-                  <div className="flex flex-col gap-[10px] mt-[5px]">
-                    <div className="flex flex-col gap-[10px]">
-                      <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                        Profile Picture
-                      </label>
-                      <div className="flex items-center gap-4">
-                        <input
-                          ref={profileAvatarInputRef}
-                          type="file"
-                          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                          className="hidden"
-                          id="settings-profile-picture-input"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            e.target.value = "";
-                            if (!file) return;
-                            if (!file.type.startsWith("image/")) {
-                              showWarning(
-                                "Warning",
-                                "Please choose an image file.",
-                              );
-                              return;
-                            }
-                            if (
-                              file.size >
-                              HOSPITAL_LOGO_MAX_MB * 1024 * 1024
-                            ) {
-                              showWarning(
-                                "Warning",
-                                `Image must be ${HOSPITAL_LOGO_MAX_MB}MB or smaller.`,
-                              );
-                              return;
-                            }
-                            setProfilePictureDraft(file);
-                          }}
-                        />
-                        <div className="w-[60px] h-[60px] rounded-full bg-grey-light flex items-center justify-center overflow-hidden shrink-0 border border-[#dedee1]">
-                          {personalAvatarDisplayUrl ? (
-                            <img
-                              src={personalAvatarDisplayUrl}
-                              alt=""
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <span className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)]">
-                              {getFirstCharacterAfterSpace(formData.fullName)}
-                            </span>
-                          )}
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => profileAvatarInputRef.current?.click()}
-                          className="inline-flex items-center gap-2 px-4 py-2 h-[38px] border border-[#dedee1] rounded-[10px] bg-white hover:bg-grey-light"
-                        >
-                          <UploadIcon className="w-4 h-4" />
-                          <span className="font-title-4r text-black text-[length:var(--title-4r-font-size)]">
-                            Upload Picture
-                          </span>
-                        </Button>
-                        {profilePictureDraft ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="w-9 h-9 text-red-500 hover:bg-red-50 bg-[#FFF1F1]"
-                            onClick={() => setProfilePictureDraft(null)}
-                            aria-label="Remove selected image"
-                          >
-                            <Trash2Icon className="w-5 h-5" />
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
-                      <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-[10px] mt-[5px]">
+                      <div className="flex flex-col gap-[10px]">
                         <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                          Full Name
+                          Profile Picture
                         </label>
-                        <Input
-                          value={formData.fullName}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              fullName: e.target.value,
-                            })
-                          }
-                          className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
-                      <div className="flex flex-col gap-2">
-                        <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                          Phone
-                        </label>
-                        <div className="flex gap-2.5">
-                          <Select
-                            value={formData.countryCode}
-                            onValueChange={(value) =>
-                              setFormData({ ...formData, countryCode: value })
-                            }
-                          >
-                            <SelectTrigger className="w-[100px] h-[44px] px-3 py-2 bg-white border border-[#dedee1] rounded-[10px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="+91">+91</SelectItem>
-                              <SelectItem value="+1">+1</SelectItem>
-                              <SelectItem value="+44">+44</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            type="tel"
-                            value={formData.phone}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                phone: e.target.value,
-                              })
-                            }
-                            className="flex-1 h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                        <div className="flex items-center gap-4">
+                          <input
+                            ref={profileAvatarInputRef}
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                            className="hidden"
+                            id="settings-profile-picture-input"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              e.target.value = "";
+                              if (!file) return;
+                              if (!file.type.startsWith("image/")) {
+                                showWarning(
+                                  "Warning",
+                                  "Please choose an image file.",
+                                );
+                                return;
+                              }
+                              if (
+                                file.size >
+                                HOSPITAL_LOGO_MAX_MB * 1024 * 1024
+                              ) {
+                                showWarning(
+                                  "Warning",
+                                  `Image must be ${HOSPITAL_LOGO_MAX_MB}MB or smaller.`,
+                                );
+                                return;
+                              }
+                              setProfilePictureDraft(file);
+                            }}
                           />
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
-                          Email Address
-                        </label>
-                        <Input
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) =>
-                            setFormData({ ...formData, email: e.target.value })
-                          }
-                          className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
-                        />
-                      </div>
-                    </div>
-
-                    {isDoctorUser ? (
-                      <div className="flex flex-col gap-2.5 pt-2 border-t border-[#eeeeef]">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {/* <Circle className="w-4 h-4 shrink-0 text-x-70" /> */}
-                          <span className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
-                            Doctor status
-                          </span>
-                          {doctorProfileLoading || doctorStatusSaving ? (
-                            <Loader2 className="w-4 h-4 animate-spin text-x-70" />
-                          ) : null}
-                        </div>
-                        <p className="font-title-5l text-x-70 text-sm leading-snug">
-                          Shown on the hospital dashboard schedule. Changes save
-                          immediately.
-                        </p>
-                        {!doctorProfileLoading && !myDoctorId ? (
-                          <div className="flex flex-col gap-3">
-                            {linkCandidateSearching ? (
-                              <p className="font-title-5l text-x-70 text-sm leading-snug flex items-center gap-2">
-                                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                                Looking for a doctor profile with the email in
-                                this form…
-                              </p>
-                            ) : linkCandidateDoctor ? (
-                              <>
-                                <p className="font-title-5l text-emerald-900 text-sm leading-snug">
-                                  A doctor profile matches this email (
-                                  {linkCandidateDoctor.fullName}). Link your
-                                  account to update shift status on the
-                                  schedule.
-                                </p>
-                                <Button
-                                  type="button"
-                                  onClick={() => void handleLinkDoctorProfile()}
-                                  loading={linkDoctorLoading}
-                                  disabled={linkDoctorLoading}
-                                  className="w-fit px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
-                                >
-                                  Link doctor profile
-                                </Button>
-                              </>
+                          <div className="w-[60px] h-[60px] rounded-full bg-grey-light flex items-center justify-center overflow-hidden shrink-0 border border-[#dedee1]">
+                            {personalAvatarDisplayUrl ? (
+                              <img
+                                src={personalAvatarDisplayUrl}
+                                alt=""
+                                className="w-full h-full object-cover"
+                              />
                             ) : (
-                              <p className="font-title-5l text-amber-800 text-sm leading-snug">
-                                No doctor profile matched your login email. Set{" "}
-                                <span className="font-medium">
-                                  Email Address
-                                </span>{" "}
-                                above to the same address as your hospital
-                                doctor record; if a match is found, a{" "}
-                                <span className="font-medium">
-                                  Link doctor profile
-                                </span>{" "}
-                                button will appear here. You can also ask a
-                                hospital admin for help.
-                              </p>
+                              <span className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)]">
+                                {getFirstCharacterAfterSpace(formData.fullName)}
+                              </span>
                             )}
                           </div>
-                        ) : (
-                          <div className="flex flex-col gap-2 max-w-[320px]">
-                            <Select
-                              value={doctorShiftStatus}
-                              onValueChange={(val) =>
-                                void handleDoctorShiftStatusChange(val)
-                              }
-                              disabled={
-                                doctorProfileLoading ||
-                                doctorStatusSaving ||
-                                !myDoctorId
-                              }
-                            >
-                              <SelectTrigger className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] w-full font-title-4r text-black">
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="On Duty">On duty</SelectItem>
-                                <SelectItem value="Off Duty">
-                                  Off duty
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-                      </div>
-                    ) : null}
-
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={() => void handleSavePersonal()}
-                        loading={personalSaveLoading}
-                        className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
-                      >
-                        Save
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-[10px] p-[25px] flex flex-col gap-5">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-full bg-grey-light flex items-center justify-center overflow-hidden shrink-0 border border-[#dedee1]">
-                      {personalAvatarDisplayUrl ? (
-                        <img
-                          src={personalAvatarDisplayUrl}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="font-title-4m font-semibold text-black text-sm">
-                          {getFirstCharacterAfterSpace(formData.fullName)}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <KeyRound className="w-5 h-5 shrink-0" />
-                      <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
-                        Security
-                      </h3>
-                    </div>
-                  </div>
-                  <p className="font-title-5l text-[#57575f] text-sm leading-relaxed">
-                    Use a strong password you don&apos;t use elsewhere.
-                    You&apos;ll stay logged in on this device after updating.
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    <label
-                      htmlFor="settings-pw-current"
-                      className="font-title-4m text-black text-[length:var(--title-4m-font-size)]"
-                    >
-                      Current password
-                    </label>
-                    <Input
-                      id="settings-pw-current"
-                      type="password"
-                      autoComplete="current-password"
-                      value={passwordCurrent}
-                      onChange={(e) => setPasswordCurrent(e.target.value)}
-                      className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label
-                      htmlFor="settings-pw-new"
-                      className="font-title-4m text-black text-[length:var(--title-4m-font-size)]"
-                    >
-                      New password
-                    </label>
-                    <div className="relative">
-                      <Input
-                        id="settings-pw-new"
-                        type={passwordShowNew ? "text" : "password"}
-                        autoComplete="new-password"
-                        value={passwordNew}
-                        onChange={(e) => setPasswordNew(e.target.value)}
-                        className="h-[44px] px-4 py-2 pr-10 bg-white border border-[#dedee1] rounded-[10px]"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8"
-                        onClick={() => setPasswordShowNew((s) => !s)}
-                        aria-label={
-                          passwordShowNew ? "Hide password" : "Show password"
-                        }
-                      >
-                        {passwordShowNew ? (
-                          <EyeOffIcon className="w-4 h-4 text-x-70" />
-                        ) : (
-                          <EyeIcon className="w-4 h-4 text-x-70" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label
-                      htmlFor="settings-pw-confirm"
-                      className="font-title-4m text-black text-[length:var(--title-4m-font-size)]"
-                    >
-                      Confirm new password
-                    </label>
-                    <Input
-                      id="settings-pw-confirm"
-                      type={passwordShowNew ? "text" : "password"}
-                      autoComplete="new-password"
-                      value={passwordConfirm}
-                      onChange={(e) => setPasswordConfirm(e.target.value)}
-                      className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
-                    />
-                  </div>
-                  <div className="flex justify-end pt-1">
-                    <Button
-                      type="button"
-                      onClick={() => void handleChangePassword()}
-                      loading={passwordSaving}
-                      leadingIcon={<KeyRound className="w-4 h-4" />}
-                      className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
-                    >
-                      Update password
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {isDoctorUser ? (
-                <div className="bg-white rounded-[10px] p-[25px] flex flex-col gap-5 w-full max-w-3xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-full bg-grey-light flex items-center justify-center shrink-0 border border-[#dedee1]">
-                      <CalendarDays className="w-5 h-5 text-x-70" />
-                    </div>
-                    <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
-                      Holiday
-                    </h3>
-                  </div>
-                  <p className="font-title-5l text-x-70 text-sm leading-relaxed max-w-prose">
-                    One leave period at a time. Saved separately from your
-                    profile (Save above).
-                  </p>
-                  {doctorProfileLoading ? (
-                    <p className="font-title-5l text-x-70 text-sm flex items-center gap-2">
-                      <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                      Loading your doctor profile…
-                    </p>
-                  ) : !myDoctorId ? (
-                    <p className="font-title-5l text-amber-800 text-sm leading-snug max-w-prose">
-                      Link your doctor profile in Personal Information to save
-                      holidays.
-                    </p>
-                  ) : !holidayFormOpen ? (
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-[10px] border border-dashed border-[#dedee1] bg-[#f9f9fa] p-5">
-                      <p className="font-title-5l text-x-70 text-sm leading-snug max-w-md">
-                        You don&apos;t have a holiday scheduled yet. Create one
-                        to set your leave dates.
-                      </p>
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          setHolidayDraft({ startDate: "", endDate: "" });
-                          setHolidayFormOpen(true);
-                        }}
-                        disabled={holidaySaveLoading}
-                        leadingIcon={<Plus className="w-4 h-4" />}
-                        className="shrink-0 px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
-                      >
-                        Create holiday
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex flex-col sm:flex-row gap-3 sm:items-end sm:flex-wrap">
-                        <div className="flex flex-col gap-2 flex-1 min-w-[160px]">
-                          <label
-                            htmlFor="settings-holiday-start"
-                            className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)]"
-                          >
-                            Start date
-                          </label>
-                          <Input
-                            id="settings-holiday-start"
-                            type="date"
-                            value={holidayDraft.startDate}
-                            onChange={(e) =>
-                              setHolidayDraft((prev) => ({
-                                ...prev,
-                                startDate: e.target.value,
-                              }))
-                            }
-                            disabled={holidaySaveLoading}
-                            className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
-                          />
-                        </div>
-                        <div className="flex flex-col gap-2 flex-1 min-w-[160px]">
-                          <label
-                            htmlFor="settings-holiday-end"
-                            className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)]"
-                          >
-                            End date
-                          </label>
-                          <Input
-                            id="settings-holiday-end"
-                            type="date"
-                            value={holidayDraft.endDate}
-                            onChange={(e) =>
-                              setHolidayDraft((prev) => ({
-                                ...prev,
-                                endDate: e.target.value,
-                              }))
-                            }
-                            disabled={holidaySaveLoading}
-                            className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
-                        {holidaySaved ? (
                           <Button
                             type="button"
                             variant="outline"
-                            onClick={() => void handleDeleteHoliday()}
-                            loading={holidaySaveLoading}
-                            disabled={holidaySaveLoading}
-                            className="px-6 py-2 border border-[#dedee1] rounded-[10px] h-[44px] text-red-600 hover:bg-red-50 hover:text-red-700"
-                            leadingIcon={<Trash2Icon className="w-4 h-4" />}
+                            onClick={() =>
+                              profileAvatarInputRef.current?.click()
+                            }
+                            className="inline-flex items-center gap-2 px-4 py-2 h-[38px] border border-[#dedee1] rounded-[10px] bg-white hover:bg-grey-light"
                           >
-                            Delete holiday
+                            <UploadIcon className="w-4 h-4" />
+                            <span className="font-title-4r text-black text-[length:var(--title-4r-font-size)]">
+                              Upload Picture
+                            </span>
                           </Button>
-                        ) : null}
+                          {profilePictureDraft ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="w-9 h-9 text-red-500 hover:bg-red-50 bg-[#FFF1F1]"
+                              onClick={() => setProfilePictureDraft(null)}
+                              aria-label="Remove selected image"
+                            >
+                              <Trash2Icon className="w-5 h-5" />
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Full Name
+                          </label>
+                          <Input
+                            value={formData.fullName}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                fullName: e.target.value,
+                              })
+                            }
+                            className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Phone
+                          </label>
+                          <div className="flex gap-2.5">
+                            <Select
+                              value={formData.countryCode}
+                              onValueChange={(value) =>
+                                setFormData({ ...formData, countryCode: value })
+                              }
+                            >
+                              <SelectTrigger className="w-[100px] h-[44px] px-3 py-2 bg-white border border-[#dedee1] rounded-[10px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="+91">+91</SelectItem>
+                                <SelectItem value="+1">+1</SelectItem>
+                                <SelectItem value="+44">+44</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="tel"
+                              value={formData.phone}
+                              onChange={(e) =>
+                                setFormData({
+                                  ...formData,
+                                  phone: e.target.value,
+                                })
+                              }
+                              className="flex-1 h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                          <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                            Email Address
+                          </label>
+                          <Input
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                email: e.target.value,
+                              })
+                            }
+                            className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                          />
+                        </div>
+                      </div>
+
+                      {isDoctorUser ? (
+                        <div className="flex flex-col gap-2.5 pt-2 border-t border-[#eeeeef]">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {/* <Circle className="w-4 h-4 shrink-0 text-x-70" /> */}
+                            <span className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+                              Doctor status
+                            </span>
+                            {doctorProfileLoading || doctorStatusSaving ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-x-70" />
+                            ) : null}
+                          </div>
+                          <p className="font-title-5l text-x-70 text-sm leading-snug">
+                            Shown on the hospital dashboard schedule. Changes
+                            save immediately.
+                          </p>
+                          {!doctorProfileLoading && !myDoctorId ? (
+                            <div className="flex flex-col gap-3">
+                              {linkCandidateSearching ? (
+                                <p className="font-title-5l text-x-70 text-sm leading-snug flex items-center gap-2">
+                                  <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                                  Looking for a doctor profile with the email in
+                                  this form…
+                                </p>
+                              ) : linkCandidateDoctor ? (
+                                <>
+                                  <p className="font-title-5l text-emerald-900 text-sm leading-snug">
+                                    A doctor profile matches this email (
+                                    {linkCandidateDoctor.fullName}). Link your
+                                    account to update shift status on the
+                                    schedule.
+                                  </p>
+                                  <Button
+                                    type="button"
+                                    onClick={() =>
+                                      void handleLinkDoctorProfile()
+                                    }
+                                    loading={linkDoctorLoading}
+                                    disabled={linkDoctorLoading}
+                                    className="w-fit px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
+                                  >
+                                    Link doctor profile
+                                  </Button>
+                                </>
+                              ) : (
+                                <p className="font-title-5l text-amber-800 text-sm leading-snug">
+                                  No doctor profile matched your login email.
+                                  Set{" "}
+                                  <span className="font-medium">
+                                    Email Address
+                                  </span>{" "}
+                                  above to the same address as your hospital
+                                  doctor record; if a match is found, a{" "}
+                                  <span className="font-medium">
+                                    Link doctor profile
+                                  </span>{" "}
+                                  button will appear here. You can also ask a
+                                  hospital admin for help.
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col gap-2 max-w-[320px]">
+                              <Select
+                                value={doctorShiftStatus}
+                                onValueChange={(val) =>
+                                  void handleDoctorShiftStatusChange(val)
+                                }
+                                disabled={
+                                  doctorProfileLoading ||
+                                  doctorStatusSaving ||
+                                  !myDoctorId
+                                }
+                              >
+                                <SelectTrigger className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] w-full font-title-4r text-black">
+                                  <SelectValue placeholder="Select status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="On Duty">
+                                    On duty
+                                  </SelectItem>
+                                  <SelectItem value="Off Duty">
+                                    Off duty
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+
+                      <div className="flex justify-end">
                         <Button
-                          type="button"
-                          onClick={() => void handleSaveHolidays()}
-                          loading={holidaySaveLoading}
+                          onClick={() => void handleSavePersonal()}
+                          loading={personalSaveLoading}
                           className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
                         >
-                          Save holiday
+                          Save
                         </Button>
                       </div>
-                    </>
-                  )}
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-[10px] p-[25px] flex flex-col gap-5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-full bg-grey-light flex items-center justify-center overflow-hidden shrink-0 border border-[#dedee1]">
+                        {personalAvatarDisplayUrl ? (
+                          <img
+                            src={personalAvatarDisplayUrl}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="font-title-4m font-semibold text-black text-sm">
+                            {getFirstCharacterAfterSpace(formData.fullName)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <KeyRound className="w-5 h-5 shrink-0" />
+                        <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
+                          Security
+                        </h3>
+                      </div>
+                    </div>
+                    <p className="font-title-5l text-[#57575f] text-sm leading-relaxed">
+                      Use a strong password you don&apos;t use elsewhere.
+                      You&apos;ll stay logged in on this device after updating.
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      <label
+                        htmlFor="settings-pw-current"
+                        className="font-title-4m text-black text-[length:var(--title-4m-font-size)]"
+                      >
+                        Current password
+                      </label>
+                      <Input
+                        id="settings-pw-current"
+                        type="password"
+                        autoComplete="current-password"
+                        value={passwordCurrent}
+                        onChange={(e) => setPasswordCurrent(e.target.value)}
+                        className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label
+                        htmlFor="settings-pw-new"
+                        className="font-title-4m text-black text-[length:var(--title-4m-font-size)]"
+                      >
+                        New password
+                      </label>
+                      <div className="relative">
+                        <Input
+                          id="settings-pw-new"
+                          type={passwordShowNew ? "text" : "password"}
+                          autoComplete="new-password"
+                          value={passwordNew}
+                          onChange={(e) => setPasswordNew(e.target.value)}
+                          className="h-[44px] px-4 py-2 pr-10 bg-white border border-[#dedee1] rounded-[10px]"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-1/2 -translate-y-1/2 h-8 w-8"
+                          onClick={() => setPasswordShowNew((s) => !s)}
+                          aria-label={
+                            passwordShowNew ? "Hide password" : "Show password"
+                          }
+                        >
+                          {passwordShowNew ? (
+                            <EyeOffIcon className="w-4 h-4 text-x-70" />
+                          ) : (
+                            <EyeIcon className="w-4 h-4 text-x-70" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label
+                        htmlFor="settings-pw-confirm"
+                        className="font-title-4m text-black text-[length:var(--title-4m-font-size)]"
+                      >
+                        Confirm new password
+                      </label>
+                      <Input
+                        id="settings-pw-confirm"
+                        type={passwordShowNew ? "text" : "password"}
+                        autoComplete="new-password"
+                        value={passwordConfirm}
+                        onChange={(e) => setPasswordConfirm(e.target.value)}
+                        className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                      />
+                    </div>
+                    <div className="flex justify-end pt-1">
+                      <Button
+                        type="button"
+                        onClick={() => void handleChangePassword()}
+                        loading={passwordSaving}
+                        leadingIcon={<KeyRound className="w-4 h-4" />}
+                        className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
+                      >
+                        Update password
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-              ) : null}
+
+                {isDoctorUser ? (
+                  <div className="bg-white rounded-[10px] p-[25px] flex flex-col gap-5 w-full max-w-3xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-full bg-grey-light flex items-center justify-center shrink-0 border border-[#dedee1]">
+                        <CalendarDays className="w-5 h-5 text-x-70" />
+                      </div>
+                      <h3 className="font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] [font-style:var(--title-3m-font-style)]">
+                        Holiday
+                      </h3>
+                    </div>
+                    <p className="font-title-5l text-x-70 text-sm leading-relaxed max-w-prose">
+                      One leave period at a time. Saved separately from your
+                      profile (Save above).
+                    </p>
+                    {doctorProfileLoading ? (
+                      <p className="font-title-5l text-x-70 text-sm flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        Loading your doctor profile…
+                      </p>
+                    ) : !myDoctorId ? (
+                      <p className="font-title-5l text-amber-800 text-sm leading-snug max-w-prose">
+                        Link your doctor profile in Personal Information to save
+                        holidays.
+                      </p>
+                    ) : !holidayFormOpen ? (
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-[10px] border border-dashed border-[#dedee1] bg-[#f9f9fa] p-5">
+                        <p className="font-title-5l text-x-70 text-sm leading-snug max-w-md">
+                          You don&apos;t have a holiday scheduled yet. Create
+                          one to set your leave dates.
+                        </p>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setHolidayDraft({ startDate: "", endDate: "" });
+                            setHolidayFormOpen(true);
+                          }}
+                          disabled={holidaySaveLoading}
+                          leadingIcon={<Plus className="w-4 h-4" />}
+                          className="shrink-0 px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
+                        >
+                          Create holiday
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex flex-col sm:flex-row gap-3 sm:items-end sm:flex-wrap">
+                          <div className="flex flex-col gap-2 flex-1 min-w-[160px]">
+                            <label
+                              htmlFor="settings-holiday-start"
+                              className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)]"
+                            >
+                              Start date
+                            </label>
+                            <Input
+                              id="settings-holiday-start"
+                              type="date"
+                              value={holidayDraft.startDate}
+                              onChange={(e) =>
+                                setHolidayDraft((prev) => ({
+                                  ...prev,
+                                  startDate: e.target.value,
+                                }))
+                              }
+                              disabled={holidaySaveLoading}
+                              className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-2 flex-1 min-w-[160px]">
+                            <label
+                              htmlFor="settings-holiday-end"
+                              className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)]"
+                            >
+                              End date
+                            </label>
+                            <Input
+                              id="settings-holiday-end"
+                              type="date"
+                              value={holidayDraft.endDate}
+                              onChange={(e) =>
+                                setHolidayDraft((prev) => ({
+                                  ...prev,
+                                  endDate: e.target.value,
+                                }))
+                              }
+                              disabled={holidaySaveLoading}
+                              className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
+                          {holidaySaved ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => void handleDeleteHoliday()}
+                              loading={holidaySaveLoading}
+                              disabled={holidaySaveLoading}
+                              className="px-6 py-2 border border-[#dedee1] rounded-[10px] h-[44px] text-red-600 hover:bg-red-50 hover:text-red-700"
+                              leadingIcon={<Trash2Icon className="w-4 h-4" />}
+                            >
+                              Delete holiday
+                            </Button>
+                          ) : null}
+                          <Button
+                            type="button"
+                            onClick={() => void handleSaveHolidays()}
+                            loading={holidaySaveLoading}
+                            className="px-6 py-2 bg-primary-2 hover:bg-primary-2/90 rounded-[10px] h-[44px]"
+                          >
+                            Save holiday
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : null}
               </>
             )}
 
@@ -2232,7 +2233,7 @@ export const Settings = (): JSX.Element => {
                             className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px]"
                           />
                         </div>
-                        <div className="flex flex-col gap-[15px]">
+                        <div className="flex flex-col gap-2">
                           <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
                             Working Hours
                           </label>
