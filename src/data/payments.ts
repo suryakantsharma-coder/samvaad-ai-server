@@ -327,10 +327,11 @@ export async function fetchPayoutsPage(params: {
 
 /**
  * GET /api/payouts/transactions/search
+ * `hospitalId` optional when the API allows super-admin global search.
  */
 export async function fetchPayoutsSearch(params: {
   q: string;
-  hospitalId: string;
+  hospitalId?: string;
   page: number;
   limit: number;
   fromDate?: string;
@@ -339,10 +340,11 @@ export async function fetchPayoutsSearch(params: {
 }): Promise<{ rows: PaymentTableRow[]; meta: PaymentsListMeta }> {
   const qs = new URLSearchParams({
     q: params.q.trim(),
-    hospitalId: params.hospitalId.trim(),
     page: String(params.page),
     limit: String(params.limit),
   });
+  const hid = params.hospitalId?.trim();
+  if (hid) qs.set("hospitalId", hid);
   if (params.fromDate?.trim()) qs.set("fromDate", params.fromDate.trim());
   if (params.toDate?.trim()) qs.set("toDate", params.toDate.trim());
   const rs = params.razorpayStatus?.trim();
@@ -376,17 +378,17 @@ export async function patchPayoutTransactionRazorpayStatus(
 }
 
 /**
- * PATCH /api/payouts/:payoutMongoId/status — mark a payout period summary as paid (super admin).
- * Adjust path/body if your API differs.
+ * PATCH /api/payouts/list/:payoutListMongoId/status — update payout list row status (e.g. `paid`).
+ * Server expects a super-admin Bearer token.
  */
 export async function patchPayoutSummaryStatus(
-  payoutMongoId: string,
+  payoutListMongoId: string,
   status: string,
 ): Promise<void> {
-  const id = payoutMongoId.trim();
-  if (!id) throw new Error("Missing payout id.");
+  const id = payoutListMongoId.trim();
+  if (!id) throw new Error("Missing payout list id.");
   const raw = await authFetch(
-    `/api/payouts/${encodeURIComponent(id)}/status`,
+    `/api/payouts/list/${encodeURIComponent(id)}/status`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useAuth } from "../../contexts/AuthProvider";
+import { getLinkedHospitalId } from "../../lib/linkedHospitalId";
 import { PaymentHeaderSection } from "./sections/PaymentHeaderSection";
-import { PaymentDateRangeBar } from "./sections/PaymentDateRangeBar";
 import { PaymentListSection } from "./sections/PaymentListSection";
 
 function toYMDLocal(d: Date): string {
@@ -20,8 +20,7 @@ function getDefaultPaymentListDateRange(): { from: string; to: string } {
 
 export const Payment = (): JSX.Element => {
   const { user } = useAuth();
-  const hospitalId =
-    typeof user?.hospital === "string" ? user.hospital.trim() : "";
+  const hospitalId = getLinkedHospitalId(user);
   const [totalRecords, setTotalRecords] = useState<number | null>(null);
   const [totalDoctors, setTotalDoctors] = useState<number | null>(null);
   const defaultListDateRange = useMemo(
@@ -54,11 +53,9 @@ export const Payment = (): JSX.Element => {
       <PaymentHeaderSection
         totalRecords={totalRecords}
         totalDoctors={totalDoctors}
-      />
-      <PaymentDateRangeBar
-        start={listFromDate}
-        end={listToDate}
-        onRangeChange={setListDateRange}
+        listFromDate={listFromDate}
+        listToDate={listToDate}
+        onListDateRangeChange={setListDateRange}
       />
       <PaymentListSection
         hospitalId={hospitalId}

@@ -102,11 +102,10 @@ function canMarkPaidRow(row: PaymentTableRow): boolean {
   return Boolean(payoutPatchId(row));
 }
 
-function isRowPaidOrCaptured(row: PaymentTableRow): boolean {
+/** Show “Mark as paid” only for draft-style rows (payout `draft` or Razorpay `created`). */
+function isRowDraftStatus(row: PaymentTableRow): boolean {
   const s = row.status.toLowerCase().trim();
-  return (
-    s === "captured" || s === "paid" || s === "success" || s === "completed"
-  );
+  return s === "draft" || s === "created";
 }
 
 function statusBadgeClass(status: string): string {
@@ -150,8 +149,11 @@ function dash(v: string | undefined): string {
 }
 
 function displayPriceLabel(priceLabel: string): string {
-  const t = priceLabel?.trim();
-  return t && t.length > 0 ? t : "—";
+  const price = priceLabel.replace("₹", "");
+  const priceWithoutComma = price.replace(/\s*,\s*/g, "");
+  const priceNumber = parseInt(priceWithoutComma) / 100;
+  const priceString = priceNumber.toString();
+  return priceString && priceString.length > 0 ? priceString : "—";
 }
 
 function PayoutInstantCell({
@@ -469,7 +471,7 @@ export const PaymentListSection = ({
 
   const emptyStateMessage = useMemo(() => {
     if (rows.length > 0) return "";
-    if (debouncedSearch.trim() && !hospitalLinked) {
+    if (debouncedSearch.trim() && !hospitalLinked && !canMarkPaid) {
       return "Link a hospital to your account to search payouts, or clear the search to browse the list.";
     }
     if (debouncedSearch.trim()) return "No payments match your search.";
@@ -488,6 +490,7 @@ export const PaymentListSection = ({
     debouncedSearch,
     statusFilter,
     hospitalLinked,
+    canMarkPaid,
     orderedListRange.fromYmd,
     orderedListRange.toYmd,
   ]);
@@ -512,14 +515,14 @@ export const PaymentListSection = ({
     try {
       const q = debouncedSearch.trim();
       if (q) {
-        if (!hospitalLinked) {
+        if (!hospitalLinked && !canMarkPaid) {
           setRows([]);
           setTotalPages(1);
           onRecordsMetaRef.current?.({ total: 0, totalDoctors: undefined });
           return;
         }
         const { rows: nextRows, meta } = await fetchPayoutsSearch({
-          hospitalId: hospitalId.trim(),
+          ...(hospitalLinked ? { hospitalId: hospitalId.trim() } : {}),
           q,
           page,
           limit: PAGE_SIZE,
@@ -558,6 +561,7 @@ export const PaymentListSection = ({
     }
   }, [
     canLoadList,
+    canMarkPaid,
     hospitalId,
     hospitalLinked,
     page,
@@ -591,6 +595,13 @@ export const PaymentListSection = ({
   }, [statusFilter]);
 
   const handleMarkAsPaid = useCallback(async (row: PaymentTableRow) => {
+    if (!isRowDraftStatus(row)) {
+      showError(
+        "Cannot mark as paid",
+        "Only draft items can be marked as paid.",
+      );
+      return;
+    }
     if (!canMarkPaidRow(row)) {
       showError(
         "Cannot mark as paid",
@@ -636,26 +647,7 @@ export const PaymentListSection = ({
         }}
       />
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 px-5 md:px-6 pt-5 md:pt-6 pb-[26px]">
-        <p className="font-title-4r text-x-70 max-w-md leading-snug">
-          Search requires a hospital linked to your account.
-        </p>
-
-        <div className="flex w-full min-w-0 flex-nowrap items-center justify-end gap-[15px] overflow-x-auto lg:min-w-0 lg:flex-1">
-          <div className="flex min-w-0 flex-1 max-w-[372px] items-center gap-2.5 px-2 py-2 bg-grey-light rounded-[100px] h-[38px]">
-            <SearchIcon className="w-6 h-6 shrink-0 text-black opacity-70" />
-            <Input
-              placeholder={
-                hospitalLinked
-                  ? "Search payouts (e.g. pay_, order id)..."
-                  : "Link a hospital to enable search…"
-              }
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              disabled={!hospitalLinked}
-              className="min-w-0 flex-1 border-0 bg-transparent opacity-70 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] focus-visible:ring-0 focus-visible:ring-offset-0 p-0 disabled:cursor-not-allowed disabled:opacity-50"
-            />
-          </div>
-
+        <div className="flex flex-col items-start gap-2">
           <ToggleGroup
             type="single"
             value={statusFilter}
@@ -664,27 +656,49 @@ export const PaymentListSection = ({
                 setStatusFilter(v);
               }
             }}
-            className="inline-flex shrink-0 items-center gap-1.5 p-[3px] bg-grey-light rounded-[100px]"
+            className="inline-flex items-center gap-[15px] p-[3px] bg-grey-light rounded-[100px]"
           >
             <ToggleGroupItem
               value="all"
-              className="inline-flex items-center justify-center px-4 py-[5px] rounded-[100px] font-title-4r text-[length:var(--title-4r-font-size)] data-[state=on]:bg-primary-2 data-[state=on]:text-white bg-transparent text-x-70"
+              className="inline-flex items-center justify-center gap-[5px] px-5 py-[5px] rounded-[100px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] data-[state=on]:bg-primary-2 data-[state=on]:text-white bg-transparent text-x-70"
             >
               All
             </ToggleGroupItem>
             <ToggleGroupItem
               value="paid"
-              className="inline-flex items-center justify-center px-4 py-[5px] rounded-[100px] font-title-4r text-[length:var(--title-4r-font-size)] data-[state=on]:bg-primary-2 data-[state=on]:text-white bg-transparent text-x-70"
+              className="inline-flex items-center justify-center gap-[5px] px-5 py-[5px] rounded-[100px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] data-[state=on]:bg-primary-2 data-[state=on]:text-white bg-transparent text-x-70"
             >
               Paid
             </ToggleGroupItem>
             <ToggleGroupItem
               value="draft"
-              className="inline-flex items-center justify-center px-4 py-[5px] rounded-[100px] font-title-4r text-[length:var(--title-4r-font-size)] data-[state=on]:bg-primary-2 data-[state=on]:text-white bg-transparent text-x-70"
+              className="inline-flex items-center justify-center gap-[5px] px-5 py-[5px] rounded-[100px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] data-[state=on]:bg-primary-2 data-[state=on]:text-white bg-transparent text-x-70"
             >
               Draft
             </ToggleGroupItem>
           </ToggleGroup>
+          {/* <p className="font-title-4r text-x-70 max-w-md leading-snug lg:max-w-sm">
+            {canMarkPaid && !hospitalLinked
+              ? "Super admin: search runs without a hospital filter if your API allows it."
+              : "Search requires a hospital linked to your account."}
+          </p> */}
+        </div>
+
+        <div className="flex w-full min-w-0 flex-nowrap items-center justify-end gap-[15px] overflow-x-auto lg:min-w-0 lg:flex-1">
+          <div className="flex min-w-0 flex-1 max-w-[372px] items-center gap-2.5 px-2 py-2 bg-grey-light rounded-[100px] h-[38px]">
+            <SearchIcon className="w-6 h-6 shrink-0 text-black opacity-70" />
+            <Input
+              placeholder={
+                hospitalLinked || canMarkPaid
+                  ? "Search payouts (e.g. pay_, order id)..."
+                  : "Link a hospital to enable search…"
+              }
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              disabled={!hospitalLinked && !canMarkPaid}
+              className="min-w-0 flex-1 border-0 bg-transparent opacity-70 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] focus-visible:ring-0 focus-visible:ring-offset-0 p-0 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </div>
 
           <Select
             value={dateSort}
@@ -784,20 +798,7 @@ export const PaymentListSection = ({
                     </Badge>
                   </TableCell>
                   <TableCell className="px-[20px] py-[16px]">
-                    <div className="flex flex-wrap items-center justify-end gap-2">
-                      {canMarkPaid &&
-                      !isRowPaidOrCaptured(row) &&
-                      canMarkPaidRow(row) ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-9 shrink-0 rounded-full border-[#dedee1] px-4 font-title-4r text-[length:var(--title-4r-font-size)] text-black hover:bg-grey-light"
-                          onClick={() => void handleMarkAsPaid(row)}
-                        >
-                          Mark as paid
-                        </Button>
-                      ) : null}
+                    <div className="flex flex-wrap items-center justify-start gap-2">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -810,11 +811,15 @@ export const PaymentListSection = ({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => void handleMarkAsPaid(row)}
-                          >
-                            Mark as paid
-                          </DropdownMenuItem>
+                          {canMarkPaid &&
+                          isRowDraftStatus(row) &&
+                          canMarkPaidRow(row) ? (
+                            <DropdownMenuItem
+                              onClick={() => void handleMarkAsPaid(row)}
+                            >
+                              Mark as paid
+                            </DropdownMenuItem>
+                          ) : null}
                           <DropdownMenuItem onClick={() => openDetails(row)}>
                             View details
                           </DropdownMenuItem>

@@ -1,15 +1,23 @@
 import { Briefcase, Wallet } from "lucide-react";
+import { PaymentDateRangeBar } from "../PaymentDateRangeBar";
 
 export interface PaymentHeaderSectionProps {
   /** Total payment records (from API), when loaded. */
   totalRecords?: number | null;
   /** From list `data.overall.totalDoctors` when the API returns it. */
   totalDoctors?: number | null;
+  /** YYYY-MM-DD — filters list and search. */
+  listFromDate: string;
+  listToDate: string;
+  onListDateRangeChange: (range: { start: string; end: string }) => void;
 }
 
 export const PaymentHeaderSection = ({
   totalRecords,
   totalDoctors,
+  listFromDate,
+  listToDate,
+  onListDateRangeChange,
 }: PaymentHeaderSectionProps): JSX.Element => {
   return (
     <header className="flex flex-col lg:flex-row w-full items-start justify-between gap-4">
@@ -22,12 +30,19 @@ export const PaymentHeaderSection = ({
 
         <p className="opacity-90 text-[16px] leading-[20px] mt-[5px] font-title-3l font-[number:var(--title-3l-font-weight)] text-black text-[length:var(--title-3l-font-size)] tracking-[var(--title-3l-letter-spacing)] leading-[var(--title-3l-line-height)] [font-style:var(--title-3l-font-style)] max-w-prose">
           View patient payments for your hospital: doctor, amount, date, and
-          status. Use the date range below to filter the list, and search or
-          filter by paid vs draft.
+          status. Use the date range to filter the list, and search or filter by
+          paid vs draft.
         </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-[15px]">
+        <div className="inline-flex rounded-[50px] border border-[#dedee1] bg-white">
+          <PaymentDateRangeBar
+            start={listFromDate}
+            end={listToDate}
+            onRangeChange={onListDateRangeChange}
+          />
+        </div>
         {totalDoctors != null && (
           <div className="inline-flex items-center gap-2.5 px-[15px] py-[6px] bg-white rounded-[50px] h-[36px] border border-[#dedee1]">
             <Briefcase className="w-5 h-5 text-primary-2" aria-hidden />
