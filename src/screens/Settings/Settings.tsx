@@ -68,6 +68,7 @@ import {
 import type { HospitalSettings } from "../../types/hospitalSettings.type";
 import {
   findDoctorForHospitalUserEmail,
+  getDoctorLinkStatus,
   updateDoctor,
 } from "../../data/doctor";
 import type { Doctor, DoctorHoliday } from "../../types/doctor.type";
@@ -411,6 +412,11 @@ export const Settings = (): JSX.Element => {
   const [linkDoctorLoading, setLinkDoctorLoading] = useState(false);
   /** If GET /me omits `doctor` immediately after link, keep this id for PATCH until profile updates. */
   const lastLinkedDoctorIdRef = useRef<string | null>(null);
+  /**
+   * When GET /doctors/link-status reports linked, blocks the debounced email effect from
+   * calling by-email/search and re-populating linkCandidateDoctor before myDoctorId is set.
+   */
+  const doctorLinkStatusReportsLinkedRef = useRef(false);
   const [holidayDraft, setHolidayDraft] = useState<HolidayFormRow>({
     startDate: "",
     endDate: "",
@@ -447,6 +453,7 @@ export const Settings = (): JSX.Element => {
       return;
     }
     let cancelled = false;
+    doctorLinkStatusReportsLinkedRef.current = false;
     setDoctorProfileLoading(true);
     const fromProfile = resolveLinkedDoctorId(user);
     if (fromProfile) {
@@ -455,48 +462,89 @@ export const Settings = (): JSX.Element => {
     const linkedDoctorId = fromProfile ?? lastLinkedDoctorIdRef.current;
     setMyDoctorId(linkedDoctorId);
 
-    findDoctorForHospitalUserEmail(user.email)
-      .then((d) => {
-        if (cancelled) return;
+    const email = user.email.trim();
+    const hospitalId = user.hospital?.trim() || null;
+
+    const applyDoctorRowIfMatch = (d: Doctor | null, expectId: string) => {
+      if (cancelled || !d || d._id !== expectId) return;
+      const nextDraft = holidaysToSingleDraft(d.holidays);
+      const hasSaved = holidayDraftHasBothDates(nextDraft);
+      setDoctorShiftStatus(normalizeDoctorShiftStatus(d.status));
+      setHolidayDraft(nextDraft);
+      setHolidaySaved(hasSaved);
+      setHolidayFormOpen(hasSaved);
+    };
+
+    void (async () => {
+      try {
         if (linkedDoctorId) {
           setLinkCandidateDoctor(null);
+          const d = await findDoctorForHospitalUserEmail(email, hospitalId);
+          applyDoctorRowIfMatch(d, linkedDoctorId);
+          return;
         }
-        if (!d) {
-          if (!linkedDoctorId) {
-            setHolidayDraft({ startDate: "", endDate: "" });
-            setHolidaySaved(false);
-            setHolidayFormOpen(false);
+
+        const status = await getDoctorLinkStatus(email, hospitalId);
+        if (cancelled) return;
+
+        if (status?.linked) {
+          doctorLinkStatusReportsLinkedRef.current = true;
+          setLinkCandidateDoctor(null);
+          let sid = status.doctorMongoId?.trim() ?? "";
+          try {
+            await refreshUser();
+          } catch {
+            /* ignore */
+          }
+          if (cancelled) return;
+          if (!sid) {
+            const row = await findDoctorForHospitalUserEmail(email, hospitalId);
+            sid = row?._id?.trim() ?? "";
+          }
+          if (cancelled) return;
+          if (sid) {
+            lastLinkedDoctorIdRef.current = sid;
+            setMyDoctorId(sid);
+            doctorLinkStatusReportsLinkedRef.current = false;
+            const d = await findDoctorForHospitalUserEmail(email, hospitalId);
+            applyDoctorRowIfMatch(d, sid);
           }
           return;
         }
 
-        if (!linkedDoctorId) {
-          setLinkCandidateDoctor(d);
-          setDoctorShiftStatus(normalizeDoctorShiftStatus(d.status));
+        doctorLinkStatusReportsLinkedRef.current = false;
+
+        const d = await findDoctorForHospitalUserEmail(email, hospitalId);
+        if (cancelled) return;
+
+        if (!d) {
           setHolidayDraft({ startDate: "", endDate: "" });
           setHolidaySaved(false);
           setHolidayFormOpen(false);
           return;
         }
 
-        if (d._id !== linkedDoctorId) {
-          return;
-        }
-
-        const nextDraft = holidaysToSingleDraft(d.holidays);
-        const hasSaved = holidayDraftHasBothDates(nextDraft);
+        setLinkCandidateDoctor(d);
         setDoctorShiftStatus(normalizeDoctorShiftStatus(d.status));
-        setHolidayDraft(nextDraft);
-        setHolidaySaved(hasSaved);
-        setHolidayFormOpen(hasSaved);
-      })
-      .finally(() => {
+        setHolidayDraft({ startDate: "", endDate: "" });
+        setHolidaySaved(false);
+        setHolidayFormOpen(false);
+      } finally {
         if (!cancelled) setDoctorProfileLoading(false);
-      });
+      }
+    })();
+
     return () => {
       cancelled = true;
     };
-  }, [activeTab, isDoctorUser, user?.email, user?.doctor]);
+  }, [
+    activeTab,
+    isDoctorUser,
+    user?.email,
+    user?.doctor,
+    user?.hospital,
+    refreshUser,
+  ]);
 
   useEffect(() => {
     if (!isDoctorUser || activeTab !== "personal") {
@@ -515,6 +563,12 @@ export const Settings = (): JSX.Element => {
       return;
     }
 
+    if (doctorLinkStatusReportsLinkedRef.current) {
+      setLinkCandidateDoctor(null);
+      setLinkCandidateSearching(false);
+      return;
+    }
+
     const email = formData.email.trim();
     if (!email) {
       setLinkCandidateDoctor(null);
@@ -522,16 +576,32 @@ export const Settings = (): JSX.Element => {
       return;
     }
 
+    /** Primary doctor-profile effect already loads link-status for the login email. */
+    const loginEmailNorm = user?.email?.trim().toLowerCase() ?? "";
+    if (email.toLowerCase() === loginEmailNorm) {
+      setLinkCandidateSearching(false);
+      return;
+    }
+
+    const hospitalId = user?.hospital?.trim() || null;
+
     let cancelled = false;
     setLinkCandidateSearching(true);
     const tid = window.setTimeout(() => {
-      findDoctorForHospitalUserEmail(email)
-        .then((d) => {
+      void (async () => {
+        try {
+          const status = await getDoctorLinkStatus(email, hospitalId);
+          if (cancelled) return;
+          if (status?.linked) {
+            setLinkCandidateDoctor(null);
+            return;
+          }
+          const d = await findDoctorForHospitalUserEmail(email, hospitalId);
           if (!cancelled) setLinkCandidateDoctor(d ?? null);
-        })
-        .finally(() => {
+        } finally {
           if (!cancelled) setLinkCandidateSearching(false);
-        });
+        }
+      })();
     }, 400);
 
     return () => {
@@ -545,6 +615,8 @@ export const Settings = (): JSX.Element => {
     myDoctorId,
     doctorProfileLoading,
     formData.email,
+    user?.email,
+    user?.hospital,
   ]);
 
   const handleLinkDoctorProfile = async () => {

@@ -82,7 +82,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   );
   const navigate = useNavigate();
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
     const data = await getUserProfile();
@@ -92,7 +92,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(nextUser);
       localStorage.setItem("user", JSON.stringify(nextUser));
     }
-  };
+  }, []);
 
   const handleUserProfile = async (token: string) => {
     try {

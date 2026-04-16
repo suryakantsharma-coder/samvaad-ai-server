@@ -35,6 +35,8 @@ interface AppointmentListOptions {
   fromDate?: string;
   toDate?: string;
   doctorId?: string;
+  /** Name fragment for `GET /api/appointments?doctor=…` (optional). */
+  doctor?: string;
   patientId?: string;
   status?: string;
   type?: string;
@@ -88,6 +90,10 @@ export const AppointmentProvider = ({
   /** YYYY-MM-DD; updated only when `options` includes `fromDate` / `toDate` keys (list fetches). */
   const listFromDateRef = useRef<string | null>(null);
   const listToDateRef = useRef<string | null>(null);
+  /** When set (e.g. hospital admin), reapplied on refetch if `options` omits `doctorId`. */
+  const listDoctorIdRef = useRef<string | null>(null);
+  /** When set (e.g. doctor role), reapplied on refetch if `options` omits `doctor`. */
+  const listDoctorNameRef = useRef<string | null>(null);
 
   const handleGetAppointments = async (
     page: number,
@@ -109,7 +115,21 @@ export const AppointmentProvider = ({
           listToDateRef.current =
             typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
         }
+        if ("doctorId" in options) {
+          const v = options.doctorId;
+          listDoctorIdRef.current =
+            typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+        }
+        if ("doctor" in options) {
+          const v = options.doctor;
+          listDoctorNameRef.current =
+            typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+        }
       }
+      const doctorIdForRequest =
+        options?.doctorId ?? listDoctorIdRef.current ?? undefined;
+      const doctorNameForRequest =
+        options?.doctor ?? listDoctorNameRef.current ?? undefined;
       const response = await getAppointments({
         page,
         limit,
@@ -117,7 +137,8 @@ export const AppointmentProvider = ({
         sortOrder: options?.sortOrder,
         fromDate: listFromDateRef.current ?? undefined,
         toDate: listToDateRef.current ?? undefined,
-        doctorId: options?.doctorId,
+        doctorId: doctorIdForRequest,
+        doctor: doctorNameForRequest,
         patientId: options?.patientId,
         status: options?.status,
         type: options?.type,

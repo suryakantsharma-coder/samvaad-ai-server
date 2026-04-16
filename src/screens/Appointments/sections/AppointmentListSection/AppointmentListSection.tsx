@@ -37,8 +37,49 @@ import {
 import { ListError } from "../../../../components/ui/list-error";
 import { Pagination } from "../../../../components/ui/pagination";
 import { useAppointments } from "../../../../contexts/AppointmentProvider";
+import { useAuth } from "../../../../contexts/AuthProvider";
 import { formatTime12h } from "../../../../lib/dateTimeDisplay";
+import {
+  getDoctorAppointmentsListOptions,
+  getLinkedDoctorRecordId,
+  normalizeRoleKey,
+} from "../../../../lib/userRole";
+import type { User } from "../../../../types/auth.type";
 import { Appointments } from "../../../../types/appointment.type";
+
+function appointmentAssignedToDoctor(
+  appointment: Appointments,
+  doctorMongoId: string,
+): boolean {
+  const d = appointment.doctor;
+  if (typeof d === "string" && d.trim()) return d.trim() === doctorMongoId;
+  if (d && typeof d === "object" && "_id" in d) {
+    return (d as { _id?: string })._id === doctorMongoId;
+  }
+  return false;
+}
+
+/** Client guard when API search/list returns rows without `doctor` name match. */
+function appointmentMatchesDoctorUserScope(
+  appointment: Appointments,
+  user: User | null | undefined,
+): boolean {
+  if (normalizeRoleKey(user?.role) !== "doctor") return true;
+  const linkedId = getLinkedDoctorRecordId(user);
+  const nameFilter = user?.name?.trim();
+  if (linkedId && appointmentAssignedToDoctor(appointment, linkedId)) return true;
+  if (nameFilter) {
+    const needle = nameFilter.toLowerCase();
+    const d = appointment.doctor;
+    if (d && typeof d === "object" && "fullName" in d) {
+      const fn = String(
+        (d as { fullName?: string }).fullName ?? "",
+      ).toLowerCase();
+      if (fn.includes(needle) || needle.includes(fn)) return true;
+    }
+  }
+  return !linkedId && !nameFilter;
+}
 
 // create a status color map function
 const statusColorMap = (status: string) => {
@@ -93,6 +134,11 @@ export const AppointmentListSection = ({
   listFromDate?: string;
   listToDate?: string;
 }): JSX.Element => {
+  const { user } = useAuth();
+  const doctorListQuery = useMemo(
+    () => getDoctorAppointmentsListOptions(user),
+    [user],
+  );
   const [activeTab, setActiveTab] = useState<"all" | "today" | "tomorrow">(
     "today",
   );
@@ -149,8 +195,17 @@ export const AppointmentListSection = ({
       type: typeForApi,
       fromDate: listFromDate,
       toDate: listToDate,
+      ...doctorListQuery,
     });
-  }, [activeTab, statusFilter, typeFilter, limit, listFromDate, listToDate]);
+  }, [
+    activeTab,
+    statusFilter,
+    typeFilter,
+    limit,
+    listFromDate,
+    listToDate,
+    doctorListQuery,
+  ]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -173,6 +228,7 @@ export const AppointmentListSection = ({
 
   const filteredAppointments = useMemo(() => {
     return (appointments ?? []).filter((appointment: Appointments) => {
+      if (!appointmentMatchesDoctorUserScope(appointment, user)) return false;
       const statusMatch =
         statusFilter === "all" ||
         appointment.status.toLowerCase() === statusFilter.toLowerCase();
@@ -182,10 +238,11 @@ export const AppointmentListSection = ({
           normalizeAppointmentType(typeFilter);
       return statusMatch && typeMatch;
     });
-  }, [appointments, statusFilter, typeFilter]);
+  }, [appointments, statusFilter, typeFilter, user]);
 
   const filteredSearchedAppointments = useMemo(() => {
     return (searchedAppointments ?? []).filter((appointment: Appointments) => {
+      if (!appointmentMatchesDoctorUserScope(appointment, user)) return false;
       const statusMatch =
         statusFilter === "all" ||
         appointment.status.toLowerCase() === statusFilter.toLowerCase();
@@ -195,7 +252,7 @@ export const AppointmentListSection = ({
           normalizeAppointmentType(typeFilter);
       return statusMatch && typeMatch;
     });
-  }, [searchedAppointments, statusFilter, typeFilter]);
+  }, [searchedAppointments, statusFilter, typeFilter, user]);
 
   const listToShow = useMemo(() => {
     if (searchQuery.trim() === "") {
@@ -524,6 +581,7 @@ export const AppointmentListSection = ({
               type: typeForApi,
               fromDate: listFromDate,
               toDate: listToDate,
+              ...doctorListQuery,
             });
           }}
           disabled={loading}

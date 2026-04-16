@@ -4,7 +4,7 @@ import {
   PhoneCall as PhoneCallIcon,
   SearchIcon,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "../../../../components/ui/button";
 import {
   DropdownMenu,
@@ -39,7 +39,46 @@ import { PatientData } from "../../../../components/modals/AddPatientModal";
 import { usePatient } from "../../../../contexts/PatientProvider";
 import { getDoctorNames, type DoctorNameRow } from "../../../../data/doctor";
 import { formatTime12h } from "../../../../lib/dateTimeDisplay";
+import {
+  getDoctorPatientsListQuery,
+  getLinkedDoctorRecordId,
+  normalizeRoleKey,
+} from "../../../../lib/userRole";
+import { useAuth } from "../../../../contexts/AuthProvider";
 import { useNavigate } from "react-router-dom";
+import type { User } from "../../../../types/auth.type";
+import type { Patients } from "../../../../types/patient.type";
+
+function patientHasAppointmentWithDoctor(
+  patient: Patients,
+  doctorMongoId: string,
+): boolean {
+  return (
+    patient.appointments?.some((a) => a.doctor?._id === doctorMongoId) ??
+    false
+  );
+}
+
+/** Client guard for search/list when API omits `doctor` match on embedded appointments. */
+function patientMatchesDoctorUserScope(
+  patient: Patients,
+  user: User | null | undefined,
+): boolean {
+  if (normalizeRoleKey(user?.role) !== "doctor") return true;
+  const linkedId = getLinkedDoctorRecordId(user);
+  const nameFilter = user?.name?.trim();
+  if (linkedId && patientHasAppointmentWithDoctor(patient, linkedId)) return true;
+  if (nameFilter) {
+    const needle = nameFilter.toLowerCase();
+    return (
+      patient.appointments?.some((a) => {
+        const fn = (a.doctor?.fullName ?? "").toLowerCase();
+        return fn.includes(needle) || needle.includes(fn);
+      }) ?? false
+    );
+  }
+  return !linkedId && !nameFilter;
+}
 
 const filterTabIds = ["all", "today", "tomorrow"] as const;
 type PatientFilterTab = (typeof filterTabIds)[number];
@@ -182,6 +221,12 @@ export const PatientListSection = ({
   listEndDate = "",
 }: PatientListSectionProps): JSX.Element => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const doctorListQuery = useMemo(
+    () => getDoctorPatientsListQuery(user),
+    [user],
+  );
+  const isDoctorUser = normalizeRoleKey(user?.role) === "doctor";
   const [activeTab, setActiveTab] = useState<PatientFilterTab>("all");
   const [statusFilter, setStatusFilter] = useState<
     "all" | "completed" | "today" | "upcoming" | "cancelled"
@@ -206,10 +251,13 @@ export const PatientListSection = ({
   } = usePatient();
 
   const baseList = searchQuery.trim() === "" ? patients : searchedPatients;
+  const scopedList = useMemo(() => {
+    return baseList.filter((p) => patientMatchesDoctorUserScope(p, user));
+  }, [baseList, user]);
   const listToShow =
     statusFilter === "all"
-      ? baseList
-      : baseList.filter((p) =>
+      ? scopedList
+      : scopedList.filter((p) =>
           p.appointments?.some(
             (a) => a.status?.toLowerCase() === statusFilter.toLowerCase(),
           ),
@@ -238,15 +286,21 @@ export const PatientListSection = ({
     };
   }, []);
 
-  const doctorIdForApi = doctorFilter === "__all__" ? "" : doctorFilter.trim();
+  const doctorScopeForList = useMemo(():
+    | string
+    | { doctorId?: string; doctor?: string } => {
+    if (Object.keys(doctorListQuery).length > 0) return doctorListQuery;
+    return doctorFilter === "__all__" ? "" : doctorFilter.trim();
+  }, [doctorListQuery, doctorFilter]);
+
   const dateRangeForApi = {
     startDate: listStartDate,
     endDate: listEndDate,
   };
 
   useEffect(() => {
-    handlePatient(1, limit, activeTab, doctorIdForApi, dateRangeForApi);
-  }, [activeTab, limit, doctorIdForApi, listStartDate, listEndDate]);
+    handlePatient(1, limit, activeTab, doctorScopeForList, dateRangeForApi);
+  }, [activeTab, limit, doctorScopeForList, listStartDate, listEndDate]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -350,28 +404,30 @@ export const PatientListSection = ({
             </SelectContent>
           </Select>
 
-          <Select value={doctorFilter} onValueChange={setDoctorFilter}>
-            <SelectTrigger className="flex min-w-[200px] max-w-[180px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
-              <SelectValue placeholder="Doctor" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                className="text-[14px] leading-[19px] font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]"
-                value="__all__"
-              >
-                All doctors
-              </SelectItem>
-              {doctorsForFilter.map((d) => (
+          {!isDoctorUser ? (
+            <Select value={doctorFilter} onValueChange={setDoctorFilter}>
+              <SelectTrigger className="flex min-w-[200px] max-w-[180px] items-center justify-between px-[15px] py-2 bg-grey-light rounded-[100px] border-0 font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
+                <SelectValue placeholder="Doctor" />
+              </SelectTrigger>
+              <SelectContent>
                 <SelectItem
-                  key={d._id}
                   className="text-[14px] leading-[19px] font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]"
-                  value={d._id}
+                  value="__all__"
                 >
-                  {d.fullName}
+                  All doctors
                 </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                {doctorsForFilter.map((d) => (
+                  <SelectItem
+                    key={d._id}
+                    className="text-[14px] leading-[19px] font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]"
+                    value={d._id}
+                  >
+                    {d.fullName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
         </div>
       </div>
 
@@ -575,7 +631,7 @@ export const PatientListSection = ({
               page,
               limit,
               activeTab,
-              doctorIdForApi,
+              doctorScopeForList,
               dateRangeForApi,
             )
           }

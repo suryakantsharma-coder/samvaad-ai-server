@@ -37,7 +37,7 @@ interface PatientContextType {
     page?: number,
     limit?: number,
     filter?: "all" | "today" | "tomorrow",
-    doctorId?: string,
+    doctorScope?: string | { doctorId?: string; doctor?: string },
     dateRange?: { startDate: string; endDate: string },
   ) => void;
   totalPages: number;
@@ -74,6 +74,8 @@ export const PatientProvider = ({
   const [limit, setLimit] = useState(10);
   /** When omitted on `handlePatient`, last non-empty list filter is reused (e.g. after delete). */
   const listDoctorIdRef = useRef<string | null>(null);
+  /** Optional `doctor=` query (doctor-role name filter); reapplied when scope object omits keys. */
+  const listDoctorNameRef = useRef<string | null>(null);
   /** YYYY-MM-DD; when `dateRange` arg omitted, previous range is reused. */
   const listDateStartRef = useRef<string | null>(null);
   const listDateEndRef = useRef<string | null>(null);
@@ -100,14 +102,22 @@ export const PatientProvider = ({
     page = 1,
     pageLimit = 10,
     filter: "all" | "today" | "tomorrow" = "all",
-    doctorId?: string,
+    doctorScope?: string | { doctorId?: string; doctor?: string },
     dateRange?: { startDate: string; endDate: string },
   ) => {
     try {
       setLoading(true);
-      if (doctorId !== undefined) {
-        const trimmed = doctorId.trim();
-        listDoctorIdRef.current = trimmed.length > 0 ? trimmed : null;
+      if (doctorScope !== undefined) {
+        if (typeof doctorScope === "string") {
+          const trimmed = doctorScope.trim();
+          listDoctorIdRef.current = trimmed.length > 0 ? trimmed : null;
+          listDoctorNameRef.current = null;
+        } else {
+          const id = doctorScope.doctorId?.trim();
+          const dn = doctorScope.doctor?.trim();
+          listDoctorIdRef.current = id && id.length > 0 ? id : null;
+          listDoctorNameRef.current = dn && dn.length > 0 ? dn : null;
+        }
       }
       if (dateRange !== undefined) {
         const s = dateRange.startDate?.trim();
@@ -122,6 +132,7 @@ export const PatientProvider = ({
         listDoctorIdRef.current,
         listDateStartRef.current,
         listDateEndRef.current,
+        listDoctorNameRef.current,
       );
       setPatients(response.data?.patients ?? []);
       const overallPatch = pickOverallFromApiData(response.data);

@@ -36,6 +36,8 @@ export const getPatients = async (
   doctorId?: string | null,
   startDate?: string | null,
   endDate?: string | null,
+  /** Optional name fragment — `GET /api/patients?doctor=…` (server-defined matching). */
+  doctor?: string | null,
 ) => {
   const params = new URLSearchParams({
     page: String(page),
@@ -47,6 +49,10 @@ export const getPatients = async (
   const id = doctorId?.trim();
   if (id) {
     params.set("doctorId", id);
+  }
+  const doctorName = doctor?.trim();
+  if (doctorName) {
+    params.set("doctor", doctorName);
   }
   const start = startDate?.trim();
   const end = endDate?.trim();
