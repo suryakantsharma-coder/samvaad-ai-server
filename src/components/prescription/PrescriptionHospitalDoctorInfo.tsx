@@ -29,18 +29,23 @@ export const PrescriptionHospitalDoctorInfo = ({
     <div className="flex flex-col gap-4">
       {hospital && (
         <div className="rounded-[10px] border border-[#dedee1] bg-[#fafaf9] p-4">
-          <div className="min-w-0 space-y-2">
-            <div className="flex items-start gap-2">
-              <Building2 className="h-5 w-5 text-primary-2 shrink-0 mt-0.5" />
-              <div className="min-w-0">
-                <p className="font-title-3m text-black text-base">{hospital.name}</p>
+          <div className="min-w-0 space-y-2 text-center">
+            <div className="flex flex-col items-center gap-2">
+              <Building2
+                className="h-5 w-5 text-primary-2 shrink-0"
+                aria-hidden
+              />
+              <div className="min-w-0 w-full">
+                <p className="font-title-3m text-black text-base">
+                  {hospital.name}
+                </p>
                 <p className="font-title-4r text-x-70 text-sm whitespace-pre-line mt-1">
                   {formatHospitalAddress(hospital)}
                 </p>
               </div>
             </div>
             {hospitalPhone || hospital.email ? (
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm justify-center">
                 {hospitalPhone ? (
                   <span className="inline-flex items-center gap-1.5 font-title-4r text-black">
                     <PhoneCall className="h-3.5 w-3.5 text-x-70 shrink-0" />

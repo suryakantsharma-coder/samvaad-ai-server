@@ -45,7 +45,7 @@ export interface DoctorData {
   morningEnd: string;
   eveningStart: string;
   eveningEnd: string;
-  status: "Off Duty" | "On Duty" | "On Break" | "On Leave";
+  status: "Off Duty" | "On Duty";
   holidays?: DoctorHoliday[];
 }
 
@@ -116,9 +116,7 @@ function doctorToFormData(d: Doctor): DoctorData {
   const { countryCode, phone } = parsePhoneForForm(d.phoneNumber);
   const times = parseAvailabilityForForm(d.availability);
   const st = d.status as DoctorData["status"];
-  const status = ["Off Duty", "On Duty", "On Break", "On Leave"].includes(st)
-    ? st
-    : "On Duty";
+  const status = ["Off Duty", "On Duty"].includes(st) ? st : "On Duty";
   return {
     name: d.fullName,
     phone,
@@ -334,7 +332,7 @@ export const AddDoctorModal = ({
                   type="button"
                   onClick={() =>
                     toggleWorkingDay(
-                      day.key as keyof typeof formData.workingDays
+                      day.key as keyof typeof formData.workingDays,
                     )
                   }
                   className={`inline-flex items-center gap-2 px-3 py-2 rounded-[10px] border transition-colors ${
@@ -451,11 +449,7 @@ export const AddDoctorModal = ({
               onValueChange={(value) =>
                 setFormData({
                   ...formData,
-                  status: value as
-                    | "Off Duty"
-                    | "On Duty"
-                    | "On Break"
-                    | "On Leave",
+                  status: value as "Off Duty" | "On Duty",
                 })
               }
             >
@@ -465,8 +459,6 @@ export const AddDoctorModal = ({
               <SelectContent>
                 <SelectItem value="Off Duty">Off Duty</SelectItem>
                 <SelectItem value="On Duty">On Duty</SelectItem>
-                <SelectItem value="On Break">On Break</SelectItem>
-                <SelectItem value="On Leave">On Leave</SelectItem>
               </SelectContent>
             </Select>
           </div>

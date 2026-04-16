@@ -8,26 +8,10 @@ import {
   RescheduleModal,
 } from "../../components/modals/AddAppointmentModal";
 import { useAppointments } from "../../contexts/AppointmentProvider";
-
-function toYMDLocal(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function getDefaultAppointmentListDateRange(): { from: string; to: string } {
-  const to = new Date();
-  const from = new Date();
-  from.setDate(from.getDate() - 29);
-  return { from: toYMDLocal(from), to: toYMDLocal(to) };
-}
+import { currentMonthFromToYmd } from "../../lib/currentMonthDateRange";
 
 export const Appointments = (): JSX.Element => {
-  const defaultListDateRange = useMemo(
-    () => getDefaultAppointmentListDateRange(),
-    [],
-  );
+  const defaultListDateRange = useMemo(() => currentMonthFromToYmd(), []);
   const [listFromDate, setListFromDate] = useState(defaultListDateRange.from);
   const [listToDate, setListToDate] = useState(defaultListDateRange.to);
   const [showAddModal, setShowAddModal] = useState(false);

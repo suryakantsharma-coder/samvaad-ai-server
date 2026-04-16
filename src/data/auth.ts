@@ -8,12 +8,20 @@ export const register = async (
   role: string,
   hospitalId: string,
 ) => {
+  const hid = hospitalId.trim();
   const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ email, password, name, role, hospital: hospitalId }),
+    body: JSON.stringify({
+      email,
+      password,
+      name,
+      role,
+      hospital: hid,
+      hospitalId: hid,
+    }),
   });
   return response.json();
 };
@@ -267,6 +275,32 @@ export const updateUserRoleByHospitalId = async (
     body: { role, hospitalId } as object,
   });
 };
+
+/**
+ * DELETE /api/admin/users/:userId?hospitalId=… — remove a user from the hospital (hospital_admin).
+ */
+export async function deleteHospitalUser(
+  userId: string,
+  hospitalId: string,
+): Promise<void> {
+  const id = userId.trim();
+  const hid = hospitalId.trim();
+  if (!id) throw new Error("Missing user id.");
+  if (!hid) throw new Error("Missing hospital id.");
+  const data = (await authFetch(
+    `/api/admin/users/${encodeURIComponent(id)}?hospitalId=${encodeURIComponent(hid)}`,
+    { method: "DELETE" },
+  )) as {
+    success?: boolean;
+    message?: string;
+    error?: string;
+  };
+  if (data && typeof data === "object" && data.success === false) {
+    throw new Error(
+      String(data.message ?? data.error ?? "Failed to delete user"),
+    );
+  }
+}
 
 /** POST /api/admin/users/:userId/link-doctor — associate a hospital user with a doctor record. */
 export const linkHospitalUserToDoctor = async (

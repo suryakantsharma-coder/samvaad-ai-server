@@ -72,8 +72,9 @@ export function DashboardDataProvider({
   const [dateRange, setDateRangeState] = useState<DashboardDateRange>(() =>
     defaultDashboardDateRange(),
   );
+  /** `null` = use {@link dateRange} as `from_date` / `to_date` (default: current calendar month). */
   const [dashboardPreset, setDashboardPreset] =
-    useState<HospitalAdminDashboardPreset | null>("last_30_days");
+    useState<HospitalAdminDashboardPreset | null>(null);
   const [response, setResponse] = useState<DashboardResponse>(
     emptyDashboardPlaceholder,
   );

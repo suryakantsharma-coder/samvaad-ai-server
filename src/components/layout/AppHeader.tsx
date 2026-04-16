@@ -78,7 +78,7 @@ function navigationItemsForUser(user: User | null): NavItem[] {
       },
       {
         id: "payments",
-        label: "Payments",
+        label: "Payouts",
         icon: "/payment.svg",
         path: "/payment",
       },

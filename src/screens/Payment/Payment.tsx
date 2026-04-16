@@ -1,32 +1,18 @@
 import { useCallback, useMemo, useState } from "react";
 import { useAuth } from "../../contexts/AuthProvider";
+import { currentMonthFromToYmd } from "../../lib/currentMonthDateRange";
 import { getLinkedHospitalId } from "../../lib/linkedHospitalId";
+import { isSuperAdminRole } from "../../lib/userRole";
 import { PaymentHeaderSection } from "./sections/PaymentHeaderSection";
 import { PaymentListSection } from "./sections/PaymentListSection";
-
-function toYMDLocal(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function getDefaultPaymentListDateRange(): { from: string; to: string } {
-  const to = new Date();
-  const from = new Date();
-  from.setDate(from.getDate() - 29);
-  return { from: toYMDLocal(from), to: toYMDLocal(to) };
-}
 
 export const Payment = (): JSX.Element => {
   const { user } = useAuth();
   const hospitalId = getLinkedHospitalId(user);
+  const headerVariant = isSuperAdminRole(user?.role) ? "payouts" : "payments";
   const [totalRecords, setTotalRecords] = useState<number | null>(null);
   const [totalDoctors, setTotalDoctors] = useState<number | null>(null);
-  const defaultListDateRange = useMemo(
-    () => getDefaultPaymentListDateRange(),
-    [],
-  );
+  const defaultListDateRange = useMemo(() => currentMonthFromToYmd(), []);
   const [listFromDate, setListFromDate] = useState(defaultListDateRange.from);
   const [listToDate, setListToDate] = useState(defaultListDateRange.to);
 
@@ -51,6 +37,7 @@ export const Payment = (): JSX.Element => {
   return (
     <div className="w-full flex flex-col gap-[25px] p-4 md:p-6">
       <PaymentHeaderSection
+        variant={headerVariant}
         totalRecords={totalRecords}
         totalDoctors={totalDoctors}
         listFromDate={listFromDate}

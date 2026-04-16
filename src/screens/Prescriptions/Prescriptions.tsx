@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { currentMonthStartEndYmd } from "../../lib/currentMonthDateRange";
 import { showSuccess, showError } from "../../lib/toast";
 import { downloadPrescriptionReportPdf } from "../../lib/prescriptionPdf";
 import {
@@ -14,20 +15,6 @@ import type {
 } from "../../types/prescription.type";
 import { PrescriptionsHeaderSection } from "./sections/PrescriptionHeaderSection/ PrescriptionsHeaderSection";
 import { PrescriptionListSection } from "./sections/PrescriptionListSection/PrescriptionListSection";
-
-function toYMDLocal(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function getDefaultPrescriptionListDateRange(): { start: string; end: string } {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - 29);
-  return { start: toYMDLocal(start), end: toYMDLocal(end) };
-}
 
 function mapModalPayloadToCreate(
   payload: NewPrescriptionPayload,
@@ -62,10 +49,7 @@ function mapModalPayloadToCreate(
 }
 
 export const Prescriptions = (): JSX.Element => {
-  const defaultListDateRange = useMemo(
-    () => getDefaultPrescriptionListDateRange(),
-    [],
-  );
+  const defaultListDateRange = useMemo(() => currentMonthStartEndYmd(), []);
   const [listStartDate, setListStartDate] = useState(defaultListDateRange.start);
   const [listEndDate, setListEndDate] = useState(defaultListDateRange.end);
   const [showNewPrescriptionModal, setShowNewPrescriptionModal] =

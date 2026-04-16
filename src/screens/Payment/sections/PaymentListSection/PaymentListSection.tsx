@@ -50,6 +50,8 @@ import {
   SelectValue,
 } from "../../../../components/ui/select";
 import {
+  fetchHospitalPaymentsList,
+  fetchHospitalPaymentsSearch,
   fetchPayoutsPage,
   fetchPayoutsSearch,
   patchPayoutSummaryStatus,
@@ -74,6 +76,15 @@ function statusFilterToPayoutListStatus(
 
 /** Search API optional `razorpayStatus`. */
 function statusFilterToRazorpayStatus(
+  filter: "all" | "paid" | "draft",
+): string | undefined {
+  if (filter === "paid") return "captured";
+  if (filter === "draft") return "created";
+  return undefined;
+}
+
+/** GET /api/payments/search `paymentStatus` (e.g. captured, created). */
+function statusFilterToPaymentsSearchStatus(
   filter: "all" | "paid" | "draft",
 ): string | undefined {
   if (filter === "paid") return "captured";
@@ -174,6 +185,17 @@ function PayoutInstantCell({
     );
   }
   return <div className="px-[20px] py-[16px] font-title-4l text-x-70">—</div>;
+}
+
+function TransactionPaidCell({ row }: { row: PaymentTableRow }): JSX.Element {
+  if (row.paymentAtMs != null && !Number.isNaN(row.paymentAtMs)) {
+    return <PayoutInstantCell atMs={row.paymentAtMs} />;
+  }
+  return (
+    <div className="px-[20px] py-[16px] font-title-4l text-black">
+      {row.paymentDateLabel}
+    </div>
+  );
 }
 
 function DetailBlock({
@@ -417,6 +439,12 @@ export const PaymentListSection = ({
     return () => window.clearTimeout(t);
   }, [searchQuery]);
 
+  /** Super-admin default view is payout periods; search switches to transaction rows. */
+  const usePayoutTableLayout = useMemo(
+    () => canMarkPaid && !debouncedSearch.trim(),
+    [canMarkPaid, debouncedSearch],
+  );
+
   const orderedListRange = useMemo(() => {
     const a = listFromDate.trim();
     const b = listToDate.trim();
@@ -453,7 +481,17 @@ export const PaymentListSection = ({
     [statusFilter],
   );
 
+  const paymentsSearchStatus = useMemo(
+    () => statusFilterToPaymentsSearchStatus(statusFilter),
+    [statusFilter],
+  );
+
+  /** Hospital payment list/search use GET /api/payments* `sort`; payouts stay client-sorted. */
+  const serverPaymentSortActive = !canMarkPaid && hospitalLinked;
+
   const displayRows = useMemo(() => {
+    if (serverPaymentSortActive) return rows;
+
     const sortMs = (row: PaymentTableRow) =>
       row.rowKind === "payout"
         ? (row.payoutStartAtMs ?? row.paymentAtMs ?? 0)
@@ -467,24 +505,27 @@ export const PaymentListSection = ({
       if (tb === 0) return -1;
       return dateSort === "newest" ? tb - ta : ta - tb;
     });
-  }, [rows, dateSort]);
+  }, [rows, dateSort, serverPaymentSortActive]);
 
   const emptyStateMessage = useMemo(() => {
     if (rows.length > 0) return "";
+    const noun = usePayoutTableLayout ? "payouts" : "payments";
     if (debouncedSearch.trim() && !hospitalLinked && !canMarkPaid) {
-      return "Link a hospital to your account to search payouts, or clear the search to browse the list.";
+      return "Link a hospital to your account to search payments, or clear the search to browse the list.";
     }
-    if (debouncedSearch.trim()) return "No payments match your search.";
+    if (debouncedSearch.trim()) {
+      return `No ${noun} match your search.`;
+    }
     if (statusFilter === "paid") {
-      return "No paid payments match the current filters.";
+      return `No paid ${noun} match the current filters.`;
     }
     if (statusFilter === "draft") {
-      return "No draft payments match the current filters.";
+      return `No draft ${noun} match the current filters.`;
     }
     if (orderedListRange.fromYmd && orderedListRange.toYmd) {
-      return "No payments in the selected date range.";
+      return `No ${noun} in the selected date range.`;
     }
-    return "No payments found.";
+    return `No ${noun} found.`;
   }, [
     rows.length,
     debouncedSearch,
@@ -493,6 +534,7 @@ export const PaymentListSection = ({
     canMarkPaid,
     orderedListRange.fromYmd,
     orderedListRange.toYmd,
+    usePayoutTableLayout,
   ]);
 
   const openDetails = (row: PaymentTableRow) => {
@@ -521,22 +563,41 @@ export const PaymentListSection = ({
           onRecordsMetaRef.current?.({ total: 0, totalDoctors: undefined });
           return;
         }
-        const { rows: nextRows, meta } = await fetchPayoutsSearch({
-          ...(hospitalLinked ? { hospitalId: hospitalId.trim() } : {}),
-          q,
-          page,
-          limit: PAGE_SIZE,
-          fromDate: listDateRange.fromDate,
-          toDate: listDateRange.toDate,
-          razorpayStatus: searchRazorpayStatus,
-        });
-        setRows(nextRows);
-        setTotalPages(meta.totalPages);
-        onRecordsMetaRef.current?.({
-          total: meta.total,
-          totalDoctors: meta.totalDoctors,
-        });
-      } else {
+        if (canMarkPaid) {
+          const { rows: nextRows, meta } = await fetchPayoutsSearch({
+            ...(hospitalLinked ? { hospitalId: hospitalId.trim() } : {}),
+            q,
+            page,
+            limit: PAGE_SIZE,
+            fromDate: listDateRange.fromDate,
+            toDate: listDateRange.toDate,
+            razorpayStatus: searchRazorpayStatus,
+          });
+          setRows(nextRows);
+          setTotalPages(meta.totalPages);
+          onRecordsMetaRef.current?.({
+            total: meta.total,
+            totalDoctors: meta.totalDoctors,
+          });
+        } else {
+          const { rows: nextRows, meta } = await fetchHospitalPaymentsSearch({
+            hospitalId: hospitalId.trim(),
+            q,
+            page,
+            limit: PAGE_SIZE,
+            paymentStatus: paymentsSearchStatus,
+            fromDate: listDateRange.fromDate,
+            toDate: listDateRange.toDate,
+            sort: dateSort,
+          });
+          setRows(nextRows);
+          setTotalPages(meta.totalPages);
+          onRecordsMetaRef.current?.({
+            total: meta.total,
+            totalDoctors: meta.totalDoctors,
+          });
+        }
+      } else if (canMarkPaid) {
         const { rows: nextRows, meta } = await fetchPayoutsPage({
           page,
           limit: PAGE_SIZE,
@@ -550,9 +611,27 @@ export const PaymentListSection = ({
           total: meta.total,
           totalDoctors: meta.totalDoctors,
         });
+      } else {
+        const { rows: nextRows, meta } = await fetchHospitalPaymentsList({
+          hospitalId: hospitalId.trim(),
+          page,
+          limit: PAGE_SIZE,
+          filter: statusFilter,
+          fromDate: listDateRange.fromDate,
+          toDate: listDateRange.toDate,
+          sort: dateSort,
+        });
+        setRows(nextRows);
+        setTotalPages(meta.totalPages);
+        onRecordsMetaRef.current?.({
+          total: meta.total,
+          totalDoctors: meta.totalDoctors,
+        });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load payments.");
+      setError(
+        e instanceof Error ? e.message : "Failed to load payments or payouts.",
+      );
       setRows([]);
       setTotalPages(1);
       onRecordsMetaRef.current?.({ total: 0, totalDoctors: undefined });
@@ -570,6 +649,9 @@ export const PaymentListSection = ({
     listDateRange.toDate,
     payoutListStatus,
     searchRazorpayStatus,
+    paymentsSearchStatus,
+    statusFilter,
+    dateSort,
   ]);
 
   loadRef.current = load;
@@ -593,6 +675,10 @@ export const PaymentListSection = ({
   useEffect(() => {
     setPage(1);
   }, [statusFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [dateSort]);
 
   const handleMarkAsPaid = useCallback(async (row: PaymentTableRow) => {
     if (!isRowDraftStatus(row)) {
@@ -648,35 +734,6 @@ export const PaymentListSection = ({
       />
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 px-5 md:px-6 pt-5 md:pt-6 pb-[26px]">
         <div className="flex flex-col items-start gap-2">
-          <ToggleGroup
-            type="single"
-            value={statusFilter}
-            onValueChange={(v) => {
-              if (v === "all" || v === "paid" || v === "draft") {
-                setStatusFilter(v);
-              }
-            }}
-            className="inline-flex items-center gap-[15px] p-[3px] bg-grey-light rounded-[100px]"
-          >
-            <ToggleGroupItem
-              value="all"
-              className="inline-flex items-center justify-center gap-[5px] px-5 py-[5px] rounded-[100px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] data-[state=on]:bg-primary-2 data-[state=on]:text-white bg-transparent text-x-70"
-            >
-              All
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="paid"
-              className="inline-flex items-center justify-center gap-[5px] px-5 py-[5px] rounded-[100px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] data-[state=on]:bg-primary-2 data-[state=on]:text-white bg-transparent text-x-70"
-            >
-              Paid
-            </ToggleGroupItem>
-            <ToggleGroupItem
-              value="draft"
-              className="inline-flex items-center justify-center gap-[5px] px-5 py-[5px] rounded-[100px] font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] data-[state=on]:bg-primary-2 data-[state=on]:text-white bg-transparent text-x-70"
-            >
-              Draft
-            </ToggleGroupItem>
-          </ToggleGroup>
           {/* <p className="font-title-4r text-x-70 max-w-md leading-snug lg:max-w-sm">
             {canMarkPaid && !hospitalLinked
               ? "Super admin: search runs without a hospital filter if your API allows it."
@@ -690,7 +747,9 @@ export const PaymentListSection = ({
             <Input
               placeholder={
                 hospitalLinked || canMarkPaid
-                  ? "Search payouts (e.g. pay_, order id)..."
+                  ? usePayoutTableLayout
+                    ? "Search transactions (payment id, order id)…"
+                    : "Search payments (patient, payment id, order id)…"
                   : "Link a hospital to enable search…"
               }
               value={searchQuery}
@@ -722,45 +781,73 @@ export const PaymentListSection = ({
         <Table>
           <TableHeader>
             <TableRow className="bg-grey-dark hover:bg-grey-dark border-0">
-              <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
-                Hospital name
-              </TableHead>
-              <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
-                Price
-              </TableHead>
-              <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
-                Start Date
-              </TableHead>
-              <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
-                End Date
-              </TableHead>
-              <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
-                Status
-              </TableHead>
-              <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
-                Action
-              </TableHead>
+              {usePayoutTableLayout ? (
+                <>
+                  <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                    Hospital name
+                  </TableHead>
+                  <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                    Price
+                  </TableHead>
+                  <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                    Start Date
+                  </TableHead>
+                  <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                    End Date
+                  </TableHead>
+                  <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                    Status
+                  </TableHead>
+                  <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                    Action
+                  </TableHead>
+                </>
+              ) : (
+                <>
+                  <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                    Patient
+                  </TableHead>
+                  <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                    Doctor
+                  </TableHead>
+                  <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                    Amount
+                  </TableHead>
+                  <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                    Paid on
+                  </TableHead>
+                  <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                    Status
+                  </TableHead>
+                  <TableHead className="font-title-4m px-[20px] py-[10px] text-black">
+                    Action
+                  </TableHead>
+                </>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableLoadingRow colSpan={6} />
+              <TableLoadingRow colSpan={usePayoutTableLayout ? 6 : 7} />
             ) : error ? (
               <TableRow>
-                <TableCell colSpan={6} className="p-0 align-top">
+                <TableCell
+                  colSpan={usePayoutTableLayout ? 6 : 7}
+                  className="p-0 align-top"
+                >
                   <ListError message={error} />
                 </TableCell>
               </TableRow>
             ) : displayRows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={usePayoutTableLayout ? 6 : 7}
                   className="px-[20px] py-12 text-center font-title-4r text-x-70"
                 >
                   {emptyStateMessage}
                 </TableCell>
               </TableRow>
-            ) : (
+            ) : usePayoutTableLayout ? (
               displayRows.map((row) => (
                 <TableRow
                   key={row.id}
@@ -847,6 +934,79 @@ export const PaymentListSection = ({
                             {row.rowKind === "payout"
                               ? "Copy payout ID"
                               : "Copy payment ID"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              displayRows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className="border-b border-[#dedee1] hover:bg-grey-light/50"
+                >
+                  <TableCell className="px-[20px] py-[16px] font-title-4l text-black max-w-[180px]">
+                    {row.patientName}
+                  </TableCell>
+                  <TableCell className="px-[20px] py-[16px] font-title-4l text-black max-w-[180px]">
+                    {row.doctorName}
+                  </TableCell>
+                  <TableCell className="px-[20px] py-[16px] font-title-4l text-black">
+                    ₹ {displayPriceLabel(row.priceLabel)}
+                  </TableCell>
+                  <TableCell className="p-0 align-top">
+                    <TransactionPaidCell row={row} />
+                  </TableCell>
+                  <TableCell className="px-[20px] py-[16px]">
+                    <Badge
+                      className={`rounded-[100px] px-2.5 py-[5px] font-title-4r ${statusBadgeClass(row.status)}`}
+                    >
+                      {displayPaymentStatus(row.status)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="px-[20px] py-[16px]">
+                    <div className="flex flex-wrap items-center justify-start gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 shrink-0 rounded-full hover:bg-transparent active:bg-transparent data-[state=open]:bg-transparent"
+                            aria-label={`More actions for payment ${row.id}`}
+                          >
+                            <MoreVerticalIcon className="h-5 w-5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {canMarkPaid &&
+                          isRowDraftStatus(row) &&
+                          canMarkPaidRow(row) ? (
+                            <DropdownMenuItem
+                              onClick={() => void handleMarkAsPaid(row)}
+                            >
+                              Mark as paid
+                            </DropdownMenuItem>
+                          ) : null}
+                          <DropdownMenuItem onClick={() => openDetails(row)}>
+                            View details
+                          </DropdownMenuItem>
+                          {row.patientId ? (
+                            <DropdownMenuItem
+                              onClick={() =>
+                                navigate(
+                                  `/prescriptions/patient/${row.patientId}`,
+                                )
+                              }
+                            >
+                              View patient
+                            </DropdownMenuItem>
+                          ) : null}
+                          <DropdownMenuItem
+                            onClick={() => void copyText("Payment ID", row.id)}
+                          >
+                            Copy payment ID
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

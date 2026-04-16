@@ -8,28 +8,11 @@ import { PatientData } from "../../components/modals/AddPatientModal";
 import { PatientHeaderSection } from "./sections/PatientHeaderSection";
 import { PatientListSection } from "./sections/PatientListSection";
 import { usePatient } from "../../contexts/PatientProvider";
+import { currentMonthStartEndYmd } from "../../lib/currentMonthDateRange";
 import { CreatePatientPayload } from "../../types/patient.type";
 
-function toYMDLocal(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-/** Inclusive last 30 days: today and the 29 prior calendar days. */
-function getDefaultPatientListDateRange(): { start: string; end: string } {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - 29);
-  return { start: toYMDLocal(start), end: toYMDLocal(end) };
-}
-
 export const Patients = (): JSX.Element => {
-  const defaultListDateRange = useMemo(
-    () => getDefaultPatientListDateRange(),
-    [],
-  );
+  const defaultListDateRange = useMemo(() => currentMonthStartEndYmd(), []);
   const [listStartDate, setListStartDate] = useState(
     defaultListDateRange.start,
   );

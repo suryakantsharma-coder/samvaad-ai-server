@@ -158,7 +158,7 @@ function DashboardInner(): JSX.Element {
                             {card.label}
                           </span>
                         </div>
-                        <div className="absolute top-[72px] left-5 right-[6.75rem] flex min-w-0 flex-col items-stretch gap-[5px]">
+                        <div className="w-[100%] absolute top-[72px] left-5 right-[6.75rem] flex min-w-0 flex-col items-stretch gap-[5px]">
                           <span className="font-title-1 font-[number:var(--title-1-font-weight)] text-black text-[length:var(--title-1-font-size)] tracking-[var(--title-1-letter-spacing)] leading-[var(--title-1-line-height)] [font-style:var(--title-1-font-style)]">
                             {card.value}
                           </span>
@@ -180,9 +180,9 @@ function DashboardInner(): JSX.Element {
                             </span>
                           </div>
                         </div>
-                        <div className="absolute top-[78px] right-5">
+                        {/* <div className="absolute top-[78px] right-5">
                           {card.chart}
-                        </div>
+                        </div> */}
                       </CardContent>
                     </Card>
                   );

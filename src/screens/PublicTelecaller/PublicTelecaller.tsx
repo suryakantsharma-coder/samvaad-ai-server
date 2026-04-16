@@ -17,6 +17,7 @@ import { API_BASE_URL } from "../../config";
 import { authFetch } from "../../data/api";
 import type { PublicTelecallerPayload } from "../../types/telecaller.type";
 import { resolveTelecallerBookingAmountInr } from "../../lib/telecallerPricing";
+import { PublicBrandHeader } from "../../components/layout/PublicBrandHeader";
 
 type RazorpayOrder = {
   id: string;
@@ -611,8 +612,10 @@ export const PublicTelecaller = (): JSX.Element => {
   };
 
   return (
-    <div className="bg-app-background w-full min-h-screen flex flex-col gap-6 p-4 md:p-6 text-black">
-      <div className="max-w-2xl w-full mx-auto">
+    <div className="bg-app-background w-full min-h-screen flex flex-col text-black">
+      <PublicBrandHeader />
+      <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+        <div className="max-w-2xl w-full mx-auto">
         {successMessage ? (
           <div className="rounded-[12px] border border-[#86efac] bg-[#f0fdf4] p-8 md:p-10 text-center space-y-4">
             <div className="mx-auto w-12 h-12 rounded-full bg-[#dcfce7] text-[#166534] flex items-center justify-center">
@@ -829,6 +832,7 @@ export const PublicTelecaller = (): JSX.Element => {
             )}
           </div>
         )}
+        </div>
       </div>
       {failureToast && (
         <div className="fixed right-4 top-4 z-50 rounded-[10px] border border-[#fecaca] bg-[#fff1f2] px-4 py-3 text-sm text-[#9f1239] shadow-md">

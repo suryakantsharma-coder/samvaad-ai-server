@@ -35,8 +35,8 @@ import { useHospital } from "../../contexts/HospitalProvider";
 import { showSuccess, showError, showWarning } from "../../lib/toast";
 import { connectWhatsAppEmbeddedSignup } from "../../lib/whatsappConnect";
 import {
-  getHospitalUsers,
   linkHospitalUserToDoctor,
+  registerUserWithHospital,
   updateCurrentUserProfile,
   uploadProfilePicture,
 } from "../../data/auth";
@@ -198,7 +198,14 @@ function resolvePersonalAvatarSrc(
 }
 
 export const Settings = (): JSX.Element => {
-  const { user, refreshUser } = useAuth();
+  const {
+    user,
+    refreshUser,
+    handleGetHospitalUsers,
+    hospitalUsers: hospitalUsersWithRoles,
+    handleChangeUserRole,
+    handleDeleteHospitalUser,
+  } = useAuth();
   const {
     currentHospital,
     currentHospitalLoading,
@@ -249,36 +256,6 @@ export const Settings = (): JSX.Element => {
     }
   }, [canManageHospitalIntegrations, activeTab]);
 
-  useEffect(() => {
-    if (activeTab === "auth" && isHospitalAdmin) {
-      setUsersLoading(true);
-      getHospitalUsers(user?._id ?? "")
-        .then((res) => {
-          const data = res as { data?: { users?: User[] }; users?: User[] };
-          const list = data?.data?.users ?? data?.users ?? [];
-          setHospitalUsers(Array.isArray(list) ? list : []);
-        })
-        .catch(() => setHospitalUsers([]))
-        .finally(() => setUsersLoading(false));
-    }
-  }, [activeTab, isHospitalAdmin]);
-
-  const handleRoleChange = async (userId: string, newRole: string) => {
-    setUpdatingRoleId(userId);
-    try {
-      setHospitalUsers((prev) =>
-        prev.map((u) => (u._id === userId ? { ...u, role: newRole } : u)),
-      );
-    } catch (err) {
-      showError(
-        "Error",
-        err instanceof Error ? err.message : "Failed to update role",
-      );
-    } finally {
-      setUpdatingRoleId(null);
-    }
-  };
-
   const handleAddUserSuccess = () => {
     setAddUserSuccess(true);
     setNewUserForm({
@@ -288,13 +265,6 @@ export const Settings = (): JSX.Element => {
       confirmPassword: "",
       role: "doctor",
     });
-    getHospitalUsers(user?._id ?? "")
-      .then((res) => {
-        const data = res as { data?: { users?: User[] }; users?: User[] };
-        const list = data?.data?.users ?? data?.users ?? [];
-        setHospitalUsers(Array.isArray(list) ? list : []);
-      })
-      .catch(() => {});
   };
 
   const [newUserForm, setNewUserForm] = useState({
@@ -306,10 +276,10 @@ export const Settings = (): JSX.Element => {
   });
   const [addUserLoading, setAddUserLoading] = useState(false);
   const [addUserSuccess, setAddUserSuccess] = useState(false);
-  const [hospitalUsers, setHospitalUsers] = useState<User[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [listUpdating, setListUpdating] = useState(false);
   const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     fullName: "",
     phone: "",
@@ -1138,16 +1108,23 @@ export const Settings = (): JSX.Element => {
       showWarning("Warning", "Please fill in name, email, and password.");
       return;
     }
+    const hospitalId = String(user?.hospital ?? "").trim();
+    if (!hospitalId) {
+      showWarning("Warning", "Your account has no linked hospital.");
+      return;
+    }
     setAddUserLoading(true);
     setAddUserSuccess(false);
     try {
-      await handleRegister(
-        newUserForm.email,
-        newUserForm.password,
-        newUserForm.name,
-        "user",
-        user?.hospital as string,
-      );
+      await registerUserWithHospital({
+        email: newUserForm.email,
+        password: newUserForm.password,
+        name: newUserForm.name,
+        role: newUserForm.role.trim() || "doctor",
+        hospitalId,
+      });
+      await refreshUser();
+      await handleGetHospitalUsers(hospitalId);
       handleAddUserSuccess();
       showSuccess("Success!", "User created successfully.");
     } catch (err) {
@@ -1160,20 +1137,21 @@ export const Settings = (): JSX.Element => {
     }
   };
 
-  // hospital users list + role assign
-
-  const {
-    handleGetHospitalUsers,
-    hospitalUsers: hospitalUsersWithRoles,
-    handleRegister,
-    handleChangeUserRole,
-  } = useAuth();
-
   useEffect(() => {
-    if (activeTab === "auth" && isHospitalAdmin) {
-      handleGetHospitalUsers(user?.hospital as string);
+    if (activeTab !== "auth" || !isHospitalAdmin) {
+      setUsersLoading(false);
+      return;
     }
-  }, [activeTab, isHospitalAdmin, user]);
+    const hospitalId = String(user?.hospital ?? "").trim();
+    if (!hospitalId) {
+      setUsersLoading(false);
+      return;
+    }
+    setUsersLoading(true);
+    void handleGetHospitalUsers(hospitalId).finally(() =>
+      setUsersLoading(false),
+    );
+  }, [activeTab, isHospitalAdmin, user?.hospital, handleGetHospitalUsers]);
 
   const handleChangeUserRoles = async (
     userId: string,
@@ -1194,6 +1172,31 @@ export const Settings = (): JSX.Element => {
     } finally {
       setListUpdating(false);
       setUpdatingRoleId(null);
+    }
+  };
+
+  const handleRemoveHospitalUser = async (
+    targetUserId: string,
+    hospitalId: string,
+  ) => {
+    if (
+      !confirm(
+        "Remove this user from the hospital? They will no longer be able to sign in.",
+      )
+    ) {
+      return;
+    }
+    setDeletingUserId(targetUserId);
+    try {
+      await handleDeleteHospitalUser(targetUserId, hospitalId);
+      showSuccess("User removed", "The user has been deleted.");
+    } catch (err) {
+      showError(
+        "Error",
+        err instanceof Error ? err.message : "Failed to delete user",
+      );
+    } finally {
+      setDeletingUserId(null);
     }
   };
 
@@ -1851,7 +1854,7 @@ export const Settings = (): JSX.Element => {
                     </h3>
                   </div>
                   <p className="font-title-5l text-[#57575f] text-sm">
-                    View and assign roles to users in your hospital.
+                    View, assign roles, or remove users from your hospital.
                   </p>
                   {usersLoading && hospitalUsersWithRoles?.length === 0 ? (
                     <p className="font-title-4r text-[#57575f] py-4">
@@ -1863,10 +1866,12 @@ export const Settings = (): JSX.Element => {
                     </p>
                   ) : (
                     <div className="relative overflow-x-auto rounded-[10px] border border-[#dedee1]">
-                      {listUpdating && (
+                      {(listUpdating || deletingUserId != null) && (
                         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[10px] bg-white/80">
                           <p className="font-title-4r text-primary-2">
-                            Updating role…
+                            {deletingUserId != null
+                              ? "Removing user…"
+                              : "Updating role…"}
                           </p>
                         </div>
                       )}
@@ -1885,10 +1890,18 @@ export const Settings = (): JSX.Element => {
                             <th className="text-left font-title-4m text-black px-4 py-3 w-[180px]">
                               Assign role
                             </th>
+                            <th className="text-left font-title-4m text-black px-4 py-3 w-[100px]">
+                              Remove
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
-                          {hospitalUsersWithRoles?.map((u) => (
+                          {hospitalUsersWithRoles?.map((u) => {
+                            const hospitalIdForApi = String(
+                              user?.hospital ?? "",
+                            ).trim();
+                            const isSelf = u._id === user?._id;
+                            return (
                             <tr
                               key={u._id}
                               className="border-b border-[#dedee1] last:border-0"
@@ -1946,8 +1959,38 @@ export const Settings = (): JSX.Element => {
                                   </SelectContent>
                                 </Select>
                               </td>
+                              <td className="px-4 py-3">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-9 w-9 p-0 border-[#dedee1] text-red-600 hover:bg-red-50 hover:text-red-700"
+                                  title={
+                                    isSelf
+                                      ? "You cannot remove your own account here."
+                                      : "Remove user"
+                                  }
+                                  disabled={
+                                    isSelf ||
+                                    deletingUserId === u._id ||
+                                    listUpdating ||
+                                    !hospitalIdForApi
+                                  }
+                                  onClick={() =>
+                                    void handleRemoveHospitalUser(
+                                      u._id,
+                                      hospitalIdForApi,
+                                    )
+                                  }
+                                >
+                                  {deletingUserId === u._id ?
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  : <Trash2Icon className="w-4 h-4" />}
+                                </Button>
+                              </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

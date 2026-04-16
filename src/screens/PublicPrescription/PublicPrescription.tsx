@@ -9,6 +9,7 @@ import { formatDateTime12h } from "../../lib/dateTimeDisplay";
 import { downloadPrescriptionReportPdf } from "../../lib/prescriptionPdf";
 import { getDiagnosis } from "../../lib/prescriptionMeta";
 import type { Prescription } from "../../types/prescription.type";
+import { PublicBrandHeader } from "../../components/layout/PublicBrandHeader";
 
 export const PublicPrescription = (): JSX.Element => {
   const { prescriptionId } = useParams<{ prescriptionId: string }>();
@@ -54,8 +55,10 @@ export const PublicPrescription = (): JSX.Element => {
   };
 
   return (
-    <div className="bg-app-background w-full min-h-screen flex flex-col gap-[25px] p-4 md:p-6 text-black">
-      <div className="max-w-2xl w-full mx-auto flex flex-col gap-6">
+    <div className="bg-app-background w-full min-h-screen flex flex-col text-black">
+      <PublicBrandHeader />
+      <div className="flex flex-1 flex-col gap-[25px] p-4 md:p-6">
+        <div className="max-w-2xl w-full mx-auto flex flex-col gap-6">
         <header className="flex flex-col items-start gap-[5px]">
           <h1 className="mt-[-1px] font-medium text-black text-[28px] sm:text-[40px] leading-[32px] sm:leading-[44px] [font-family:'Archivo',Helvetica] tracking-[0]">
             Prescription
@@ -143,6 +146,7 @@ export const PublicPrescription = (): JSX.Element => {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

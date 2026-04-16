@@ -326,11 +326,84 @@ export async function fetchPayoutsPage(params: {
 }
 
 /**
+ * GET /api/payments — hospital-scoped payment list (`filter`: all | paid | draft, …).
+ */
+export async function fetchHospitalPaymentsList(params: {
+  hospitalId: string;
+  page: number;
+  limit: number;
+  /** Sent as `filter` query (e.g. all, paid, draft). */
+  filter: "all" | "paid" | "draft";
+  fromDate?: string;
+  toDate?: string;
+  /** GET /api/payments `sort` (e.g. newest, oldest). */
+  sort?: "newest" | "oldest";
+}): Promise<{ rows: PaymentTableRow[]; meta: PaymentsListMeta }> {
+  const hid = params.hospitalId.trim();
+  if (!hid) throw new Error("Missing hospital id.");
+  const filter =
+    params.filter === "paid" || params.filter === "draft" ? params.filter
+    : "all";
+  const qs = new URLSearchParams({
+    hospitalId: hid,
+    filter,
+    page: String(params.page),
+    limit: String(params.limit),
+  });
+  if (params.fromDate?.trim()) qs.set("fromDate", params.fromDate.trim());
+  if (params.toDate?.trim()) qs.set("toDate", params.toDate.trim());
+  const sort = params.sort?.trim();
+  if (sort === "newest" || sort === "oldest") qs.set("sort", sort);
+  const raw = await authFetch(`/api/payments?${qs.toString()}`, {
+    method: "GET",
+  });
+  assertPaymentsOk(raw);
+  return extractListAndMeta(raw, params.page, params.limit);
+}
+
+/**
+ * GET /api/payments/search — hospital-scoped search (`paymentStatus`: e.g. captured, created).
+ */
+export async function fetchHospitalPaymentsSearch(params: {
+  hospitalId: string;
+  q: string;
+  page: number;
+  limit: number;
+  paymentStatus?: string;
+  fromDate?: string;
+  toDate?: string;
+  sort?: "newest" | "oldest";
+}): Promise<{ rows: PaymentTableRow[]; meta: PaymentsListMeta }> {
+  const hid = params.hospitalId.trim();
+  if (!hid) throw new Error("Missing hospital id.");
+  const q = params.q.trim();
+  if (!q) throw new Error("Missing search query.");
+  const qs = new URLSearchParams({
+    hospitalId: hid,
+    q,
+    page: String(params.page),
+    limit: String(params.limit),
+  });
+  const ps = params.paymentStatus?.trim();
+  if (ps) qs.set("paymentStatus", ps);
+  if (params.fromDate?.trim()) qs.set("fromDate", params.fromDate.trim());
+  if (params.toDate?.trim()) qs.set("toDate", params.toDate.trim());
+  const sort = params.sort?.trim();
+  if (sort === "newest" || sort === "oldest") qs.set("sort", sort);
+  const raw = await authFetch(`/api/payments/search?${qs.toString()}`, {
+    method: "GET",
+  });
+  assertPaymentsOk(raw);
+  return extractListAndMeta(raw, params.page, params.limit);
+}
+
+/**
  * GET /api/payouts/transactions/search
  * `hospitalId` optional when the API allows super-admin global search.
  */
 export async function fetchPayoutsSearch(params: {
-  q: string;
+  /** Omit or empty to list all scoped transactions (hospital filter when provided). */
+  q?: string;
   hospitalId?: string;
   page: number;
   limit: number;
@@ -339,10 +412,11 @@ export async function fetchPayoutsSearch(params: {
   razorpayStatus?: string;
 }): Promise<{ rows: PaymentTableRow[]; meta: PaymentsListMeta }> {
   const qs = new URLSearchParams({
-    q: params.q.trim(),
     page: String(params.page),
     limit: String(params.limit),
   });
+  const q = params.q?.trim();
+  if (q) qs.set("q", q);
   const hid = params.hospitalId?.trim();
   if (hid) qs.set("hospitalId", hid);
   if (params.fromDate?.trim()) qs.set("fromDate", params.fromDate.trim());
@@ -398,7 +472,7 @@ export async function patchPayoutSummaryStatus(
   assertPaymentsOk(raw);
 }
 
-/** @deprecated Use fetchPayoutsPage */
+/** @deprecated Prefer {@link fetchHospitalPaymentsList} */
 export async function fetchPaymentsPage(params: {
   hospitalId: string;
   page: number;
@@ -409,20 +483,22 @@ export async function fetchPaymentsPage(params: {
   paymentStatus?: string;
 }): Promise<{ rows: PaymentTableRow[]; meta: PaymentsListMeta }> {
   const ps = params.paymentStatus?.trim();
-  const status =
+  const listFilter: "all" | "paid" | "draft" =
     ps === "captured" || ps === "paid" ? "paid"
     : ps === "created" || ps === "draft" ? "draft"
-    : "all";
-  return fetchPayoutsPage({
+    : params.filter === "today" || params.filter === "tomorrow" ? "all"
+    : (params.filter ?? "all");
+  return fetchHospitalPaymentsList({
+    hospitalId: params.hospitalId,
     page: params.page,
     limit: params.limit,
-    status,
+    filter: listFilter,
     fromDate: params.fromDate,
     toDate: params.toDate,
   });
 }
 
-/** @deprecated Use fetchPayoutsSearch */
+/** @deprecated Prefer {@link fetchHospitalPaymentsSearch} */
 export async function fetchPaymentsSearch(params: {
   hospitalId: string;
   q: string;
@@ -430,11 +506,11 @@ export async function fetchPaymentsSearch(params: {
   limit: number;
   paymentStatus?: string;
 }): Promise<{ rows: PaymentTableRow[]; meta: PaymentsListMeta }> {
-  return fetchPayoutsSearch({
+  return fetchHospitalPaymentsSearch({
     q: params.q,
     hospitalId: params.hospitalId,
     page: params.page,
     limit: params.limit,
-    razorpayStatus: params.paymentStatus,
+    paymentStatus: params.paymentStatus,
   });
 }

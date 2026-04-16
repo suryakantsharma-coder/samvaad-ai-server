@@ -1,9 +1,56 @@
+import { getHospitalById } from "../data/hospital";
 import { getPatientById } from "../data/patient";
-import type { Prescription } from "../types/prescription.type";
+import type { Hospital } from "../types/hospital.type";
+import type {
+  Prescription,
+  PrescriptionHospital,
+} from "../types/prescription.type";
 import {
   getPatientAgeForPdf,
   getPatientGenderForPdf,
 } from "./prescriptionMeta";
+
+function getHospitalIdFromEmbedded(embedded: unknown): string | null {
+  if (typeof embedded === "string" && embedded.trim()) return embedded.trim();
+  if (embedded != null && typeof embedded === "object" && "_id" in embedded) {
+    const id = (embedded as { _id?: unknown })._id;
+    return typeof id === "string" && id.trim() ? id.trim() : null;
+  }
+  return null;
+}
+
+function prescriptionHospitalFromApi(h: Hospital): PrescriptionHospital {
+  return {
+    _id: h._id,
+    name: h.name,
+    phoneCountryCode: h.phoneCountryCode,
+    phoneNumber: h.phoneNumber,
+    email: h.email,
+    contactPerson: h.contactPerson,
+    registrationNumber: h.registrationNumber,
+    address: h.address,
+    city: h.city,
+    pincode: h.pincode,
+    logoUrl: h.logoUrl,
+  };
+}
+
+function applyMergedHospital(
+  rx: Prescription,
+  merged: PrescriptionHospital,
+): Prescription {
+  if (rx.hospital !== undefined && rx.hospital !== null) {
+    return { ...rx, hospital: merged };
+  }
+  const meds = rx.medicines;
+  if (meds?.[0]) {
+    return {
+      ...rx,
+      medicines: [{ ...meds[0], hospital: merged }, ...meds.slice(1)],
+    };
+  }
+  return { ...rx, hospital: merged };
+}
 
 function getPatientIdForLookup(rx: Prescription): string | null {
   if (typeof rx.patient === "string" && rx.patient.trim()) {
@@ -70,6 +117,48 @@ export async function resolvePrescriptionDemographicsForPdf(
     if (missingAge && age != null) next = { ...next, patientAge: age };
     if (missingGender && gender) next = { ...next, patientGender: gender };
     return next;
+  } catch {
+    return rx;
+  }
+}
+
+/**
+ * When the prescription embeds a hospital without `logoUrl` (common if populate omits it),
+ * loads `GET /api/hospitals/:id` so the PDF can rasterize `/uploads/hospitals/...`.
+ * Skipped without auth (e.g. public prescription link — backend should embed `logoUrl` there).
+ */
+export async function resolvePrescriptionHospitalLogoForPdf(
+  rx: Prescription,
+): Promise<Prescription> {
+  const hasToken =
+    typeof localStorage !== "undefined" && !!localStorage.getItem("token");
+  if (!hasToken) return rx;
+
+  const embedded = rx.hospital ?? rx.medicines?.[0]?.hospital;
+  const id = getHospitalIdFromEmbedded(embedded);
+  if (!id) return rx;
+
+  const existingLogo =
+    typeof embedded === "object" &&
+    embedded !== null &&
+    typeof (embedded as PrescriptionHospital).logoUrl === "string" ?
+      (embedded as PrescriptionHospital).logoUrl?.trim()
+    : "";
+  if (existingLogo) return rx;
+
+  try {
+    const res = await getHospitalById(id);
+    const full = res?.data?.hospital;
+    if (!full?.logoUrl?.trim()) return rx;
+    const base: PrescriptionHospital =
+      typeof embedded === "object" && embedded !== null ?
+        (embedded as PrescriptionHospital)
+      : { _id: id, name: "", phoneNumber: "" };
+    const merged: PrescriptionHospital = {
+      ...base,
+      ...prescriptionHospitalFromApi(full),
+    };
+    return applyMergedHospital(rx, merged);
   } catch {
     return rx;
   }

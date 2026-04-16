@@ -1,7 +1,14 @@
 //  create a context for authentication
 
-import { createContext, useContext, useEffect, useState } from "react";
 import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import {
+  deleteHospitalUser,
   getHospitalUsers,
   getUserProfile,
   login,
@@ -38,6 +45,10 @@ export const AuthContext = createContext<{
     role: string,
     hospitalId: string,
   ) => Promise<void>;
+  handleDeleteHospitalUser: (
+    userId: string,
+    hospitalId: string,
+  ) => Promise<void>;
   authHydrating: boolean;
 }>({
   accessToken: null,
@@ -57,6 +68,7 @@ export const AuthContext = createContext<{
     role: string,
     hospitalId: string,
   ) => {},
+  handleDeleteHospitalUser: async () => {},
   authHydrating: false,
 });
 
@@ -134,12 +146,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setIsAuthenticated(!!data.data?.accessToken);
   };
 
-  const handleGetHospitalUsers = async (hospitalId: string) => {
+  const handleGetHospitalUsers = useCallback(async (hospitalId: string) => {
     const data = await getHospitalUsers(hospitalId);
     const users = (data as HospitalUsersResponse)?.data
       ?.users as HospitalUser[];
-    setHospitalUsers(users);
-  };
+    setHospitalUsers(Array.isArray(users) ? users : []);
+  }, []);
 
   const handleChangeUserRole = async (
     userId: string,
@@ -150,6 +162,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const users = (data as HospitalUsersResponse)?.data
       ?.users as HospitalUser[];
     setHospitalUsers(users);
+  };
+
+  const handleDeleteHospitalUser = async (
+    userId: string,
+    hospitalId: string,
+  ) => {
+    await deleteHospitalUser(userId, hospitalId);
+    await handleGetHospitalUsers(hospitalId);
   };
 
   useEffect(() => {
@@ -182,6 +202,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         hospitalUsers,
         handleGetHospitalUsers,
         handleChangeUserRole,
+        handleDeleteHospitalUser,
         authHydrating,
       }}
     >

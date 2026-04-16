@@ -2,6 +2,8 @@ import { Briefcase, Wallet } from "lucide-react";
 import { PaymentDateRangeBar } from "../PaymentDateRangeBar";
 
 export interface PaymentHeaderSectionProps {
+  /** Super admin sees hospital payout periods; hospital admin sees patient payments. */
+  variant?: "payments" | "payouts";
   /** Total payment records (from API), when loaded. */
   totalRecords?: number | null;
   /** From list `data.overall.totalDoctors` when the API returns it. */
@@ -13,25 +15,36 @@ export interface PaymentHeaderSectionProps {
 }
 
 export const PaymentHeaderSection = ({
+  variant = "payments",
   totalRecords,
   totalDoctors,
   listFromDate,
   listToDate,
   onListDateRangeChange,
 }: PaymentHeaderSectionProps): JSX.Element => {
+  const isPayouts = variant === "payouts";
   return (
     <header className="flex flex-col lg:flex-row w-full items-start justify-between gap-4">
       <div className="inline-flex flex-col items-start gap-[5px] flex-1">
         <div className="flex items-center gap-[15px] w-full">
           <h1 className="mt-[-1.00px] text-[40px] leading-[44px] font-medium text-black [font-family:'Archivo',Helvetica] tracking-[0]">
-            Payments
+            {isPayouts ? "Payouts" : "Payments"}
           </h1>
         </div>
 
         <p className="opacity-90 text-[16px] leading-[20px] mt-[5px] font-title-3l font-[number:var(--title-3l-font-weight)] text-black text-[length:var(--title-3l-font-size)] tracking-[var(--title-3l-letter-spacing)] leading-[var(--title-3l-line-height)] [font-style:var(--title-3l-font-style)] max-w-prose">
-          View patient payments for your hospital: doctor, amount, date, and
-          status. Use the date range to filter the list, and search or filter by
-          paid vs draft.
+          {isPayouts ?
+            <>
+              Review hospital payout periods: billing window, totals, and
+              settlement status. Filter by date and paid vs draft; search to open
+              individual Razorpay transactions when needed.
+            </>
+          : <>
+              View patient payments for your hospital: doctor, amount, date, and
+              status. Use the date range to filter the list, and search or filter
+              by paid vs draft.
+            </>
+          }
         </p>
       </div>
 

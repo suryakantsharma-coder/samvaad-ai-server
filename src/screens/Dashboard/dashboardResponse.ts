@@ -1,3 +1,10 @@
+import {
+  currentMonthStartEndYmd,
+  toYMDLocal,
+} from "../../lib/currentMonthDateRange";
+
+export { toYMDLocal };
+
 /** Local-date YYYY-MM-DD (no timezone shift). */
 export type DashboardDateRange = { start: string; end: string };
 
@@ -86,18 +93,8 @@ function parseYMD(s: string): Date {
   return new Date(y, m - 1, d);
 }
 
-export function toYMDLocal(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
 export function defaultDashboardDateRange(): DashboardDateRange {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - 29);
-  return { start: toYMDLocal(start), end: toYMDLocal(end) };
+  return currentMonthStartEndYmd();
 }
 
 export function daysInclusive(start: string, end: string): number {
