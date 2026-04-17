@@ -61,8 +61,10 @@ export const EditPatientModal = ({
         ? rawPhone.replace(/\s/g, "")
         : `${(formData.countryCode || "").replace(/\s/g, "")}${rawPhone.replace(/\s/g, "")}`;
       const payload: UpdatePatientPayload = {
+        fullName: (formData.name || "").trim(),
         age: formData.age,
         phoneNumber,
+        gender: formData.gender as "Male" | "Female" | "Other",
         reason: formData.reason,
       };
       await handleUpdatePatient(id, payload);
@@ -158,13 +160,13 @@ export const EditPatientModal = ({
               >
                 <SelectTrigger className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]">
                   <div className="flex items-center gap-2.5">
-                    <img
+                    {/* <img
                       src={
                         formData.gender === "Male" ? "/male.svg" : "/female.svg"
                       }
                       alt={formData.gender}
                       className="w-5 h-5"
-                    />
+                    /> */}
                     <SelectValue />
                   </div>
                 </SelectTrigger>
@@ -179,6 +181,12 @@ export const EditPatientModal = ({
                     <div className="flex items-center gap-2.5">
                       <img src="/female.svg" alt="Female" className="w-5 h-5" />
                       <span>Female</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="Other">
+                    <div className="flex items-center gap-2.5">
+                      <UserIcon className="w-5 h-5" />
+                      <span>Other</span>
                     </div>
                   </SelectItem>
                 </SelectContent>

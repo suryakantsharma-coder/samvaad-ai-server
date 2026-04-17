@@ -1,7 +1,9 @@
 import { Briefcase, Wallet } from "lucide-react";
 import { FinanceListDateRangeBar } from "../../../../components/payment/FinanceListDateRangeBar";
 
-export interface PaymentHeaderSectionProps {
+export type SuperAdminPayoutFilter = "draft" | "paid";
+
+export interface PayoutHeaderSectionProps {
   totalRecords?: number | null;
   totalDoctors?: number | null;
   listFromDate: string;
@@ -9,26 +11,26 @@ export interface PaymentHeaderSectionProps {
   onListDateRangeChange: (range: { start: string; end: string }) => void;
 }
 
-export const PaymentHeaderSection = ({
+export const PayoutHeaderSection = ({
   totalRecords,
   totalDoctors,
   listFromDate,
   listToDate,
   onListDateRangeChange,
-}: PaymentHeaderSectionProps): JSX.Element => {
+}: PayoutHeaderSectionProps): JSX.Element => {
   return (
     <header className="flex flex-col lg:flex-row w-full items-start justify-between gap-4">
       <div className="inline-flex flex-col items-start gap-[5px] flex-1">
         <div className="flex items-center gap-[15px] w-full">
           <h1 className="mt-[-1.00px] text-[40px] leading-[44px] font-medium text-black [font-family:'Archivo',Helvetica] tracking-[0]">
-            Payments
+            Payouts
           </h1>
         </div>
 
         <p className="opacity-90 text-[16px] leading-[20px] mt-[5px] font-title-3l font-[number:var(--title-3l-font-weight)] text-black text-[length:var(--title-3l-font-size)] tracking-[var(--title-3l-letter-spacing)] leading-[var(--title-3l-line-height)] [font-style:var(--title-3l-font-style)] max-w-prose">
-          View patient payments for your hospital: doctor, amount, date, and
-          status. Use the date range to filter the list, and search or filter by
-          paid vs draft.
+          Review hospital payout periods: billing window, totals, and settlement
+          status. Use Draft or Paid, the date range, and search in the list
+          header below.
         </p>
       </div>
 

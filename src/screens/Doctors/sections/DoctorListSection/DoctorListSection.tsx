@@ -59,9 +59,7 @@ const getStatusColor = (status: string) => {
 const STATUS_OPTIONS = [
   { value: "all", label: "All" },
   { value: "On Duty", label: "On Duty" },
-  { value: "On Break", label: "On Break" },
   { value: "Off Duty", label: "Off Duty" },
-  { value: "On Leave", label: "On Leave" },
 ] as const;
 
 export const DoctorListSection = ({
@@ -318,17 +316,17 @@ export const DoctorListSection = ({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem disabled>
+                        {/* <DropdownMenuItem disabled>
                           View Profile
-                        </DropdownMenuItem>
+                        </DropdownMenuItem> */}
                         <DropdownMenuItem
                           onClick={() => onEditDoctor?.(doctor)}
                         >
                           Edit Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem disabled>
+                        {/* <DropdownMenuItem disabled>
                           View Schedule
-                        </DropdownMenuItem>
+                        </DropdownMenuItem> */}
                         <DropdownMenuItem
                           className="text-red-600 focus:text-red-600"
                           onClick={() => onRemoveDoctor?.(doctor)}

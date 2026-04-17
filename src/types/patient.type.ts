@@ -40,8 +40,10 @@ export interface Appointment {
 }
 
 export interface UpdatePatientPayload {
+  fullName: string;
   age: number;
   phoneNumber: string;
+  gender: "Male" | "Female" | "Other";
   reason: string;
 }
 

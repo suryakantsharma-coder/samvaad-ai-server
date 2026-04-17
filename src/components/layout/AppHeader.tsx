@@ -77,10 +77,10 @@ function navigationItemsForUser(user: User | null): NavItem[] {
         path: "/medicines",
       },
       {
-        id: "payments",
+        id: "payouts",
         label: "Payouts",
         icon: "/payment.svg",
-        path: "/payment",
+        path: "/payout",
       },
     ];
   }

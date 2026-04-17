@@ -1,1 +1,4 @@
-export { PaymentHeaderSection } from "./PaymentHeaderSection";
+export {
+  PaymentHeaderSection,
+  type PaymentHeaderSectionProps,
+} from "./PaymentHeaderSection";
