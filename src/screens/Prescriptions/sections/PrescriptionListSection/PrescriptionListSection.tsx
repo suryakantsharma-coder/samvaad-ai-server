@@ -87,6 +87,7 @@ export const PrescriptionListSection = ({
   onPrescriptionReport,
   listStartDate = "",
   listEndDate = "",
+  listDoctorEmail = "",
 }: {
   onEditPrescription: (prescription: Prescription) => void;
   onDeletePrescription: (prescription: Prescription) => void;
@@ -95,6 +96,8 @@ export const PrescriptionListSection = ({
   onPrescriptionReport?: (prescription: Prescription) => void;
   listStartDate?: string;
   listEndDate?: string;
+  /** Passed as `doctorEmail` to GET /api/prescriptions (hospital staff dashboard). */
+  listDoctorEmail?: string;
 }): JSX.Element => {
   const [searchQuery, setSearchQuery] = useState("");
   const hadSearchRef = useRef(false);
@@ -122,9 +125,10 @@ export const PrescriptionListSection = ({
     handleGetPrescriptions(1, limit, {
       startDate: listStartDate,
       endDate: listEndDate,
+      doctorEmail: listDoctorEmail,
       ...(currentStatusFilter != null ? { status: currentStatusFilter } : {}),
     });
-  }, [limit, listStartDate, listEndDate, currentStatusFilter]);
+  }, [limit, listStartDate, listEndDate, listDoctorEmail, currentStatusFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -139,6 +143,7 @@ export const PrescriptionListSection = ({
           void handleGetPrescriptions(1, limit, {
             startDate: listStartDate,
             endDate: listEndDate,
+            doctorEmail: listDoctorEmail,
             ...(currentStatusFilter != null
               ? { status: currentStatusFilter }
               : {}),
@@ -149,7 +154,7 @@ export const PrescriptionListSection = ({
     return () => window.clearTimeout(timer);
     // Intentionally omit handler identities — provider recreates them each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce only on query / list scope
-  }, [searchQuery, limit, listStartDate, listEndDate, currentStatusFilter]);
+  }, [searchQuery, limit, listStartDate, listEndDate, listDoctorEmail, currentStatusFilter]);
 
   const tableLoading = loading && listToShow.length === 0;
   const showError = error && !loading;
@@ -334,6 +339,7 @@ export const PrescriptionListSection = ({
             : void handleGetPrescriptions(page, limit, {
                 startDate: listStartDate,
                 endDate: listEndDate,
+                doctorEmail: listDoctorEmail,
                 ...(currentStatusFilter != null
                   ? { status: currentStatusFilter }
                   : {}),

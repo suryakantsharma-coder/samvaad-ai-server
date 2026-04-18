@@ -15,6 +15,8 @@ export interface PrescriptionListParams {
   status?: PrescriptionStatusFilter;
   startDate?: string;
   endDate?: string;
+  /** Server filters list to prescriptions for this doctor (e.g. hospital admin dashboard). */
+  doctorEmail?: string;
 }
 
 export const getPrescriptions = async (params: PrescriptionListParams) => {
@@ -28,6 +30,8 @@ export const getPrescriptions = async (params: PrescriptionListParams) => {
   const end = params.endDate?.trim();
   if (start) search.set("startDate", start);
   if (end) search.set("endDate", end);
+  const docMail = params.doctorEmail?.trim();
+  if (docMail) search.set("doctorEmail", docMail);
 
   return authFetch(`/api/prescriptions?${search.toString()}`, {
     method: "GET",
@@ -38,12 +42,15 @@ export const searchPrescriptions = async (
   q: string,
   page: number,
   limit: number,
+  options?: { doctorEmail?: string },
 ) => {
   const params = new URLSearchParams({
     q,
     page: String(page),
     limit: String(limit),
   });
+  const docMail = options?.doctorEmail?.trim();
+  if (docMail) params.set("doctorEmail", docMail);
   return authFetch(`/api/prescriptions/search?${params.toString()}`, {
     method: "GET",
   });

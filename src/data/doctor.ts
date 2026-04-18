@@ -44,6 +44,14 @@ export const getDoctors = async (page: number, limit: number) => {
   });
 };
 
+/** First page of doctors for hospital-scoped dropdowns (e.g. create login in Settings). */
+export async function getDoctorsForAccountLinking(
+  limit = 500,
+): Promise<Doctor[]> {
+  const res = await getDoctors(1, limit);
+  return doctorsFromListResponse(res);
+}
+
 /** Lightweight row for dropdowns (GET /api/doctors/names). */
 export type DoctorNameRow = {
   _id: string;
@@ -98,6 +106,18 @@ export const searchDoctors = async (q: string, page: number, limit: number) => {
     method: "GET",
   });
 };
+
+/** Parsed doctor rows from GET /api/doctors/search (hospital-scoped). */
+export async function searchDoctorsAsList(
+  q: string,
+  page = 1,
+  limit = 30,
+): Promise<Doctor[]> {
+  const trimmed = q.trim();
+  if (!trimmed) return [];
+  const res = await searchDoctors(trimmed, page, limit);
+  return doctorsFromListResponse(res);
+}
 
 /** Parsed from GET /api/doctors/link-status */
 export type DoctorLinkStatusResult = {

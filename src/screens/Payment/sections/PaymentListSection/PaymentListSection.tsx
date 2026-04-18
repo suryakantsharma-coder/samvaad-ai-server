@@ -63,7 +63,11 @@ export interface PaymentListSectionProps {
   hospitalId?: string;
   listFromDate: string;
   listToDate: string;
-  onRecordsMeta?: (meta: { total: number; totalDoctors?: number }) => void;
+  onRecordsMeta?: (meta: {
+    total: number;
+    totalDoctors?: number;
+    totalAmountPaise?: number;
+  }) => void;
 }
 
 export const PaymentListSection = ({
@@ -182,7 +186,11 @@ export const PaymentListSection = ({
       setLoading(false);
       setRows([]);
       setTotalPages(1);
-      onRecordsMetaRef.current?.({ total: 0, totalDoctors: undefined });
+      onRecordsMetaRef.current?.({
+        total: 0,
+        totalDoctors: undefined,
+        totalAmountPaise: undefined,
+      });
       return;
     }
     setLoading(true);
@@ -205,6 +213,7 @@ export const PaymentListSection = ({
         onRecordsMetaRef.current?.({
           total: meta.total,
           totalDoctors: meta.totalDoctors,
+          totalAmountPaise: meta.totalAmountPaise,
         });
       } else {
         const { rows: nextRows, meta } = await fetchHospitalPaymentsList({
@@ -221,6 +230,7 @@ export const PaymentListSection = ({
         onRecordsMetaRef.current?.({
           total: meta.total,
           totalDoctors: meta.totalDoctors,
+          totalAmountPaise: meta.totalAmountPaise,
         });
       }
     } catch (e) {
@@ -229,7 +239,11 @@ export const PaymentListSection = ({
       );
       setRows([]);
       setTotalPages(1);
-      onRecordsMetaRef.current?.({ total: 0, totalDoctors: undefined });
+      onRecordsMetaRef.current?.({
+        total: 0,
+        totalDoctors: undefined,
+        totalAmountPaise: undefined,
+      });
     } finally {
       setLoading(false);
     }

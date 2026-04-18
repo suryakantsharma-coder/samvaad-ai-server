@@ -54,8 +54,7 @@ function patientHasAppointmentWithDoctor(
   doctorMongoId: string,
 ): boolean {
   return (
-    patient.appointments?.some((a) => a.doctor?._id === doctorMongoId) ??
-    false
+    patient.appointments?.some((a) => a.doctor?._id === doctorMongoId) ?? false
   );
 }
 
@@ -67,7 +66,8 @@ function patientMatchesDoctorUserScope(
   if (normalizeRoleKey(user?.role) !== "doctor") return true;
   const linkedId = getLinkedDoctorRecordId(user);
   const nameFilter = user?.name?.trim();
-  if (linkedId && patientHasAppointmentWithDoctor(patient, linkedId)) return true;
+  if (linkedId && patientHasAppointmentWithDoctor(patient, linkedId))
+    return true;
   if (nameFilter) {
     const needle = nameFilter.toLowerCase();
     return (
@@ -89,7 +89,7 @@ function getFilterTabLabel(
 ): string {
   switch (id) {
     case "all":
-      return `All (${counts.all})`;
+      return "All";
     case "today":
       return `Today (${counts.today})`;
     case "tomorrow":
@@ -360,7 +360,7 @@ export const PatientListSection = ({
             />
           </div>
 
-          <Select
+          {/* <Select
             value={statusFilter}
             onValueChange={(value) => {
               if (
@@ -402,7 +402,7 @@ export const PatientListSection = ({
                 Cancelled
               </SelectItem>
             </SelectContent>
-          </Select>
+          </Select> */}
 
           {!isDoctorUser ? (
             <Select value={doctorFilter} onValueChange={setDoctorFilter}>

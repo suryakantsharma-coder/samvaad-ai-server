@@ -1,5 +1,12 @@
-import { Briefcase, CalendarIcon, ClockIcon, PlusIcon } from "lucide-react";
+import { Briefcase, CalendarIcon, ClockIcon, PlusIcon, Stethoscope } from "lucide-react";
 import { Button } from "../../../../components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../../../components/ui/select";
 
 /*
 function formatRangeLabel(start: string, end: string): string {
@@ -21,6 +28,12 @@ function formatRangeLabel(start: string, end: string): string {
 }
 */
 
+export interface PrescriptionsHeaderDoctorOption {
+  _id: string;
+  fullName: string;
+  email: string;
+}
+
 export interface PrescriptionsHeaderSectionProps {
   onAddPrescription: () => void;
   totalPrescriptions?: number;
@@ -29,7 +42,15 @@ export interface PrescriptionsHeaderSectionProps {
   endDate: string;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
+  /** When set, show doctor filter (hospital / admin prescription dashboard). */
+  showDoctorFilter?: boolean;
+  doctorsForFilter?: PrescriptionsHeaderDoctorOption[];
+  doctorsForFilterLoading?: boolean;
+  doctorEmailFilter: string;
+  onDoctorEmailFilterChange: (email: string) => void;
 }
+
+const ALL_DOCTORS_VALUE = "__all_prescriptions_doctors__";
 
 export const PrescriptionsHeaderSection = ({
   onAddPrescription,
@@ -39,6 +60,11 @@ export const PrescriptionsHeaderSection = ({
   endDate,
   onStartDateChange,
   onEndDateChange,
+  showDoctorFilter = false,
+  doctorsForFilter = [],
+  doctorsForFilterLoading = false,
+  doctorEmailFilter,
+  onDoctorEmailFilterChange,
 }: PrescriptionsHeaderSectionProps): JSX.Element => {
   // const rangeLabel = formatRangeLabel(startDate, endDate);
 
@@ -85,6 +111,44 @@ export const PrescriptionsHeaderSection = ({
                 Total Doctors
               </span>
             </div>
+          </div>
+        )}
+
+        {showDoctorFilter && (
+          <div className="inline-flex flex-wrap items-center gap-2 sm:gap-[10px] px-[12px] sm:px-[15px] py-[6px] bg-white rounded-[50px] min-h-[36px] min-w-0">
+            <Stethoscope
+              className="w-5 h-5 shrink-0 text-black"
+              aria-hidden
+            />
+            <Select
+              disabled={doctorsForFilterLoading}
+              value={
+                doctorEmailFilter.trim()
+                  ? doctorEmailFilter.trim()
+                  : ALL_DOCTORS_VALUE
+              }
+              onValueChange={(v) =>
+                onDoctorEmailFilterChange(
+                  v === ALL_DOCTORS_VALUE ? "" : v,
+                )
+              }
+            >
+              <SelectTrigger className="h-8 min-w-[min(100vw-6rem,240px)] max-w-[min(100vw-6rem,320px)] rounded-full border-0 bg-grey-light px-2.5 text-[13px] font-title-4r text-black focus:ring-2 focus:ring-primary-2/40">
+                <SelectValue
+                  placeholder={
+                    doctorsForFilterLoading ? "Loading doctors…" : "Doctor"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_DOCTORS_VALUE}>All doctors</SelectItem>
+                {doctorsForFilter.map((d) => (
+                  <SelectItem key={d._id} value={d.email.trim()}>
+                    {`${d.fullName} · ${d.email}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
 

@@ -1,4 +1,7 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAuth } from "../../contexts/AuthProvider";
+import { getDoctorsForAccountLinking } from "../../data/doctor";
+import type { Doctor } from "../../types/doctor.type";
 import { currentMonthStartEndYmd } from "../../lib/currentMonthDateRange";
 import { showSuccess, showError } from "../../lib/toast";
 import { downloadPrescriptionReportPdf } from "../../lib/prescriptionPdf";
@@ -13,7 +16,10 @@ import type {
   CreatePrescriptionPayload,
   Prescription,
 } from "../../types/prescription.type";
-import { PrescriptionsHeaderSection } from "./sections/PrescriptionHeaderSection/ PrescriptionsHeaderSection";
+import {
+  PrescriptionsHeaderSection,
+  type PrescriptionsHeaderDoctorOption,
+} from "./sections/PrescriptionHeaderSection/ PrescriptionsHeaderSection";
 import { PrescriptionListSection } from "./sections/PrescriptionListSection/PrescriptionListSection";
 
 function mapModalPayloadToCreate(
@@ -48,10 +54,68 @@ function mapModalPayloadToCreate(
   };
 }
 
+function uniqueDoctorsWithEmail(
+  doctors: Doctor[],
+): PrescriptionsHeaderDoctorOption[] {
+  const seen = new Set<string>();
+  const out: PrescriptionsHeaderDoctorOption[] = [];
+  for (const d of doctors) {
+    const e = String(d.email ?? "").trim();
+    if (!e) continue;
+    const k = e.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push({ _id: d._id, fullName: d.fullName, email: e });
+  }
+  return out;
+}
+
 export const Prescriptions = (): JSX.Element => {
+  const { user } = useAuth();
   const defaultListDateRange = useMemo(() => currentMonthStartEndYmd(), []);
   const [listStartDate, setListStartDate] = useState(defaultListDateRange.start);
   const [listEndDate, setListEndDate] = useState(defaultListDateRange.end);
+  const [listDoctorEmail, setListDoctorEmail] = useState("");
+  const [doctorsForFilterRaw, setDoctorsForFilterRaw] = useState<Doctor[]>([]);
+  const [doctorsForFilterLoading, setDoctorsForFilterLoading] = useState(false);
+
+  const hasHospital = Boolean(String(user?.hospital ?? "").trim());
+  const isDoctorRole = user?.role === "doctor";
+  /** Header dropdown only for staff who pick a doctor; doctors use their login email for the API. */
+  const showDoctorDropdown =
+    (user?.role === "hospital_admin" || user?.role === "admin") && hasHospital;
+
+  const doctorLoginEmail = useMemo(
+    () => String(user?.email ?? "").trim(),
+    [user?.email],
+  );
+
+  /** For `doctor` role: always filter by logged-in user email (no header dropdown). */
+  const effectiveListDoctorEmail = useMemo(() => {
+    if (isDoctorRole) return doctorLoginEmail;
+    return listDoctorEmail;
+  }, [isDoctorRole, doctorLoginEmail, listDoctorEmail]);
+
+  const doctorsForFilter = useMemo(
+    () => uniqueDoctorsWithEmail(doctorsForFilterRaw),
+    [doctorsForFilterRaw],
+  );
+
+  const loadDoctorsForFilter = useCallback(() => {
+    if (!showDoctorDropdown) {
+      setDoctorsForFilterRaw([]);
+      return;
+    }
+    setDoctorsForFilterLoading(true);
+    void getDoctorsForAccountLinking(500)
+      .then((list) => setDoctorsForFilterRaw(Array.isArray(list) ? list : []))
+      .catch(() => setDoctorsForFilterRaw([]))
+      .finally(() => setDoctorsForFilterLoading(false));
+  }, [showDoctorDropdown]);
+
+  useEffect(() => {
+    loadDoctorsForFilter();
+  }, [loadDoctorsForFilter]);
   const [showNewPrescriptionModal, setShowNewPrescriptionModal] =
     useState(false);
   const [editingPrescription, setEditingPrescription] =
@@ -88,6 +152,7 @@ export const Prescriptions = (): JSX.Element => {
       await handleGetPrescriptions(1, limit, {
         startDate: listStartDate,
         endDate: listEndDate,
+        doctorEmail: effectiveListDoctorEmail,
         ...(currentStatusFilter != null ? { status: currentStatusFilter } : {}),
       });
       showSuccess("Success!", "Prescription created successfully.");
@@ -109,6 +174,7 @@ export const Prescriptions = (): JSX.Element => {
       await handleGetPrescriptions(1, limit, {
         startDate: listStartDate,
         endDate: listEndDate,
+        doctorEmail: effectiveListDoctorEmail,
         ...(currentStatusFilter != null ? { status: currentStatusFilter } : {}),
       });
       showSuccess("Success!", "Prescription updated successfully.");
@@ -130,6 +196,11 @@ export const Prescriptions = (): JSX.Element => {
         endDate={listEndDate}
         onStartDateChange={setListStartDate}
         onEndDateChange={setListEndDate}
+        showDoctorFilter={showDoctorDropdown}
+        doctorsForFilter={doctorsForFilter}
+        doctorsForFilterLoading={doctorsForFilterLoading}
+        doctorEmailFilter={listDoctorEmail}
+        onDoctorEmailFilterChange={setListDoctorEmail}
       />
       <NewPrescriptionModal
         open={modalOpen}
@@ -160,6 +231,7 @@ export const Prescriptions = (): JSX.Element => {
       <PrescriptionListSection
         listStartDate={listStartDate}
         listEndDate={listEndDate}
+        listDoctorEmail={effectiveListDoctorEmail}
         onEditPrescription={(p) => setEditingPrescription(p)}
         onDeletePrescription={(p) => setPrescriptionPendingDelete(p)}
         onMarkAsDonePrescription={() => {}}

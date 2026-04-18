@@ -12,15 +12,25 @@ export const Payment = (): JSX.Element => {
   const hospitalId = getLinkedHospitalId(user);
   const [totalRecords, setTotalRecords] = useState<number | null>(null);
   const [totalDoctors, setTotalDoctors] = useState<number | null>(null);
+  const [totalAmountPaise, setTotalAmountPaise] = useState<number | null>(null);
   const defaultListDateRange = useMemo(() => currentMonthFromToYmd(), []);
   const [listFromDate, setListFromDate] = useState(defaultListDateRange.from);
   const [listToDate, setListToDate] = useState(defaultListDateRange.to);
 
   const handleRecordsMeta = useCallback(
-    (meta: { total: number; totalDoctors?: number }) => {
+    (meta: {
+      total: number;
+      totalDoctors?: number;
+      totalAmountPaise?: number;
+    }) => {
       setTotalRecords(meta.total);
       if (typeof meta.totalDoctors === "number") {
         setTotalDoctors(meta.totalDoctors);
+      }
+      if (typeof meta.totalAmountPaise === "number") {
+        setTotalAmountPaise(meta.totalAmountPaise);
+      } else {
+        setTotalAmountPaise(null);
       }
     },
     [],
@@ -45,6 +55,7 @@ export const Payment = (): JSX.Element => {
     <div className="w-full flex flex-col gap-[25px] p-4 md:p-6">
       <PaymentHeaderSection
         totalRecords={totalRecords}
+        totalAmountPaise={totalAmountPaise}
         totalDoctors={totalDoctors}
         listFromDate={listFromDate}
         listToDate={listToDate}

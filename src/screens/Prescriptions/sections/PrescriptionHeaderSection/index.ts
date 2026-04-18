@@ -1,1 +1,4 @@
-export { PrescriptionsHeaderSection } from "./ PrescriptionsHeaderSection";
+export {
+  PrescriptionsHeaderSection,
+  type PrescriptionsHeaderDoctorOption,
+} from "./ PrescriptionsHeaderSection";

@@ -67,7 +67,8 @@ function appointmentMatchesDoctorUserScope(
   if (normalizeRoleKey(user?.role) !== "doctor") return true;
   const linkedId = getLinkedDoctorRecordId(user);
   const nameFilter = user?.name?.trim();
-  if (linkedId && appointmentAssignedToDoctor(appointment, linkedId)) return true;
+  if (linkedId && appointmentAssignedToDoctor(appointment, linkedId))
+    return true;
   if (nameFilter) {
     const needle = nameFilter.toLowerCase();
     const d = appointment.doctor;
@@ -175,7 +176,7 @@ export const AppointmentListSection = ({
   //   searchQuery.trim() === "" ? appointments : (searchedAppointments ?? []);
 
   const tabs = [
-    { id: "all" as const, label: `All (${counts.all})` },
+    { id: "all" as const, label: `All` },
     { id: "today" as const, label: `Today (${counts.today})` },
     { id: "tomorrow" as const, label: `Tomorrow (${counts.tomorrow})` },
   ];

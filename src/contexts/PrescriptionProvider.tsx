@@ -22,6 +22,8 @@ interface PrescriptionListOptions {
   appointmentId?: string;
   startDate?: string;
   endDate?: string;
+  /** When set (including empty string), updates the persisted list filter. */
+  doctorEmail?: string;
 }
 
 interface PrescriptionContextType {
@@ -76,6 +78,7 @@ export const PrescriptionProvider = ({
     useState<PrescriptionStatusFilter | null>(null);
   const listStartDateRef = useRef<string | null>(null);
   const listEndDateRef = useRef<string | null>(null);
+  const listDoctorEmailRef = useRef<string | null>(null);
 
   const handleGetPrescriptions = async (
     page: number,
@@ -99,6 +102,11 @@ export const PrescriptionProvider = ({
           listEndDateRef.current =
             typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
         }
+        if ("doctorEmail" in options) {
+          const v = options.doctorEmail;
+          listDoctorEmailRef.current =
+            typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+        }
       }
       const statusForRequest =
         options != null && options.status !== undefined
@@ -112,6 +120,7 @@ export const PrescriptionProvider = ({
         appointmentId: options?.appointmentId,
         startDate: listStartDateRef.current ?? undefined,
         endDate: listEndDateRef.current ?? undefined,
+        doctorEmail: listDoctorEmailRef.current ?? undefined,
       });
       const list = response.data?.prescriptions ?? [];
       setPrescriptions(Array.isArray(list) ? list : []);
@@ -145,7 +154,9 @@ export const PrescriptionProvider = ({
       setLoading(true);
       setError(null);
       const lim = pageLimit ?? limit;
-      const response = await searchPrescriptions(q.trim(), page, lim);
+      const response = await searchPrescriptions(q.trim(), page, lim, {
+        doctorEmail: listDoctorEmailRef.current ?? undefined,
+      });
       const list = response.data?.prescriptions ?? [];
       setSearchedPrescriptions(Array.isArray(list) ? list : []);
       const overallPatch = pickOverallFromApiData(response.data);

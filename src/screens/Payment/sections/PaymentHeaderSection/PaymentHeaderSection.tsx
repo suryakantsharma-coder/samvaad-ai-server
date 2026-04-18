@@ -1,8 +1,19 @@
-import { Briefcase, Wallet } from "lucide-react";
+import { Banknote, Briefcase, Wallet } from "lucide-react";
 import { FinanceListDateRangeBar } from "../../../../components/payment/FinanceListDateRangeBar";
+
+function formatInrFromPaise(paise: number): string {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(paise / 100);
+}
 
 export interface PaymentHeaderSectionProps {
   totalRecords?: number | null;
+  /** Sum for the current list / date range (API paise). */
+  totalAmountPaise?: number | null;
   totalDoctors?: number | null;
   listFromDate: string;
   listToDate: string;
@@ -11,6 +22,7 @@ export interface PaymentHeaderSectionProps {
 
 export const PaymentHeaderSection = ({
   totalRecords,
+  totalAmountPaise,
   totalDoctors,
   listFromDate,
   listToDate,
@@ -33,22 +45,15 @@ export const PaymentHeaderSection = ({
       </div>
 
       <div className="flex flex-wrap items-center gap-[15px]">
-        <div className="inline-flex rounded-[50px] border border-[#dedee1] bg-white">
-          <FinanceListDateRangeBar
-            start={listFromDate}
-            end={listToDate}
-            onRangeChange={onListDateRangeChange}
-          />
-        </div>
-        {totalDoctors != null && (
+        {totalAmountPaise != null && (
           <div className="inline-flex items-center gap-2.5 px-[15px] py-[6px] bg-white rounded-[50px] h-[36px] border border-[#dedee1]">
-            <Briefcase className="w-5 h-5 text-primary-2" aria-hidden />
-            <div className="inline-flex items-center gap-[5px]">
+            <Banknote className="w-5 h-5 text-primary-2 shrink-0" aria-hidden />
+            <div className="inline-flex items-center gap-[5px] min-w-0">
               <span className="mt-[-1.00px] font-title-3m font-[number:var(--title-3m-font-weight)] text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)] leading-[var(--title-3m-line-height)] whitespace-nowrap [font-style:var(--title-3m-font-style)]">
-                {totalDoctors.toLocaleString("en-IN")}
+                {formatInrFromPaise(totalAmountPaise)}
               </span>
               <span className="mt-[-0.50px] font-title-4r font-[number:var(--title-4r-font-weight)] text-x-70 text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
-                Total doctors
+                Total amount
               </span>
             </div>
           </div>
@@ -67,6 +72,14 @@ export const PaymentHeaderSection = ({
             </div>
           </div>
         )}
+
+        <div className="inline-flex rounded-[50px] border border-[#dedee1] bg-white">
+          <FinanceListDateRangeBar
+            start={listFromDate}
+            end={listToDate}
+            onRangeChange={onListDateRangeChange}
+          />
+        </div>
       </div>
     </header>
   );

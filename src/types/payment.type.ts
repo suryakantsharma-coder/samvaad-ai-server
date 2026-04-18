@@ -41,4 +41,6 @@ export type PaymentsListMeta = {
   totalPages: number;
   /** From `data.overall.totalDoctors` when the API includes it. */
   totalDoctors?: number;
+  /** Paise — prefer `data.dateRange.totalAmountPaise`, else `data.overall.totalAmountPaise`. */
+  totalAmountPaise?: number;
 };

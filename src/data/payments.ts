@@ -277,6 +277,17 @@ function extractListAndMeta(
     if (Number.isFinite(n)) totalDoctors = n;
   }
 
+  const dateRangeBlock = asDict(dataNode.dateRange);
+  let totalAmountPaise: number | undefined;
+  if (dateRangeBlock) {
+    const paise = Number(dateRangeBlock.totalAmountPaise);
+    if (Number.isFinite(paise)) totalAmountPaise = paise;
+  }
+  if (totalAmountPaise === undefined && overallBlock) {
+    const paise = Number(overallBlock.totalAmountPaise);
+    if (Number.isFinite(paise)) totalAmountPaise = paise;
+  }
+
   return {
     rows,
     meta: {
@@ -285,6 +296,7 @@ function extractListAndMeta(
       limit,
       totalPages,
       totalDoctors,
+      totalAmountPaise,
     },
   };
 }
