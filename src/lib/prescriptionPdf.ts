@@ -188,6 +188,176 @@ function decodeImageFromSrc(
   });
 }
 
+/** In dev, rewrite API URLs to `/api-proxy/...` so `fetch` is same-origin (see `vite.config.ts`). */
+function urlForPdfImageFetch(url: string): string {
+  const base = API_BASE_URL.replace(/\/$/, "");
+  if (!url.startsWith(base)) return url;
+  const path = url.slice(base.length) || "/";
+  if (import.meta.env.DEV) {
+    return `/api-proxy${path.startsWith("/") ? path : `/${path}`}`;
+  }
+  return url;
+}
+
+async function fetchImageBlobForPdf(url: string): Promise<Blob | null> {
+  if (typeof window === "undefined") return null;
+  const apiBase = API_BASE_URL.replace(/\/$/, "");
+  const token = localStorage.getItem("token");
+  const fetchUrl = urlForPdfImageFetch(url);
+
+  if (token && url.startsWith(apiBase)) {
+    try {
+      const res = await fetch(fetchUrl, {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) return await res.blob();
+    } catch {
+      /* fall through */
+    }
+  }
+  try {
+    const res = await fetch(fetchUrl, {
+      mode: "cors",
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (res.ok) return await res.blob();
+  } catch {
+    /* fall through */
+  }
+  try {
+    const res = await fetch(fetchUrl, { mode: "cors", cache: "no-store" });
+    if (res.ok) return await res.blob();
+  } catch {
+    /* fall through */
+  }
+  return null;
+}
+
+/** Center-crop to square, PNG data URL (pixels from Blob are not canvas-tainted). */
+async function squareCropBlobToPngDataUrl(
+  blob: Blob,
+  targetPx: number,
+): Promise<string | null> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(blob);
+      try {
+        const iw = bitmap.width;
+        const ih = bitmap.height;
+        if (iw < 1 || ih < 1) return null;
+        const side = Math.min(iw, ih);
+        const sx = (iw - side) / 2;
+        const sy = (ih - side) / 2;
+        const canvas = document.createElement("canvas");
+        canvas.width = targetPx;
+        canvas.height = targetPx;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return null;
+        ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, targetPx, targetPx);
+        return canvas.toDataURL("image/png");
+      } finally {
+        bitmap.close();
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  const objUrl = URL.createObjectURL(blob);
+  try {
+    const img = await decodeImageFromSrc(objUrl, undefined);
+    if (!img) return null;
+    return squareCropImageToPngDataUrl(img, targetPx);
+  } finally {
+    URL.revokeObjectURL(objUrl);
+  }
+}
+
+function squareCropImageToPngDataUrl(
+  img: HTMLImageElement,
+  targetPx: number,
+): string | null {
+  try {
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
+    if (iw < 1 || ih < 1) return null;
+    const side = Math.min(iw, ih);
+    const sx = (iw - side) / 2;
+    const sy = (ih - side) / 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = targetPx;
+    canvas.height = targetPx;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, sx, sy, side, side, 0, 0, targetPx, targetPx);
+    return canvas.toDataURL("image/png");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Load hospital logo URL into PDF as a square (center crop). Prefers fetch→Blob; falls back to
+ * `Image` + `crossOrigin = "anonymous"` (your snippet) when CORS allows.
+ */
+async function addHospitalLogoSquareToPdf(
+  doc: jsPDF,
+  url: string,
+  x: number,
+  y: number,
+  widthMm: number,
+): Promise<boolean> {
+  if (typeof window === "undefined" || !url.trim()) return false;
+  const targetPx = Math.max(64, Math.round((widthMm / 25.4) * 96));
+  const trimmed = url.trim();
+
+  const blob = await fetchImageBlobForPdf(trimmed);
+  if (blob) {
+    const dataUrl = await squareCropBlobToPngDataUrl(blob, targetPx);
+    if (dataUrl) {
+      try {
+        doc.addImage(dataUrl, "PNG", x, y, widthMm, widthMm);
+        return true;
+      } catch {
+        /* fall through */
+      }
+    }
+  }
+
+  const img = await new Promise<HTMLImageElement | null>((resolve) => {
+    const im = new Image();
+    im.crossOrigin = "anonymous";
+    im.onload = () => resolve(im);
+    im.onerror = () => resolve(null);
+    im.src = urlForPdfImageFetch(trimmed);
+  });
+  if (img) {
+    const dataUrl = squareCropImageToPngDataUrl(img, targetPx);
+    if (dataUrl) {
+      try {
+        doc.addImage(dataUrl, "PNG", x, y, widthMm, widthMm);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  }
+
+  const raster = await rasterizeImageUrlToPng(trimmed, targetPx * 2);
+  if (!raster?.dataUrl) return false;
+  try {
+    const im = await decodeImageFromSrc(raster.dataUrl, undefined);
+    if (!im) return false;
+    const sq = squareCropImageToPngDataUrl(im, targetPx);
+    if (!sq) return false;
+    doc.addImage(sq, "PNG", x, y, widthMm, widthMm);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Rasterize remote/local image to PNG for jsPDF (WebP/JPEG/PNG; SVG when the browser decodes it).
  * For URLs under `API_BASE_URL`, tries Bearer fetch first so protected `/uploads/...` works when
@@ -201,10 +371,12 @@ async function rasterizeImageUrlToPng(
 
   const apiBase = API_BASE_URL.replace(/\/$/, "");
   const token = localStorage.getItem("token");
+  const fetchUrl = urlForPdfImageFetch(url);
 
   if (token && url.startsWith(apiBase)) {
     try {
-      const res = await fetch(url, {
+      const res = await fetch(fetchUrl, {
+        cache: "no-store",
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -225,8 +397,9 @@ async function rasterizeImageUrlToPng(
     }
   }
 
+  const imgSrc = urlForPdfImageFetch(url);
   for (const cors of ["anonymous", undefined] as const) {
-    const img = await decodeImageFromSrc(url, cors);
+    const img = await decodeImageFromSrc(imgSrc, cors);
     if (img) {
       const r = rasterizeLoadedImage(img, maxWidthPx);
       if (r) return r;
@@ -235,39 +408,85 @@ async function rasterizeImageUrlToPng(
   return null;
 }
 
-async function drawTopLeftHospitalLogo(
+/** Hospital header logo: 50×50 px at 96 dpi → square side in mm for jsPDF. */
+const HOSPITAL_HEADER_LOGO_SIZE_PX = 50;
+const TOP_LEFT_HOSPITAL_LOGO_SQUARE_MM =
+  (HOSPITAL_HEADER_LOGO_SIZE_PX * 25.4) / 96;
+/** 20px gap between logo and hospital name (≈5.29 mm at 96 dpi). */
+const HOSPITAL_HEADER_LOGO_TEXT_GAP_MM = (20 * 25.4) / 96;
+
+/**
+ * Centered header row: [logo] — 20px — [hospital name], vertically centered as one unit.
+ * Returns Y (mm) for the line below the title block (same convention as before).
+ */
+async function drawHospitalHeaderBranding(
   doc: jsPDF,
   hospital: PrescriptionHospital | undefined,
   margin: number,
+  contentW: number,
+  pageW: number,
   logoTopMm: number,
-  maxWMm: number,
-  maxHMm: number,
 ): Promise<number> {
-  if (typeof window === "undefined") return logoTopMm;
-  const maxWidthPx = Math.max(80, Math.round((maxWMm / 25.4) * 96));
-  for (const url of prescriptionLogoUrlCandidates(hospital)) {
-    const raster = await rasterizeImageUrlToPng(url, maxWidthPx);
-    if (!raster) continue;
-    let wMm = (raster.width / 96) * 25.4;
-    let hMm = (raster.height / 96) * 25.4;
-    if (wMm > maxWMm) {
-      const s = maxWMm / wMm;
-      wMm *= s;
-      hMm *= s;
-    }
-    if (hMm > maxHMm) {
-      const s = maxHMm / hMm;
-      wMm *= s;
-      hMm *= s;
-    }
-    try {
-      doc.addImage(raster.dataUrl, "PNG", margin, logoTopMm, wMm, hMm);
-      return logoTopMm + hMm + 3;
-    } catch {
-      /* try next candidate */
+  doc.setTextColor(...BLUE);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(17);
+  const title = hospital?.name ?? "Medical Prescription";
+  const titleLinePitchMm = 6.4;
+  const logoSide = TOP_LEFT_HOSPITAL_LOGO_SQUARE_MM;
+  const gapMm = HOSPITAL_HEADER_LOGO_TEXT_GAP_MM;
+  const fontHeightMm = (doc.getFontSize() * 25.4) / 72;
+
+  const finishBlock = (firstBaselineY: number, lineCount: number): number =>
+    firstBaselineY +
+    (lineCount > 1 ? (lineCount - 1) * titleLinePitchMm : 0) +
+    11 +
+    HEADER_EXTRA_V_MM;
+
+  const logoUrls = prescriptionLogoUrlCandidates(hospital);
+  if (logoUrls.length && typeof window !== "undefined") {
+    const maxTitleW = Math.max(
+      8,
+      contentW - gapMm - logoSide,
+    );
+    const titleLinesNarrow = doc.splitTextToSize(title, maxTitleW);
+    const textWidth = Math.max(
+      ...titleLinesNarrow.map((l: string) => doc.getTextWidth(l)),
+    );
+    const groupW = logoSide + gapMm + textWidth;
+    const groupLeft = margin + (contentW - groupW) / 2;
+    const url = logoUrls[0]!;
+    const logoPlaced = await addHospitalLogoSquareToPdf(
+      doc,
+      url,
+      groupLeft,
+      logoTopMm,
+      logoSide,
+    );
+    if (logoPlaced) {
+      const textLeft = groupLeft + logoSide + gapMm;
+      const logoCenterY = logoTopMm + logoSide / 2;
+      const n = titleLinesNarrow.length;
+      const firstBaselineY =
+        logoCenterY -
+        ((n - 1) * titleLinePitchMm) / 2 +
+        (n === 1 ? fontHeightMm * 0.38 : 0);
+      titleLinesNarrow.forEach((line: string, i: number) => {
+        doc.text(line, textLeft, firstBaselineY + i * titleLinePitchMm, {
+          align: "left",
+        });
+      });
+      return finishBlock(firstBaselineY, n);
     }
   }
-  return logoTopMm;
+
+  const titleLines = doc.splitTextToSize(title, contentW);
+  const firstBaselineY = logoTopMm + 2;
+  titleLines.forEach((line: string, i: number) => {
+    doc.text(line, pageW / 2, firstBaselineY + i * titleLinePitchMm, {
+      align: "center",
+    });
+  });
+  return finishBlock(firstBaselineY, titleLines.length);
 }
 
 async function buildPrescriptionPdfDocument(
@@ -298,30 +517,14 @@ async function buildPrescriptionPdfDocument(
   };
 
   const logoTop = 8;
-  const titleStartY = await drawTopLeftHospitalLogo(
+  let y = await drawHospitalHeaderBranding(
     doc,
     hospital,
     margin,
+    contentW,
+    pageW,
     logoTop,
-    48,
-    13,
   );
-
-  let y = Math.max(titleStartY, logoTop + 2);
-
-  doc.setTextColor(...BLUE);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(17);
-  const title = hospital?.name ?? "Medical Prescription";
-  const titleLines = doc.splitTextToSize(title, contentW);
-  const titleLinePitchMm = 6.4;
-  titleLines.forEach((line: string, i: number) => {
-    doc.text(line, pageW / 2, y + i * titleLinePitchMm, { align: "center" });
-  });
-  y +=
-    (titleLines.length > 1 ? (titleLines.length - 1) * titleLinePitchMm : 0) +
-    11 +
-    HEADER_EXTRA_V_MM;
 
   doc.setTextColor(...TEXT_GREY);
   doc.setFont("helvetica", "normal");
@@ -339,7 +542,7 @@ async function buildPrescriptionPdfDocument(
 
   const ph = hospital ? formatHospitalPhone(hospital) : "";
   const rightParts: string[] = [];
-  if (ph) rightParts.push(`PH: ${ph}`);
+  if (ph) rightParts.push(`Ph: ${ph}`);
   if (hospital?.email?.trim()) rightParts.push(`Email: ${hospital.email.trim()}`);
   else if (doctor?.email?.trim())
     rightParts.push(`Email: ${doctor.email.trim()}`);

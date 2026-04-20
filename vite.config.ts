@@ -12,4 +12,15 @@ export default defineConfig({
       plugins: [tailwind()],
     },
   },
+  /** Same-origin proxy for PDF image fetches (must match `API_BASE_URL` in `src/config.ts`). */
+  server: {
+    proxy: {
+      "/api-proxy": {
+        target: "https://api.samvaadai.com",
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api-proxy/, "") || "/",
+      },
+    },
+  },
 });

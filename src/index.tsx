@@ -156,18 +156,20 @@ function AuthenticatedApp(): JSX.Element {
 
 createRoot(document.getElementById("app") as HTMLElement).render(
   <StrictMode>
-    <BrowserRouter>
-      <ToastContainer position="top-right" limit={3} />
-      <Routes>
-        <Route
-          path="/public/prescriptions/:prescriptionId"
-          element={<PublicPrescription />}
-        />
-        <Route path="/telecaller/:patientId" element={<PublicTelecaller />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/auth/reset-password" element={<ResetPassword />} />
-        <Route path="*" element={<AuthenticatedApp />} />
-      </Routes>
-    </BrowserRouter>
+    <div className="mb-[20px]">
+      <BrowserRouter>
+        <ToastContainer position="top-right" limit={3} />
+        <Routes>
+          <Route
+            path="/public/prescriptions/:prescriptionId"
+            element={<PublicPrescription />}
+          />
+          <Route path="/telecaller/:patientId" element={<PublicTelecaller />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/auth/reset-password" element={<ResetPassword />} />
+          <Route path="*" element={<AuthenticatedApp />} />
+        </Routes>
+      </BrowserRouter>
+    </div>
   </StrictMode>,
 );
