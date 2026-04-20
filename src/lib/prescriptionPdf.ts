@@ -35,8 +35,83 @@ const BLUE: [number, number, number] = [33, 89, 181];
 const TEXT_GREY: [number, number, number] = [82, 82, 82];
 const LINE_GREY: [number, number, number] = [200, 200, 200];
 
-/** Space reserved at bottom: signature block + ref + powered-by line. */
+/** Space reserved at bottom: signature block + ref + brand logo strip. */
 const FOOTER_RESERVED_MM = 56 + SIGNATURE_RULE_TOP_EXTRA_MM;
+
+/** Same asset as auth header (`AuthSplitLayout`): `public/Logo-light-bg.svg`. */
+const SAMVAAD_BRAND_LOGO_PATH = "/Logo-light-bg.svg";
+
+function samvaadBrandLogoAbsoluteUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  return `${window.location.origin}${SAMVAAD_BRAND_LOGO_PATH}`;
+}
+
+/** Footer “Powered by” font size (pt); used for vertical centering math. */
+const FOOTER_BRAND_FONT_PT = 6.8;
+
+/**
+ * “Powered by” + Samvaad mark as one row, bottom-centered, vertically centered as a pair (items-center).
+ * Same asset as login header; SVG → PNG for jsPDF.
+ */
+async function drawFooterSamvaadLogo(
+  doc: jsPDF,
+  pageW: number,
+  rowBottomMm: number,
+  maxWMm: number,
+  maxHMm: number,
+): Promise<void> {
+  const label = "Powered by ";
+  doc.setFontSize(FOOTER_BRAND_FONT_PT);
+  doc.setTextColor(160, 160, 160);
+  doc.setFont("helvetica", "normal");
+  const labelW = doc.getTextWidth(label);
+  const gapMm = 1.2;
+
+  let wMm = 0;
+  let hMm = 0;
+  let pngDataUrl: string | null = null;
+  const url = samvaadBrandLogoAbsoluteUrl();
+  if (url) {
+    const maxWidthPx = Math.max(64, Math.round((maxWMm / 25.4) * 96));
+    try {
+      const raster = await rasterizeImageUrlToPng(url, maxWidthPx);
+      if (raster) {
+        pngDataUrl = raster.dataUrl;
+        wMm = (raster.width / 96) * 25.4;
+        hMm = (raster.height / 96) * 25.4;
+        if (wMm > maxWMm) {
+          const s = maxWMm / wMm;
+          wMm *= s;
+          hMm *= s;
+        }
+        if (hMm > maxHMm) {
+          const s = maxHMm / hMm;
+          wMm *= s;
+          hMm *= s;
+        }
+      }
+    } catch {
+      /* text-only footer below */
+    }
+  }
+
+  const fontMm = (FOOTER_BRAND_FONT_PT * 25.4) / 72;
+  /** Line box height ≈ one line of footer text (align with logo height). */
+  const textLineMm = fontMm * 1.2;
+  const rowH = pngDataUrl ? Math.max(hMm, textLineMm) : textLineMm;
+  const midY = rowBottomMm - rowH / 2;
+  /** jsPDF draws text on baseline; optical vertical center sits above baseline (~x-height center). */
+  const textBaselineY = midY + 0.36 * fontMm;
+
+  const groupW = pngDataUrl ? labelW + gapMm + wMm : labelW;
+  const startX = pageW / 2 - groupW / 2;
+
+  doc.text(label, startX, textBaselineY);
+  if (pngDataUrl) {
+    const imgTopY = midY - hMm / 2;
+    doc.addImage(pngDataUrl, "PNG", startX + labelW + gapMm, imgTopY, wMm, hMm);
+  }
+}
 
 function formatPdfDate(iso: string | undefined): string {
   if (!iso) return "—";
@@ -240,7 +315,7 @@ async function buildPrescriptionPdfDocument(
   const title = hospital?.name ?? "Medical Prescription";
   const titleLines = doc.splitTextToSize(title, contentW);
   const titleLinePitchMm = 6.4;
-  titleLines.forEach((line, i) => {
+  titleLines.forEach((line: string, i: number) => {
     doc.text(line, pageW / 2, y + i * titleLinePitchMm, { align: "center" });
   });
   y +=
@@ -414,19 +489,14 @@ async function buildPrescriptionPdfDocument(
     maxWidth: 100,
   });
 
-  doc.setFontSize(5.5);
-  doc.setTextColor(160, 160, 160);
-  doc.setFont("helvetica", "normal");
-  doc.text("Powered by Samvaad AI", pageW / 2, poweredByBaseline, {
-    align: "center",
-  });
+  await drawFooterSamvaadLogo(doc, pageW, poweredByBaseline, 24, 4.5);
 
   return doc;
 }
 
 /**
- * Prescription PDF: Sarvodaya/hospital logo top-left, hospital title, body, signature,
- * ref id, and small “Powered by Samvaad AI” footer.
+ * Prescription PDF: hospital logo top-left, hospital title, body, signature,
+ * ref id, and footer “Powered by” + Samvaad logo (same asset as login header).
  */
 export async function downloadPrescriptionReportPdf(
   input: Prescription,
