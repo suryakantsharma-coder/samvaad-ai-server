@@ -5,6 +5,27 @@ import {
 } from "../types/doctor.type";
 import { authFetch } from "./api";
 
+/** Minutes per appointment; supports camelCase/snake_case and numeric strings from API. */
+export function parseAveragePatientTime(raw: unknown): number | undefined {
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
+    return Math.round(raw);
+  }
+  if (typeof raw === "string" && raw.trim()) {
+    const n = Number.parseInt(raw.trim(), 10);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return undefined;
+}
+
+export function normalizeDoctor(raw: unknown): Doctor {
+  const base = raw as Doctor;
+  const r = raw as Record<string, unknown>;
+  const averagePatientTime =
+    parseAveragePatientTime(base.averagePatientTime) ??
+    parseAveragePatientTime(r.average_patient_time);
+  return averagePatientTime != null ? { ...base, averagePatientTime } : base;
+}
+
 function doctorsFromListResponse(response: unknown): Doctor[] {
   const root = response as Record<string, unknown> | undefined;
   const data =
@@ -12,7 +33,7 @@ function doctorsFromListResponse(response: unknown): Doctor[] {
       ? (root.data as Record<string, unknown>)
       : {};
   const arr = data.doctors;
-  return Array.isArray(arr) ? (arr as Doctor[]) : [];
+  return Array.isArray(arr) ? arr.map(normalizeDoctor) : [];
 }
 
 export const addDoctor = async (doctor: CreateDoctorPayload) => {
@@ -145,10 +166,10 @@ function parseDoctorFromByEmailResponse(raw: unknown): Doctor | null {
     "_id" in doc &&
     typeof (doc as Record<string, unknown>)._id === "string"
   ) {
-    return doc as Doctor;
+    return normalizeDoctor(doc);
   }
   if (r.doctor != null && typeof r.doctor === "object") {
-    return r.doctor as Doctor;
+    return normalizeDoctor(r.doctor);
   }
   return null;
 }

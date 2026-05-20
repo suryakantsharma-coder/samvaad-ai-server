@@ -13,16 +13,23 @@ import { CreateDoctorPayload } from "../../types/doctor.type";
 /** Same separator as `DoctorListSection` uses when splitting availability lines. */
 const AVAILABILITY_LINE_SEP = "&#x2F;n";
 
-function doctorDataToPayload(doctor: DoctorData): CreateDoctorPayload {
+function doctorDataToPayload(
+  doctor: DoctorData,
+  options?: { includeUtilization?: boolean },
+): CreateDoctorPayload {
   const timing = `${doctor.morningStart} - ${doctor.morningEnd}${AVAILABILITY_LINE_SEP}${doctor.eveningStart} - ${doctor.eveningEnd}`;
   const payload: CreateDoctorPayload = {
     fullName: doctor.name,
     phoneNumber: `${doctor.countryCode} ${doctor.phone}`.trim(),
     designation: doctor.designation,
+    averagePatientTime: doctor.averagePatientTime,
     availability: timing,
     status: doctor.status,
     email: doctor.email,
   };
+  if (options?.includeUtilization) {
+    payload.utilization = 0;
+  }
   if (doctor.holidays !== undefined) {
     payload.holidays = doctor.holidays;
   }
@@ -48,7 +55,9 @@ export const Doctors = (): JSX.Element => {
   };
 
   const handleSaveDoctor = async (doctor: DoctorData) => {
-    await handleAddDoctor(doctorDataToPayload(doctor));
+    await handleAddDoctor(
+      doctorDataToPayload(doctor, { includeUtilization: true }),
+    );
   };
 
   const handleUpdateDoctorSubmit = async (

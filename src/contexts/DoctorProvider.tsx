@@ -19,6 +19,7 @@ import {
   searchDoctors,
   updateDoctor,
   deleteDoctor,
+  normalizeDoctor,
 } from "../data/doctor";
 import type { ListOverallPatch } from "../lib/listOverallFromApi";
 import { pickOverallFromApiData } from "../lib/listOverallFromApi";
@@ -148,7 +149,7 @@ export const DoctorProvider = ({ children }: { children: ReactNode }) => {
       const response = await addDoctor(doctor);
       const created = response.data?.doctor;
       if (created) {
-        setDoctors((prev) => [...prev, created as Doctor]);
+        setDoctors((prev) => [...prev, normalizeDoctor(created)]);
       } else {
         await getDoctorsData({ page: 1 });
       }
