@@ -9,8 +9,11 @@ export type CreateDoctorPayload = {
   phoneNumber: string;
   email: string;
   designation: string;
+  /** Average appointment length in minutes. */
+  averagePatientTime: number;
   availability: string;
   status: "Off Duty" | "On Duty" | "On Break" | "On Leave";
+  utilization?: number;
   holidays?: DoctorHoliday[];
 };
 
@@ -24,6 +27,7 @@ export type Doctor = {
   phoneNumber: string;
   email: string;
   designation: string;
+  averagePatientTime?: number;
   availability: string;
   status: string;
   utilization: number;

@@ -1,6 +1,7 @@
 import { BriefcaseIcon, CircleCheck, MailIcon, X } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import type { Doctor, DoctorHoliday } from "../../types/doctor.type";
+import { parseAveragePatientTime } from "../../data/doctor";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
@@ -41,6 +42,8 @@ export interface DoctorData {
     sun: boolean;
   };
   designation: string;
+  /** Average appointment length in minutes. */
+  averagePatientTime: number;
   morningStart: string;
   morningEnd: string;
   eveningStart: string;
@@ -64,6 +67,7 @@ const DEFAULT_FORM: DoctorData = {
     sun: false,
   },
   designation: "",
+  averagePatientTime: 10,
   morningStart: "10:00 AM",
   morningEnd: "1:00 PM",
   eveningStart: "2:00 PM",
@@ -117,6 +121,7 @@ function doctorToFormData(d: Doctor): DoctorData {
   const times = parseAvailabilityForForm(d.availability);
   const st = d.status as DoctorData["status"];
   const status = ["Off Duty", "On Duty"].includes(st) ? st : "On Duty";
+  const fetchedAveragePatientTime = parseAveragePatientTime(d.averagePatientTime);
   return {
     name: d.fullName,
     phone,
@@ -124,6 +129,7 @@ function doctorToFormData(d: Doctor): DoctorData {
     countryCode,
     workingDays: { ...DEFAULT_FORM.workingDays },
     designation: d.designation,
+    averagePatientTime: fetchedAveragePatientTime ?? DEFAULT_FORM.averagePatientTime,
     ...times,
     status,
     holidays: Array.isArray(d.holidays) ? d.holidays : undefined,
@@ -153,9 +159,9 @@ export const AddDoctorModal = ({
     if (initialDoctor) {
       setFormData(doctorToFormData(initialDoctor));
     } else {
-      setFormData(DEFAULT_FORM);
+      setFormData({ ...DEFAULT_FORM });
     }
-  }, [open, initialDoctor?._id]);
+  }, [open, initialDoctor?._id, initialDoctor?.averagePatientTime]);
 
   const handleSubmit = async () => {
     if (submitting) return;
@@ -163,7 +169,7 @@ export const AddDoctorModal = ({
       setSubmitting(true);
       try {
         await onUpdate(initialDoctor._id, formData);
-        setFormData(DEFAULT_FORM);
+        setFormData({ ...DEFAULT_FORM });
         onOpenChange(false);
       } catch {
         /* toast from provider */
@@ -175,7 +181,7 @@ export const AddDoctorModal = ({
     setSubmitting(true);
     try {
       await Promise.resolve(onSave(formData));
-      setFormData(DEFAULT_FORM);
+      setFormData({ ...DEFAULT_FORM });
       onOpenChange(false);
     } catch {
       /* toast from provider */
@@ -190,7 +196,7 @@ export const AddDoctorModal = ({
   };
 
   const resetForm = () => {
-    setFormData(DEFAULT_FORM);
+    setFormData({ ...DEFAULT_FORM });
   };
 
   const toggleWorkingDay = (day: keyof typeof formData.workingDays) => {
@@ -254,6 +260,27 @@ export const AddDoctorModal = ({
                 setFormData({ ...formData, designation: e.target.value })
               }
               placeholder="Cardiologist"
+              className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] placeholder:text-x-70"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+              Average Patient Time (minutes)
+              <RequiredMark />
+            </label>
+            <Input
+              type="number"
+              min={1}
+              value={formData.averagePatientTime}
+              onChange={(e) => {
+                const parsed = Number.parseInt(e.target.value, 10);
+                setFormData({
+                  ...formData,
+                  averagePatientTime: Number.isFinite(parsed) ? parsed : 10,
+                });
+              }}
+              placeholder="10"
               className="h-[44px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)] placeholder:text-x-70"
             />
           </div>
