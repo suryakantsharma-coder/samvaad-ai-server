@@ -57,6 +57,11 @@ export interface MedicineEntry {
   dinner: boolean;
   notes: string;
   expanded: boolean;
+  /**
+   * Set when user picks from the catalog (or prefilled in edit mode). Turns off catalogue
+   * suggestions until they edit the name field.
+   */
+  medicineNameSelected: boolean;
 }
 
 /** Map catalog `units` / `type` to prescription dosage unit options used in this form. */
@@ -89,7 +94,7 @@ function tryParseDosageFromCatalogName(name: string): number | undefined {
 
 function updatesFromCatalogRow(
   row: MedicineCatalogRow,
-): Pick<MedicineEntry, "name" | "dosageUnit" | "dosage"> {
+): Pick<MedicineEntry, "name" | "dosageUnit"> & { dosage?: number } {
   const dosageUnit = catalogRowToDosageUnit(row);
   const parsed = tryParseDosageFromCatalogName(row.name);
   return {
@@ -103,6 +108,7 @@ interface PrescriptionMedicineNameSearchProps {
   medicineRowId: string;
   name: string;
   expanded: boolean;
+  nameSelectedFromCatalog: boolean;
   onNameChange: (value: string) => void;
   onSelectCatalogRow: (row: MedicineCatalogRow) => void;
 }
@@ -111,6 +117,7 @@ function PrescriptionMedicineNameSearch({
   medicineRowId,
   name,
   expanded,
+  nameSelectedFromCatalog,
   onNameChange,
   onSelectCatalogRow,
 }: PrescriptionMedicineNameSearchProps): JSX.Element {
@@ -129,6 +136,14 @@ function PrescriptionMedicineNameSearch({
       setNoMatchHintVisible(false);
       return;
     }
+    if (nameSelectedFromCatalog) {
+      setResults([]);
+      setHadSearch(false);
+      setLoading(false);
+      setNoMatchHintVisible(false);
+      return;
+    }
+
     const q = name.trim();
     if (q.length < MEDICINE_SEARCH_MIN_CHARS) {
       setResults([]);
@@ -157,10 +172,10 @@ function PrescriptionMedicineNameSearch({
       cancelled = true;
       window.clearTimeout(handle);
     };
-  }, [name, expanded, medicineRowId]);
+  }, [name, expanded, medicineRowId, nameSelectedFromCatalog]);
 
   useEffect(() => {
-    if (loading) {
+    if (nameSelectedFromCatalog || loading) {
       setNoMatchHintVisible(false);
       return;
     }
@@ -182,10 +197,19 @@ function PrescriptionMedicineNameSearch({
     setNoMatchHintVisible(true);
     const id = window.setTimeout(() => setNoMatchHintVisible(false), 2000);
     return () => window.clearTimeout(id);
-  }, [loading, hadSearch, results.length, expanded, name]);
+  }, [
+    loading,
+    hadSearch,
+    results.length,
+    expanded,
+    name,
+    nameSelectedFromCatalog,
+  ]);
 
   const showDropdown =
-    expanded && name.trim().length >= MEDICINE_SEARCH_MIN_CHARS;
+    expanded &&
+    !nameSelectedFromCatalog &&
+    name.trim().length >= MEDICINE_SEARCH_MIN_CHARS;
 
   return (
     <div className="flex flex-col gap-2">
@@ -193,16 +217,39 @@ function PrescriptionMedicineNameSearch({
         Medicine name<span className="text-red-500">*</span>
       </label>
       <p className="font-title-5l text-x-70 text-xs -mt-1">
-        Search the hospital catalog or type any name — if nothing matches, your
-        text is used as the medicine name.
+        {nameSelectedFromCatalog && name.trim() ? (
+          <>
+            Medicine selected from catalog — edit the name above to search again
+            or change it manually.
+          </>
+        ) : (
+          <>
+            Search the hospital catalog or type any name — if nothing matches,
+            your text is used as the medicine name.
+          </>
+        )}
       </p>
       <div className="relative z-10">
-        <div className="relative flex h-[38px] w-full items-center rounded-[10px] border border-[#dedee1] bg-white pr-10 focus-within:ring-1 focus-within:ring-ring">
+        <div
+          className={`relative flex h-[38px] w-full items-center rounded-[10px] border bg-white pr-10 focus-within:ring-1 focus-within:ring-ring ${
+            nameSelectedFromCatalog && name.trim()
+              ? "border-primary-2/50 ring-primary-2/20"
+              : "border-[#dedee1]"
+          }`}
+        >
           <span
             className="flex h-full w-11 shrink-0 items-center justify-center text-x-70"
             aria-hidden
           >
-            <Search className="h-4 w-4" strokeWidth={2} />
+            {nameSelectedFromCatalog && name.trim() ? (
+              <CircleCheck
+                className="h-4 w-4 text-primary-2"
+                strokeWidth={2}
+                aria-hidden
+              />
+            ) : (
+              <Search className="h-4 w-4" strokeWidth={2} />
+            )}
           </span>
           <Input
             placeholder="Search or type medicine name"
@@ -212,7 +259,12 @@ function PrescriptionMedicineNameSearch({
             autoComplete="off"
           />
           {loading ? (
-            <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-x-70 pointer-events-none" />
+            <span className="absolute right-3 top-1/2 flex h-4 w-4 -translate-y-1/2 items-center justify-center pointer-events-none">
+              <Loader2
+                className="h-4 w-4 shrink-0 animate-spin text-x-70"
+                aria-hidden
+              />
+            </span>
           ) : null}
         </div>
 
@@ -263,7 +315,7 @@ export interface NewPrescriptionPayload {
   appointmentId: string;
   appointmentDate: string;
   followUpDays: number;
-  medicines: Omit<MedicineEntry, "id" | "expanded">[];
+  medicines: Omit<MedicineEntry, "id" | "expanded" | "medicineNameSelected">[];
 }
 
 function prescriptionMedicineToEntry(
@@ -287,6 +339,7 @@ function prescriptionMedicineToEntry(
     dinner: m.time?.dinner ?? false,
     notes: m.notes ?? "",
     expanded: false,
+    medicineNameSelected: Boolean(String(m.name ?? "").trim()),
   };
 }
 
@@ -352,6 +405,7 @@ export const NewPrescriptionModal = ({
         dinner: false,
         notes: "",
         expanded: true,
+        medicineNameSelected: false,
       },
     ]);
   };
@@ -380,7 +434,7 @@ export const NewPrescriptionModal = ({
       const pid =
         typeof initialPrescription.patient === "string"
           ? initialPrescription.patient
-          : initialPrescription.patient?._id ?? "";
+          : (initialPrescription.patient?._id ?? "");
       const pfull =
         typeof initialPrescription.patient === "object" &&
         initialPrescription.patient
@@ -514,7 +568,9 @@ export const NewPrescriptionModal = ({
       appointmentId: selectedAppointment._id,
       appointmentDate,
       followUpDays,
-      medicines: medicines.map(({ id, expanded, ...rest }) => rest),
+      medicines: medicines.map(
+        ({ id, expanded, medicineNameSelected, ...rest }) => rest,
+      ),
     };
     setSubmitting(true);
     try {
@@ -630,10 +686,9 @@ export const NewPrescriptionModal = ({
                   {patientAppointments.map((apt) => (
                     <SelectItem key={apt._id} value={apt._id}>
                       {new Date(apt.appointmentDateTime).toLocaleDateString()} •{" "}
-                      {formatTime12h(apt.appointmentDateTime)}{" "}
-                      •{" "}
+                      {formatTime12h(apt.appointmentDateTime)} •{" "}
                       {typeof apt.doctor === "object" && apt.doctor !== null
-                        ? apt.doctor.fullName ?? "—"
+                        ? (apt.doctor.fullName ?? "—")
                         : "—"}{" "}
                       • {apt.reason || "—"}
                     </SelectItem>
@@ -736,23 +791,30 @@ export const NewPrescriptionModal = ({
                   </button>
 
                   {med.expanded && (
-                    <div className="px-4 pb-4 pt-0 border-t border-[#dedee1] space-y-4">
+                    <div className="px-4 pb-4 pt-2 border-t border-[#dedee1] space-y-4">
                       <PrescriptionMedicineNameSearch
                         medicineRowId={med.id}
                         name={med.name}
                         expanded={med.expanded}
+                        nameSelectedFromCatalog={med.medicineNameSelected}
                         onNameChange={(value) =>
-                          updateMedicine(med.id, { name: value })
+                          updateMedicine(med.id, {
+                            name: value,
+                            medicineNameSelected: false,
+                          })
                         }
                         onSelectCatalogRow={(row) =>
-                          updateMedicine(med.id, updatesFromCatalogRow(row))
+                          updateMedicine(med.id, {
+                            ...updatesFromCatalogRow(row),
+                            medicineNameSelected: true,
+                          })
                         }
                       />
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-2">
                           <label className="font-title-4m text-black text-sm">
-                            Dosage<span className="text-red-500">*</span>
+                            Dosage<span className="text-red-500"></span>
                           </label>
                           <div className="flex rounded-[10px] border border-[#dedee1] overflow-hidden bg-white">
                             <Input
@@ -881,7 +943,9 @@ export const NewPrescriptionModal = ({
           </div>
 
           {/* Footer */}
-          <div className={`${modalFooterRowClassName} pt-2 border-t border-[#dedee1]`}>
+          <div
+            className={`${modalFooterRowClassName} pt-2 border-t border-[#dedee1]`}
+          >
             <Button
               type="button"
               variant="ghost"
