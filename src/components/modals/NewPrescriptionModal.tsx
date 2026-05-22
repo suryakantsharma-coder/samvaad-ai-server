@@ -29,8 +29,10 @@ import type {
   Prescription,
   PrescriptionMedicine,
 } from "../../types/prescription.type";
-import { Patients } from "../../types/patient.type";
-import { usePatient } from "../../contexts/PatientProvider";
+import type { Patients } from "../../types/patient.type";
+import { searchPatients, type PatientSearchDoctorScope } from "../../data/patient";
+import { useAuth } from "../../contexts/AuthProvider";
+import { getDoctorPatientsListQuery } from "../../lib/userRole";
 import type { UpdatePrescriptionPayload } from "../../types/prescription.type";
 import {
   modalFooterCancelClassName,
@@ -43,6 +45,9 @@ const INTAKE_OPTIONS = ["Before", "After"];
 
 const MEDICINE_SEARCH_MIN_CHARS = 1;
 const MEDICINE_SEARCH_DEBOUNCE_MS = 320;
+
+const PATIENT_SEARCH_MIN_CHARS = 1;
+const PATIENT_SEARCH_DEBOUNCE_MS = 320;
 
 export interface MedicineEntry {
   id: string;
@@ -309,6 +314,195 @@ function PrescriptionMedicineNameSearch({
   );
 }
 
+/** When API returns appointments on each patient, narrow results by assigned doctor if search didn’t already scope. */
+function filterPatientsByAssignedDoctor(
+  list: Patients[],
+  scope: PatientSearchDoctorScope,
+): Patients[] {
+  const nameFrag = scope.doctor?.trim().toLowerCase();
+  const idFrag = scope.doctorId?.trim();
+  if (!nameFrag && !idFrag) return list;
+  return list.filter((p) => {
+    const apts = p.appointments;
+    if (!Array.isArray(apts) || apts.length === 0) return true;
+    return apts.some((apt) => {
+      const doc = apt?.doctor;
+      if (!doc || typeof doc !== "object") return false;
+      if (idFrag && (doc._id === idFrag || doc.doctorId === idFrag))
+        return true;
+      const fn = doc.fullName?.trim().toLowerCase() ?? "";
+      if (nameFrag && fn.includes(nameFrag)) return true;
+      return false;
+    });
+  });
+}
+
+interface PrescriptionPatientSearchProps {
+  doctorScope: PatientSearchDoctorScope;
+  searchText: string;
+  onSearchTextChange: (v: string) => void;
+  selectedPatient: Patients | null;
+  onSelectPatient: (p: Patients | null) => void;
+}
+
+function PrescriptionPatientSearch({
+  doctorScope,
+  searchText,
+  onSearchTextChange,
+  selectedPatient,
+  onSelectPatient,
+}: PrescriptionPatientSearchProps): JSX.Element {
+  const [results, setResults] = useState<Patients[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const q = searchText.trim();
+    const selectionLocked =
+      selectedPatient != null &&
+      q === selectedPatient.fullName.trim();
+
+    if (selectionLocked) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+
+    if (q.length < PATIENT_SEARCH_MIN_CHARS) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        setLoading(true);
+        try {
+          const res = (await searchPatients(q, 1, 15, doctorScope)) as {
+            data?: { patients?: Patients[] };
+          };
+          const raw = Array.isArray(res.data?.patients)
+            ? res.data!.patients!
+            : [];
+          const narrowed = filterPatientsByAssignedDoctor(raw, doctorScope);
+          if (!cancelled) setResults(narrowed);
+        } catch {
+          if (!cancelled) setResults([]);
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      })();
+    }, PATIENT_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [
+    searchText,
+    doctorScope.doctor,
+    doctorScope.doctorId,
+    selectedPatient?._id,
+    selectedPatient?.fullName,
+  ]);
+
+  const handleInputChange = (v: string) => {
+    onSearchTextChange(v);
+    if (
+      selectedPatient &&
+      v.trim() !== selectedPatient.fullName.trim()
+    ) {
+      onSelectPatient(null);
+    }
+  };
+
+  const showDropdown =
+    searchText.trim().length >= PATIENT_SEARCH_MIN_CHARS &&
+    (loading || results.length > 0);
+
+  const scopeActive = Boolean(
+    doctorScope.doctor?.trim() || doctorScope.doctorId?.trim(),
+  );
+
+  return (
+    <div className="flex flex-col gap-2">
+      {scopeActive ? (
+        <p className="font-title-5l text-x-70 text-xs -mt-1">
+          Search is limited to patients associated with your doctor profile.
+        </p>
+      ) : null}
+      <div className="relative z-20">
+        <div className="relative flex h-[38px] w-full items-center rounded-[10px] border border-[#dedee1] bg-white pr-10 focus-within:ring-1 focus-within:ring-ring">
+          <span
+            className="flex h-full w-11 shrink-0 items-center justify-center text-x-70"
+            aria-hidden
+          >
+            {selectedPatient && searchText.trim() === selectedPatient.fullName.trim() ? (
+              <CircleCheck
+                className="h-4 w-4 text-primary-2"
+                strokeWidth={2}
+                aria-hidden
+              />
+            ) : (
+              <Search className="h-4 w-4" strokeWidth={2} />
+            )}
+          </span>
+          <Input
+            placeholder="Search patient by name or phone..."
+            value={searchText}
+            onChange={(e) => handleInputChange(e.target.value)}
+            className="h-full min-w-0 flex-1 border-0 bg-transparent py-2 pl-0 pr-2 shadow-none focus-visible:ring-0 rounded-none font-title-4r md:text-sm"
+            autoComplete="off"
+          />
+          {loading ? (
+            <span className="absolute right-3 top-1/2 flex h-4 w-4 -translate-y-1/2 items-center justify-center pointer-events-none">
+              <Loader2
+                className="h-4 w-4 shrink-0 animate-spin text-x-70"
+                aria-hidden
+              />
+            </span>
+          ) : null}
+        </div>
+
+        {showDropdown ? (
+          <div
+            className="absolute left-0 right-0 top-[calc(100%+4px)] z-[100] max-h-48 overflow-auto rounded-[10px] border border-[#dedee1] bg-white shadow-md"
+            role="listbox"
+            aria-label="Patients matching search"
+          >
+            {loading && results.length === 0 ? (
+              <div className="px-3 py-2.5 font-title-5l text-x-70 text-xs">
+                Searching…
+              </div>
+            ) : null}
+            {results.map((p) => (
+              <button
+                key={p._id}
+                type="button"
+                role="option"
+                className="flex w-full flex-col items-start gap-0.5 px-3 py-2.5 text-left hover:bg-grey-light/80 border-b border-[#dedee1] last:border-b-0"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onSearchTextChange(p.fullName);
+                  onSelectPatient(p);
+                  setResults([]);
+                }}
+              >
+                <span className="font-title-4m text-black text-sm">
+                  {p.fullName}
+                </span>
+                <span className="font-title-5l text-x-70 text-xs">
+                  {p.phoneNumber ?? "—"}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export interface NewPrescriptionPayload {
   patientId: string;
   patientName: string;
@@ -355,7 +549,7 @@ interface NewPrescriptionModalProps {
   ) => void | Promise<void>;
   /** When set, modal opens in edit mode with form pre-filled */
   initialPrescription?: Prescription | null;
-  /** When set (create mode), pre-select this patient in the dropdown */
+  /** When set (create mode), pre-select this patient in the patient search field */
   initialPatient?: Patients | null;
   onCancel?: () => void;
 }
@@ -370,8 +564,15 @@ export const NewPrescriptionModal = ({
   onCancel,
 }: NewPrescriptionModalProps): JSX.Element => {
   const isEditMode = Boolean(initialPrescription);
-  const { patients, searchedPatients, handlePatient } = usePatient();
+  const { user } = useAuth();
+
+  const doctorPatientSearchScope: PatientSearchDoctorScope = React.useMemo(
+    () => getDoctorPatientsListQuery(user),
+    [user?.role, user?.name, user?.doctor],
+  );
+
   const [selectedPatient, setSelectedPatient] = useState<Patients | null>(null);
+  const [patientSearchText, setPatientSearchText] = useState("");
   const [selectedAppointment, setSelectedAppointment] =
     useState<Appointments | null>(null);
   const [patientAppointments, setPatientAppointments] = useState<
@@ -420,14 +621,6 @@ export const NewPrescriptionModal = ({
     );
   };
 
-  // Fetch patients only once when the modal opens (create mode).
-  React.useEffect(() => {
-    if (open && !initialPrescription) {
-      handlePatient(1, 20, "all");
-    }
-  }, [open, initialPrescription]);
-
-  // Pre-fill form when opening in edit mode.
   React.useEffect(() => {
     if (!open) return;
     if (initialPrescription) {
@@ -467,9 +660,11 @@ export const NewPrescriptionModal = ({
           prescriptionMedicineToEntry(m, i),
         ),
       );
+      setPatientSearchText("");
     } else {
       if (initialPatient) {
         setSelectedPatient(initialPatient);
+        setPatientSearchText(initialPatient.fullName ?? "");
         setSelectedAppointment(null);
         setPatientAppointments([]);
         setAppointmentDate("2025-11-04");
@@ -477,6 +672,7 @@ export const NewPrescriptionModal = ({
         setMedicines([]);
       } else {
         setSelectedPatient(null);
+        setPatientSearchText("");
         setSelectedAppointment(null);
         setPatientAppointments([]);
         setAppointmentDate("2025-11-04");
@@ -502,6 +698,7 @@ export const NewPrescriptionModal = ({
       page: 1,
       limit: 50,
       patientId: selectedPatient._id,
+      ...getDoctorPatientsListQuery(user),
     })
       .then((res) => {
         if (!cancelled) {
@@ -520,7 +717,7 @@ export const NewPrescriptionModal = ({
     return () => {
       cancelled = true;
     };
-  }, [selectedPatient?._id]);
+  }, [isEditMode, selectedPatient?._id, user]);
 
   const handleSend = async () => {
     if (submitting) return;
@@ -628,30 +825,13 @@ export const NewPrescriptionModal = ({
                   "—"}
               </div>
             ) : (
-              <Select
-                value={selectedPatient?._id ?? ""}
-                onValueChange={(id) => {
-                  const list = searchedPatients?.length
-                    ? searchedPatients
-                    : patients;
-                  const p = list?.find((x) => x._id === id) ?? null;
-                  setSelectedPatient(p);
-                }}
-              >
-                <SelectTrigger className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r">
-                  <SelectValue placeholder="Choose a patient" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(searchedPatients?.length
-                    ? searchedPatients
-                    : patients
-                  )?.map((p) => (
-                    <SelectItem key={p._id} value={p._id}>
-                      {p.fullName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <PrescriptionPatientSearch
+                doctorScope={doctorPatientSearchScope}
+                searchText={patientSearchText}
+                onSearchTextChange={setPatientSearchText}
+                selectedPatient={selectedPatient}
+                onSelectPatient={setSelectedPatient}
+              />
             )}
           </div>
 

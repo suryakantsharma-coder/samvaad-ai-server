@@ -67,16 +67,27 @@ export const getPatients = async (
   });
 };
 
+/** Optional scoping for `/api/patients/search` — same semantics as `GET /api/patients?doctor=` / `doctorId=`. */
+export type PatientSearchDoctorScope = {
+  doctor?: string;
+  doctorId?: string;
+};
+
 export const searchPatients = async (
   q: string,
   page: number,
   limit: number,
+  doctorScope?: PatientSearchDoctorScope,
 ) => {
   const params = new URLSearchParams({
     q,
     page: String(page),
     limit: String(limit),
   });
+  const dn = doctorScope?.doctor?.trim();
+  if (dn) params.set("doctor", dn);
+  const did = doctorScope?.doctorId?.trim();
+  if (did) params.set("doctorId", did);
   return authFetch(`/api/patients/search?${params.toString()}`, {
     method: "GET",
   });
