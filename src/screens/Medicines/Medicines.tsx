@@ -73,9 +73,23 @@ export const Medicines = (): JSX.Element => {
             );
         if (ac.signal.aborted) return;
         setRows(result.rows);
-        const total = result.total ?? result.rows.length;
-        setTotalCount(total);
-        setTotalPages(Math.max(1, Math.ceil(total / MED_PAGE_SIZE)));
+        setTotalPages(Math.max(1, result.totalPages));
+
+        const reportedTotal = result.total;
+        if (typeof reportedTotal === "number") {
+          setTotalCount(reportedTotal);
+        } else if (currentPage === 1) {
+          setTotalCount(
+            Math.max(
+              0,
+              (currentPage - 1) * MED_PAGE_SIZE + result.rows.length,
+            ),
+          );
+        } else {
+          setTotalCount((prev) =>
+            Math.max(prev ?? 0, currentPage * MED_PAGE_SIZE),
+          );
+        }
       } catch (e) {
         if (ac.signal.aborted) return;
         const name = e instanceof Error ? e.name : "";
@@ -84,6 +98,8 @@ export const Medicines = (): JSX.Element => {
           e instanceof Error ? e.message : "Failed to load medicines catalog.",
         );
         setRows([]);
+        setTotalPages(1);
+        setTotalCount(null);
       } finally {
         if (!ac.signal.aborted) setLoading(false);
       }

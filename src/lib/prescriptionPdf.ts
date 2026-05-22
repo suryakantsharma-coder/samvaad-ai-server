@@ -144,7 +144,9 @@ function hospitalLogoAbsoluteUrl(
   const raw = hospital?.logoUrl?.trim();
   if (!raw) return null;
   if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
-  return raw.startsWith("/") ? `${API_BASE_URL}${raw}` : `${API_BASE_URL}/${raw}`;
+  return raw.startsWith("/")
+    ? `${API_BASE_URL}${raw}`
+    : `${API_BASE_URL}/${raw}`;
 }
 
 /** Only the hospital logo from the database (`logoUrl`); no default brand image. */
@@ -444,10 +446,7 @@ async function drawHospitalHeaderBranding(
 
   const logoUrls = prescriptionLogoUrlCandidates(hospital);
   if (logoUrls.length && typeof window !== "undefined") {
-    const maxTitleW = Math.max(
-      8,
-      contentW - gapMm - logoSide,
-    );
+    const maxTitleW = Math.max(8, contentW - gapMm - logoSide);
     const titleLinesNarrow = doc.splitTextToSize(title, maxTitleW);
     const textWidth = Math.max(
       ...titleLinesNarrow.map((l: string) => doc.getTextWidth(l)),
@@ -543,7 +542,8 @@ async function buildPrescriptionPdfDocument(
   const ph = hospital ? formatHospitalPhone(hospital) : "";
   const rightParts: string[] = [];
   if (ph) rightParts.push(`Ph: ${ph}`);
-  if (hospital?.email?.trim()) rightParts.push(`Email: ${hospital.email.trim()}`);
+  if (hospital?.email?.trim())
+    rightParts.push(`Email: ${hospital.email.trim()}`);
   else if (doctor?.email?.trim())
     rightParts.push(`Email: ${doctor.email.trim()}`);
   const rightText = rightParts.length ? rightParts.join("\n") : "";
@@ -621,7 +621,8 @@ async function buildPrescriptionPdfDocument(
   let medY = y + 12;
   (rx.medicines ?? []).forEach((m, i) => {
     const dosage = `${m.dosage?.value ?? ""} ${m.dosage?.unit ?? ""}`.trim();
-    const duration = `${m.duration?.value ?? ""} ${m.duration?.unit ?? ""}`.trim();
+    const duration =
+      `${m.duration?.value ?? ""} ${m.duration?.unit ?? ""}`.trim();
     const medName = String(m?.name ?? "—").trim() || "—";
     const block = [
       `${i + 1}. ${medName}`,
@@ -656,9 +657,7 @@ async function buildPrescriptionPdfDocument(
 
   doc.setFont("helvetica", "normal");
   const drSignName = formatDoctorNameWithDesignation(doctor);
-  const signLines = drSignName
-    ? doc.splitTextToSize(drSignName, contentW)
-    : [];
+  const signLines = drSignName ? doc.splitTextToSize(drSignName, contentW) : [];
 
   const nameFirstBaseline =
     signLines.length > 0
@@ -710,13 +709,16 @@ export async function downloadPrescriptionReportPdf(
       input._id && typeof input._id === "string" && input._id.length >= 8
         ? input._id.slice(-8)
         : "export";
-    const rawName = (input.patientName || "prescription").trim() || "prescription";
+    const rawName =
+      (input.patientName || "prescription").trim() || "prescription";
     const safeName = rawName.replace(/[^\w\s-]/g, "").trim() || "prescription";
     doc.save(`prescription-report-${safeName}-${idSuffix}.pdf`);
   } catch (err) {
     console.error("Prescription PDF generation failed:", err);
     const detail =
-      err instanceof Error ? err.message : "Unexpected error while building PDF.";
+      err instanceof Error
+        ? err.message
+        : "Unexpected error while building PDF.";
     showError(
       "Download failed",
       `${detail} If your disk is full, free space and try again.`,
@@ -734,7 +736,9 @@ export async function openPrescriptionReportPdfInNewTab(
   } catch (err) {
     console.error("Prescription PDF open failed:", err);
     const detail =
-      err instanceof Error ? err.message : "Unexpected error while building PDF.";
+      err instanceof Error
+        ? err.message
+        : "Unexpected error while building PDF.";
     showError("Print failed", `${detail} Please retry.`);
   }
 }

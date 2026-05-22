@@ -12,8 +12,21 @@ export default defineConfig({
       plugins: [tailwind()],
     },
   },
-  /** Same-origin proxy for PDF image fetches (must match `API_BASE_URL` in `src/config.ts`). */
+  /**
+   * Same-origin `/api-proxy` → API so PDF image `fetch`/canvas works without CORS.
+   * Production hosts should mirror this (e.g. nginx `location /api-proxy/` → `API_BASE_URL`).
+   */
   server: {
+    proxy: {
+      "/api-proxy": {
+        target: "https://api.samvaadai.com",
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api-proxy/, "") || "/",
+      },
+    },
+  },
+  preview: {
     proxy: {
       "/api-proxy": {
         target: "https://api.samvaadai.com",

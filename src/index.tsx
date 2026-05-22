@@ -122,7 +122,7 @@ function AuthenticatedApp(): JSX.Element {
             <AppointmentProvider>
               <PrescriptionProvider>
                 <Routes>
-                                   <Route path="/login" element={<Login />} />
+                  <Route path="/login" element={<Login />} />
                   <Route path="/signup" element={<Signup />} />
                   <Route element={<MainLayout />}>
                     <Route path="/" element={<RoleBasedHomeRedirect />} />

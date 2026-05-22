@@ -24,11 +24,27 @@ import {
 import { ListError } from "../../../../components/ui/list-error";
 import { Pagination } from "../../../../components/ui/pagination";
 import { usePrescription } from "../../../../contexts/PrescriptionProvider";
+import { decodeHtmlEntities } from "../../../../lib/prescriptionMeta";
 import { openPrescriptionReportPdfInNewTab } from "../../../../lib/prescriptionPdf";
 import {
   type PrescriptionDuration,
   Prescription,
 } from "../../../../types/prescription.type";
+
+/** Table cell: total count plus up to two medicine names; ", ..." when there are more. */
+const MEDICINES_PREVIEW_MAX = 2;
+
+function formatMedicinesCellPreview(prescription: Prescription): string {
+  const meds = prescription.medicines ?? [];
+  const n = meds.length;
+  if (n === 0) return "0 medicine(s)";
+  const names = meds.map((m) =>
+    decodeHtmlEntities(String(m.name ?? "").trim()),
+  );
+  const shown = names.slice(0, MEDICINES_PREVIEW_MAX).join(", ");
+  const ellipsis = n > MEDICINES_PREVIEW_MAX ? ", ..." : "";
+  return `${n} medicine(s): ${shown}${ellipsis}`;
+}
 
 function formatFollowUp(followUp: Prescription["followUp"]): string {
   if (!followUp) return "—";
@@ -247,10 +263,7 @@ export const PrescriptionListSection = ({
                       </TableCell>
                       <TableCell className="p-[0px]">
                         <span className="font-title-4l px-[20px] py-[16px] font-[number:var(--title-4l-font-weight)] text-black text-[length:var(--title-4l-font-size)] tracking-[var(--title-4l-letter-spacing)] leading-[var(--title-4l-line-height)] [font-style:var(--title-4l-font-style)]">
-                          {prescription.medicines?.length ?? 0} medicine(s)
-                          {prescription.medicines?.length
-                            ? `: ${prescription.medicines.map((m) => m.name).join(", ")}`
-                            : ""}
+                          {formatMedicinesCellPreview(prescription)}
                         </span>
                       </TableCell>
                       <TableCell className="p-[0px]">

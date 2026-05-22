@@ -108,14 +108,91 @@ function extractMedicinesArray(raw: unknown): unknown[] {
 function extractTotal(raw: unknown): number | undefined {
   if (raw == null || typeof raw !== "object") return undefined;
   const r = raw as Record<string, unknown>;
+
+  const asNum = (v: unknown): number | undefined => {
+    if (typeof v === "number" && Number.isFinite(v) && v >= 0) {
+      return Math.floor(v);
+    }
+    if (typeof v === "string") {
+      const n = Number(v.trim());
+      if (Number.isFinite(n) && n >= 0) return Math.floor(n);
+    }
+    return undefined;
+  };
+
+  const tryObj = (o: Record<string, unknown>): number | undefined =>
+    asNum(o.total) ??
+    asNum(o.totalCount) ??
+    asNum(o.totalItems) ??
+    asNum(o.totalDocs) ??
+    asNum(o.count) ??
+    asNum(o.itemCount);
+
+  let t = tryObj(r);
+
   const data = r.data;
-  if (data != null && typeof data === "object") {
+  if (
+    t === undefined &&
+    data != null &&
+    typeof data === "object" &&
+    !Array.isArray(data)
+  ) {
     const d = data as Record<string, unknown>;
-    const t = d.total ?? d.totalCount ?? d.count;
-    if (typeof t === "number") return t;
+    t =
+      tryObj(d) ??
+      (() => {
+        if (typeof d.meta === "object" && d.meta !== null) {
+          const m = tryObj(d.meta as Record<string, unknown>);
+          if (m !== undefined) return m;
+        }
+        if (typeof d.pagination === "object" && d.pagination !== null) {
+          return tryObj(d.pagination as Record<string, unknown>);
+        }
+        return undefined;
+      })();
   }
-  if (typeof r.total === "number") return r.total;
-  return undefined;
+
+  if (t === undefined && r.pagination != null && typeof r.pagination === "object") {
+    t = tryObj(r.pagination as Record<string, unknown>);
+  }
+
+  return t;
+}
+
+/** When the API omits `total`, infer page boundaries from slice length vs `limit`. */
+function finalizePaging(
+  page: number,
+  limit: number,
+  rowCount: number,
+  serverTotal?: number,
+): { total?: number; totalPages: number } {
+  const valid =
+    typeof serverTotal === "number" &&
+    Number.isFinite(serverTotal) &&
+    serverTotal >= 0;
+  if (valid) {
+    const t = Math.floor(serverTotal);
+    return {
+      total: t,
+      totalPages: Math.max(1, Math.ceil(t / limit)),
+    };
+  }
+  if (rowCount === 0) {
+    return {
+      total: 0,
+      totalPages: Math.max(1, page),
+    };
+  }
+  if (rowCount < limit) {
+    return {
+      total: (page - 1) * limit + rowCount,
+      totalPages: Math.max(1, page),
+    };
+  }
+  return {
+    total: undefined,
+    totalPages: Math.max(page + 1, 2),
+  };
 }
 
 function throwIfApiError(raw: unknown): void {
@@ -172,7 +249,7 @@ export async function fetchMedicinesList(
   limit = 100,
   opts?: FetchOpts,
   typeApi?: string,
-): Promise<{ rows: MedicineCatalogRow[]; total?: number }> {
+): Promise<{ rows: MedicineCatalogRow[]; total?: number; totalPages: number }> {
   try {
     const params = new URLSearchParams({
       page: String(page),
@@ -185,15 +262,28 @@ export async function fetchMedicinesList(
     })) as Record<string, unknown>;
     throwIfApiError(raw);
     const arr = extractMedicinesArray(raw);
-    return {
-      rows: arr.map((item, i) =>
-        normalizeRow(item as Record<string, unknown>, i),
-      ),
-      total: extractTotal(raw) ?? arr.length,
-    };
+    const rows = arr.map((item, i) =>
+      normalizeRow(item as Record<string, unknown>, i),
+    );
+    const extracted = extractTotal(raw);
+    const { total, totalPages } = finalizePaging(
+      page,
+      limit,
+      rows.length,
+      extracted,
+    );
+    return { rows, total, totalPages };
   } catch {
-    const demo = filterDemoByApiType([...DEMO_MEDICINES], typeApi);
-    return { rows: demo, total: demo.length };
+    const demoBase = filterDemoByApiType([...DEMO_MEDICINES], typeApi);
+    const start = Math.max(0, (page - 1) * limit);
+    const rows = demoBase.slice(start, start + limit);
+    const { total, totalPages } = finalizePaging(
+      page,
+      limit,
+      rows.length,
+      demoBase.length,
+    );
+    return { rows, total, totalPages };
   }
 }
 
@@ -204,7 +294,7 @@ export async function searchMedicines(
   limit = 20,
   opts?: FetchOpts,
   typeApi?: string,
-): Promise<{ rows: MedicineCatalogRow[]; total?: number }> {
+): Promise<{ rows: MedicineCatalogRow[]; total?: number; totalPages: number }> {
   const params = new URLSearchParams({
     page: String(page),
     limit: String(limit),
@@ -218,12 +308,17 @@ export async function searchMedicines(
   )) as Record<string, unknown>;
   throwIfApiError(raw);
   const arr = extractMedicinesArray(raw);
-  return {
-    rows: arr.map((item, i) =>
-      normalizeRow(item as Record<string, unknown>, i),
-    ),
-    total: extractTotal(raw),
-  };
+  const rows = arr.map((item, i) =>
+    normalizeRow(item as Record<string, unknown>, i),
+  );
+  const extracted = extractTotal(raw);
+  const { total, totalPages } = finalizePaging(
+    page,
+    limit,
+    rows.length,
+    extracted,
+  );
+  return { rows, total, totalPages };
 }
 
 /** POST /api/medicines */
