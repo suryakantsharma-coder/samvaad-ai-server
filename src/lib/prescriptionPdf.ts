@@ -143,23 +143,44 @@ function formatDoctorNameWithDesignation(
   return des ? `${name}, ${des}` : name;
 }
 
-function hospitalLogoAbsoluteUrl(
+function hospitalLogoAbsoluteUrlCandidates(
   hospital: PrescriptionHospital | undefined,
-): string | null {
+): string[] {
   const raw = hospital?.logoUrl?.trim();
-  if (!raw) return null;
-  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
-  return raw.startsWith("/")
-    ? `${API_BASE_URL}${raw}`
-    : `${API_BASE_URL}/${raw}`;
+  if (!raw) return [];
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return [raw];
+
+  const base = API_BASE_URL.replace(/\/$/, "");
+  const clean = raw.replace(/^\/+/, "");
+  const pathVariants = new Set<string>();
+
+  console.log("base", base);
+  console.log("clean", clean);
+  console.log("pathVariants", pathVariants);
+
+  // Stored as full relative path (common): "/uploads/hospitals/x.png" or "uploads/hospitals/x.png"
+  pathVariants.add(`/${clean}`);
+
+  // Stored as filename only (common in prod DB migrations/uploads): "x.png"
+  if (!clean.startsWith("uploads/")) {
+    pathVariants.add(`/uploads/${clean}`);
+    pathVariants.add(`/uploads/hospitals/${clean}`);
+  }
+
+  console.log("pathVariants", pathVariants);
+  console.log(
+    "Array.from(pathVariants).map((p) => `${base}${encodeURI(p)}`",
+    Array.from(pathVariants).map((p) => `${base}${encodeURI(p)}`),
+  );
+
+  return Array.from(pathVariants).map((p) => `${base}${encodeURI(p)}`);
 }
 
-/** Only the hospital logo from the database (`logoUrl`); no default brand image. */
+/** Only hospital logo candidates from DB `logoUrl`; no default brand image. */
 function prescriptionLogoUrlCandidates(
   hospital: PrescriptionHospital | undefined,
 ): string[] {
-  const h = hospitalLogoAbsoluteUrl(hospital);
-  return h ? [h] : [];
+  return hospitalLogoAbsoluteUrlCandidates(hospital);
 }
 
 function rasterizeLoadedImage(
@@ -459,14 +480,18 @@ async function drawHospitalHeaderBranding(
     );
     const groupW = logoSide + gapMm + textWidth;
     const groupLeft = margin + (contentW - groupW) / 2;
-    const url = logoUrls[0]!;
-    const logoPlaced = await addHospitalLogoSquareToPdf(
-      doc,
-      url,
-      groupLeft,
-      logoTopMm,
-      logoSide,
-    );
+    let logoPlaced = false;
+    for (const url of logoUrls) {
+      // Try each possible URL variant until one loads in production.
+      logoPlaced = await addHospitalLogoSquareToPdf(
+        doc,
+        url,
+        groupLeft,
+        logoTopMm,
+        logoSide,
+      );
+      if (logoPlaced) break;
+    }
     if (logoPlaced) {
       const textLeft = groupLeft + logoSide + gapMm;
       const logoCenterY = logoTopMm + logoSide / 2;
@@ -779,11 +804,28 @@ export async function downloadPrescriptionReportPdf(
 export async function openPrescriptionReportPdfInNewTab(
   input: Prescription,
 ): Promise<void> {
+  let targetTab: Window | null = null;
   try {
+    // Open the tab synchronously during the user gesture to avoid popup blockers in production.
+    targetTab = window.open("", "_blank");
+    if (targetTab) {
+      targetTab.opener = null;
+      targetTab.document.title = "Generating prescription PDF...";
+      targetTab.document.body.innerHTML =
+        "<p style='font-family: sans-serif; padding: 16px;'>Generating PDF, please wait...</p>";
+    }
     const doc = await buildPrescriptionPdfDocument(input);
     const blobUrl = doc.output("bloburl");
-    window.open(blobUrl, "_blank", "noopener,noreferrer");
+    if (targetTab && !targetTab.closed) {
+      targetTab.location.href = blobUrl;
+      return;
+    }
+    // Fallback if tab could not be pre-opened.
+    window.open(blobUrl, "_blank");
   } catch (err) {
+    if (targetTab && !targetTab.closed) {
+      targetTab.close();
+    }
     console.error("Prescription PDF open failed:", err);
     const detail =
       err instanceof Error
