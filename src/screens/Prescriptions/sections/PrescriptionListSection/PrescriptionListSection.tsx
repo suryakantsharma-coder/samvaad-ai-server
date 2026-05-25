@@ -26,6 +26,7 @@ import { Pagination } from "../../../../components/ui/pagination";
 import { usePrescription } from "../../../../contexts/PrescriptionProvider";
 import { decodeHtmlEntities } from "../../../../lib/prescriptionMeta";
 import { openPrescriptionReportPdfInNewTab } from "../../../../lib/prescriptionPdf";
+import { showSuccess } from "../../../../lib/toast";
 import {
   type PrescriptionDuration,
   Prescription,
@@ -306,11 +307,15 @@ export const PrescriptionListSection = ({
 
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onClick={() =>
+                              onClick={() => {
+                                showSuccess(
+                                  "Please wait",
+                                  "Prescription opening in new tab, please wait.",
+                                );
                                 void openPrescriptionReportPdfInNewTab(
                                   prescription,
-                                )
-                              }
+                                );
+                              }}
                             >
                               View prescription
                             </DropdownMenuItem>
@@ -328,6 +333,7 @@ export const PrescriptionListSection = ({
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
+                              className="text-red-600 focus:text-red-600"
                               onClick={() => onDeletePrescription(prescription)}
                             >
                               Delete

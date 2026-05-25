@@ -80,6 +80,7 @@ export interface Prescription {
   patientName: string;
   appointmentDate: string;
   medicines?: Medicine[];
+  extraNotes?: string;
 }
 
 export interface FollowUp {

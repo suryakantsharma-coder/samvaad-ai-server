@@ -15,6 +15,8 @@ import {
   getPatientAgeForPdf,
   getPatientDisplayName,
   getPatientGenderForPdf,
+  getPatientPhoneForPdf,
+  getPatientWeightForPdf,
 } from "./prescriptionMeta";
 import {
   resolvePrescriptionDemographicsForPdf,
@@ -37,6 +39,9 @@ const LINE_GREY: [number, number, number] = [200, 200, 200];
 
 /** Space reserved at bottom: signature block + ref + brand logo strip. */
 const FOOTER_RESERVED_MM = 56 + SIGNATURE_RULE_TOP_EXTRA_MM;
+/** Shared body typography for medicine and extra notes in prescription PDFs. */
+const PRESCRIPTION_BODY_FONT_PT = 10.5;
+const PRESCRIPTION_BODY_LINE_MM = 4.8;
 
 /** Same asset as auth header (`AuthSplitLayout`): `public/Logo-light-bg.svg`. */
 const SAMVAAD_BRAND_LOGO_PATH = "/Logo-light-bg.svg";
@@ -428,11 +433,12 @@ async function drawHospitalHeaderBranding(
   contentW: number,
   pageW: number,
   logoTopMm: number,
+  titleOverride?: string,
 ): Promise<number> {
   doc.setTextColor(...BLUE);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(17);
-  const title = hospital?.name ?? "Medical Prescription";
+  const title = titleOverride ?? hospital?.name ?? "Medical Prescription";
   const titleLinePitchMm = 6.4;
   const logoSide = TOP_LEFT_HOSPITAL_LOGO_SQUARE_MM;
   const gapMm = HOSPITAL_HEADER_LOGO_TEXT_GAP_MM;
@@ -491,6 +497,8 @@ async function drawHospitalHeaderBranding(
 async function buildPrescriptionPdfDocument(
   input: Prescription,
 ): Promise<jsPDF> {
+  const isPreviewDocument =
+    typeof input._id === "string" && input._id.startsWith("preview-");
   const rx = await resolvePrescriptionHospitalLogoForPdf(
     await resolvePrescriptionDemographicsForPdf(input),
   );
@@ -523,7 +531,21 @@ async function buildPrescriptionPdfDocument(
     contentW,
     pageW,
     logoTop,
+    isPreviewDocument ? "Prescription Preview" : undefined,
   );
+
+  if (isPreviewDocument) {
+    doc.setTextColor(...TEXT_GREY);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text(
+      "Preview only - for internal review. Not intended for patient use.",
+      pageW / 2,
+      y,
+      { align: "center" },
+    );
+    y += 5;
+  }
 
   doc.setTextColor(...TEXT_GREY);
   doc.setFont("helvetica", "normal");
@@ -571,35 +593,42 @@ async function buildPrescriptionPdfDocument(
   const nameVal = getPatientDisplayName(rx);
   const ageVal = getPatientAgeForPdf(rx);
   const genderVal = getPatientGenderForPdf(rx);
+  const phoneVal = getPatientPhoneForPdf(rx);
+  const weightVal = getPatientWeightForPdf(rx);
   const dateVal = formatPdfDate(rx.appointmentDate);
 
   const row1Y = y;
-  doc.setTextColor(...TEXT_GREY);
+  const columnGap = 4;
+  const colW = (contentW - columnGap * 2) / 3;
+  const colX1 = margin;
+  const colX2 = margin + colW + columnGap;
+  const colX3 = margin + (colW + columnGap) * 2;
+  const fixedUnderlineW = colW - 20;
+
+  const drawFixedPatientField = (
+    label: string,
+    value: string,
+    labelX: number,
+    baselineY: number,
+  ) => {
+    const withColon = `${label}:`;
+    const labelW = doc.getTextWidth(withColon);
+    const valueX = labelX + labelW + 2;
+    doc.setTextColor(...TEXT_GREY);
+    doc.text(withColon, labelX, baselineY);
+    doc.setTextColor(0, 0, 0);
+    doc.text(value, valueX, baselineY);
+  };
+
   doc.setFont("helvetica", "normal");
-  doc.text("Patient Name:", margin, row1Y);
-  doc.setTextColor(0, 0, 0);
-  doc.text(nameVal, margin + 26, row1Y);
-  drawLightUnderline(margin + 26, row1Y, 58);
-
-  doc.setTextColor(...TEXT_GREY);
-  doc.text("Age:", margin + 92, row1Y);
-  doc.setTextColor(0, 0, 0);
-  doc.text(ageVal, margin + 100, row1Y);
-  drawLightUnderline(margin + 100, row1Y, 18);
-
-  doc.setTextColor(...TEXT_GREY);
-  doc.text("Gender:", margin + 128, row1Y);
-  doc.setTextColor(0, 0, 0);
-  doc.text(genderVal, margin + 142, row1Y);
-  drawLightUnderline(margin + 142, row1Y, 38);
+  drawFixedPatientField("Patient Name", nameVal, colX1, row1Y);
+  drawFixedPatientField("Age", ageVal, colX2, row1Y);
+  drawFixedPatientField("Gender", genderVal, colX3, row1Y);
 
   y = row1Y + 6;
-
-  doc.setTextColor(...TEXT_GREY);
-  doc.text("Date:", margin, y);
-  doc.setTextColor(0, 0, 0);
-  doc.text(dateVal, margin + 26, y);
-  drawLightUnderline(margin + 26, y, 45);
+  drawFixedPatientField("Date", dateVal, colX1, y);
+  drawFixedPatientField("Phone", phoneVal === "—" ? "" : phoneVal, colX2, y);
+  drawFixedPatientField("Weight", weightVal === "—" ? "" : weightVal, colX3, y);
   y += 8;
 
   drawBlueRule(y);
@@ -615,7 +644,7 @@ async function buildPrescriptionPdfDocument(
   const medW = pageW - medLeft - margin;
   const contentBottomY = pageH - FOOTER_RESERVED_MM;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(PRESCRIPTION_BODY_FONT_PT);
   doc.setTextColor(0, 0, 0);
 
   let medY = y + 12;
@@ -636,7 +665,7 @@ async function buildPrescriptionPdfDocument(
       .filter(Boolean)
       .join("\n");
     const wrapped = doc.splitTextToSize(block, medW);
-    const blockHeight = wrapped.length * 4.1 + 3;
+    const blockHeight = wrapped.length * PRESCRIPTION_BODY_LINE_MM + 3;
     if (medY + blockHeight > contentBottomY) {
       doc.addPage();
       medY = 16;
@@ -649,6 +678,27 @@ async function buildPrescriptionPdfDocument(
     doc.setTextColor(...TEXT_GREY);
     doc.text("—", medLeft, medY);
     medY += 6;
+  }
+
+  const extraNotesText = rx.extraNotes?.trim();
+  if (extraNotesText) {
+    const notesBlock = [
+      "Extra Notes:",
+      decodeHtmlEntities(extraNotesText),
+    ].join("\n");
+    const wrappedNotes = doc.splitTextToSize(notesBlock, medW);
+    const notesHeight = wrappedNotes.length * PRESCRIPTION_BODY_LINE_MM + 3;
+    if (medY + notesHeight > contentBottomY) {
+      doc.addPage();
+      medY = 16;
+    }
+    doc.setTextColor(...TEXT_GREY);
+    doc.text(wrappedNotes[0], medLeft, medY);
+    if (wrappedNotes.length > 1) {
+      doc.setTextColor(0, 0, 0);
+      doc.text(wrappedNotes.slice(1), medLeft, medY + 4.1);
+    }
+    medY += notesHeight;
   }
 
   const refBaseline = pageH - 10;

@@ -4,6 +4,7 @@ export interface CreatePatientPayload {
   age: number;
   gender: "Male" | "Female" | "Other";
   reason: string;
+  weight: number;
 }
 
 export interface Patients {
@@ -11,6 +12,7 @@ export interface Patients {
   fullName: string;
   phoneNumber: string;
   age: number;
+  weight?: number;
   gender: "Male" | "Female" | "Other";
   createdAt: string;
   updatedAt: string;
@@ -45,6 +47,7 @@ export interface UpdatePatientPayload {
   phoneNumber: string;
   gender: "Male" | "Female" | "Other";
   reason: string;
+  weight: number;
 }
 
 /** Response from GET /api/patients/:patientId/overview */

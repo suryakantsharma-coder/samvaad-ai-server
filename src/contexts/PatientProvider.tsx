@@ -88,6 +88,7 @@ export const PatientProvider = ({
         age: patient.age,
         gender: patient.gender,
         reason: patient.reason,
+        weight: patient.weight,
       });
       setPatients([...patients, response.data.patient]);
       showSuccess("Success!", "Patient added successfully.");

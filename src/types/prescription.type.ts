@@ -21,6 +21,7 @@ export interface PrescriptionPatientInfo {
   patientId?: string;
   fullName: string;
   phoneNumber?: string;
+  weight?: number | string;
   /** When API populates patient on prescription detail */
   age?: number;
   gender?: string;
@@ -97,9 +98,12 @@ export interface Prescription {
   updatedAt?: string;
   hospital?: PrescriptionHospital;
   notes?: string;
+  extraNotes?: string;
   /** When API sends demographics at prescription root (PDF falls back if patient is an id) */
   patientAge?: number;
   patientGender?: string;
+  patientPhoneNumber?: string;
+  patientWeight?: number | string;
 }
 
 export interface CreatePrescriptionPayload {
@@ -109,6 +113,7 @@ export interface CreatePrescriptionPayload {
   appointmentDate: string;
   followUp?: PrescriptionFollowUp;
   medicines: PrescriptionMedicine[];
+  extraNotes?: string;
   status?: PrescriptionStatus;
 }
 
@@ -117,5 +122,6 @@ export interface UpdatePrescriptionPayload {
   appointmentDate?: string;
   followUp?: PrescriptionFollowUp;
   medicines?: PrescriptionMedicine[];
+  extraNotes?: string;
   status?: PrescriptionStatus;
 }

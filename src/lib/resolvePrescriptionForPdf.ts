@@ -8,6 +8,8 @@ import type {
 import {
   getPatientAgeForPdf,
   getPatientGenderForPdf,
+  getPatientPhoneForPdf,
+  getPatientWeightForPdf,
 } from "./prescriptionMeta";
 
 function getHospitalIdFromEmbedded(embedded: unknown): string | null {
@@ -63,9 +65,11 @@ function getPatientIdForLookup(rx: Prescription): string | null {
   return null;
 }
 
-function parseAgeGenderFromPatientResponse(res: unknown): {
+function parsePatientDetailsFromPatientResponse(res: unknown): {
   age?: number;
   gender?: string;
+  phoneNumber?: string;
+  weight?: number;
 } {
   if (res == null || typeof res !== "object") return {};
   const r = res as Record<string, unknown>;
@@ -86,9 +90,21 @@ function parseAgeGenderFromPatientResponse(res: unknown): {
     typeof p.gender === "string" && p.gender.trim()
       ? p.gender.trim()
       : undefined;
+  const phoneNumber =
+    typeof p.phoneNumber === "string" && p.phoneNumber.trim()
+      ? p.phoneNumber.trim()
+      : undefined;
+  let weight: number | undefined;
+  if (typeof p.weight === "number" && !Number.isNaN(p.weight)) weight = p.weight;
+  else if (typeof p.weight === "string" && p.weight.trim() !== "") {
+    const n = Number(p.weight.replace(/[^\d.]/g, ""));
+    if (!Number.isNaN(n)) weight = n;
+  }
   return {
     ...(age !== undefined ? { age } : {}),
     ...(gender ? { gender } : {}),
+    ...(phoneNumber ? { phoneNumber } : {}),
+    ...(weight !== undefined ? { weight } : {}),
   };
 }
 
@@ -105,17 +121,26 @@ export async function resolvePrescriptionDemographicsForPdf(
 
   const missingAge = getPatientAgeForPdf(rx) === "—";
   const missingGender = getPatientGenderForPdf(rx) === "—";
-  if (!missingAge && !missingGender) return rx;
+  const missingPhone = getPatientPhoneForPdf(rx) === "—";
+  const missingWeight = getPatientWeightForPdf(rx) === "—";
+  if (!missingAge && !missingGender && !missingPhone && !missingWeight) return rx;
 
   const id = getPatientIdForLookup(rx);
   if (!id) return rx;
 
   try {
     const raw = await getPatientById(id);
-    const { age, gender } = parseAgeGenderFromPatientResponse(raw);
+    const { age, gender, phoneNumber, weight } =
+      parsePatientDetailsFromPatientResponse(raw);
     let next: Prescription = { ...rx };
     if (missingAge && age != null) next = { ...next, patientAge: age };
     if (missingGender && gender) next = { ...next, patientGender: gender };
+    if (missingPhone && phoneNumber) {
+      next = { ...next, patientPhoneNumber: phoneNumber };
+    }
+    if (missingWeight && weight != null) {
+      next = { ...next, patientWeight: weight };
+    }
     return next;
   } catch {
     return rx;
@@ -141,9 +166,9 @@ export async function resolvePrescriptionHospitalLogoForPdf(
   const existingLogo =
     typeof embedded === "object" &&
     embedded !== null &&
-    typeof (embedded as PrescriptionHospital).logoUrl === "string" ?
-      (embedded as PrescriptionHospital).logoUrl?.trim()
-    : "";
+    typeof (embedded as PrescriptionHospital).logoUrl === "string"
+      ? (embedded as PrescriptionHospital).logoUrl?.trim()
+      : "";
   if (existingLogo) return rx;
 
   try {
@@ -151,9 +176,9 @@ export async function resolvePrescriptionHospitalLogoForPdf(
     const full = res?.data?.hospital;
     if (!full?.logoUrl?.trim()) return rx;
     const base: PrescriptionHospital =
-      typeof embedded === "object" && embedded !== null ?
-        (embedded as PrescriptionHospital)
-      : { _id: id, name: "", phoneNumber: "" };
+      typeof embedded === "object" && embedded !== null
+        ? (embedded as PrescriptionHospital)
+        : { _id: id, name: "", phoneNumber: "" };
     const merged: PrescriptionHospital = {
       ...base,
       ...prescriptionHospitalFromApi(full),

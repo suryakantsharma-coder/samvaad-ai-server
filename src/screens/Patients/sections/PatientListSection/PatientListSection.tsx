@@ -575,12 +575,13 @@ export const PatientListSection = ({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
+                        {/* <DropdownMenuItem>View Details</DropdownMenuItem> */}
                         <DropdownMenuItem
                           onClick={() =>
                             onEditPatient({
                               name: patient.fullName,
                               age: patient.age,
+                              weight: patient.weight ?? 0,
                               phone: patient.phoneNumber,
                               gender: patient.gender,
                               reason: patient.reason || "",
@@ -599,10 +600,12 @@ export const PatientListSection = ({
                           Patient History
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                          className="text-red-600 focus:text-red-600"
                           onClick={() =>
                             onDeletePatient({
                               name: patient.fullName,
                               age: patient.age,
+                              weight: patient.weight ?? 0,
                               phone: patient.phoneNumber,
                               gender: patient.gender,
                               reason: "No reason provided",

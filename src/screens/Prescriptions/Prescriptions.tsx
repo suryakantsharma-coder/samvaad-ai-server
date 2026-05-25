@@ -50,6 +50,7 @@ function mapModalPayloadToCreate(
       time: { breakfast: m.breakfast, lunch: m.lunch, dinner: m.dinner },
       notes: m.notes || undefined,
     })),
+    extraNotes: payload.extraNotes?.trim() || undefined,
     status: "Draft",
   };
 }

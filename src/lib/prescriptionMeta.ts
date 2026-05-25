@@ -28,8 +28,7 @@ export function getHospital(
 export function getPatientDisplayName(rx: Prescription): string {
   if (typeof rx.patient === "object" && rx.patient !== null) {
     const o = rx.patient as Record<string, unknown>;
-    const fromFull =
-      typeof o.fullName === "string" ? o.fullName.trim() : "";
+    const fromFull = typeof o.fullName === "string" ? o.fullName.trim() : "";
     const fromName = typeof o.name === "string" ? o.name.trim() : "";
     if (fromFull) return fromFull;
     if (fromName) return fromName;
@@ -38,6 +37,12 @@ export function getPatientDisplayName(rx: Prescription): string {
 }
 
 type LooseDemographics = { age?: unknown; gender?: unknown };
+type LoosePatientInfo = {
+  phoneNumber?: unknown;
+  patientPhoneNumber?: unknown;
+  weight?: unknown;
+  patientWeight?: unknown;
+};
 
 function readAgeFromRecord(o: Record<string, unknown>): string | null {
   const v = o.age ?? o.Age;
@@ -90,6 +95,49 @@ export function getPatientGenderForPdf(rx: Prescription): string {
   if (typeof loose.gender === "string" && loose.gender.trim()) {
     return loose.gender.trim();
   }
+  return "—";
+}
+
+/** Phone for PDF: nested patient.phoneNumber, root patientPhoneNumber, or loose phoneNumber. */
+export function getPatientPhoneForPdf(rx: Prescription): string {
+  if (typeof rx.patient === "object" && rx.patient !== null) {
+    const nested = rx.patient as Record<string, unknown>;
+    if (typeof nested.phoneNumber === "string" && nested.phoneNumber.trim()) {
+      return nested.phoneNumber.trim();
+    }
+  }
+  if (typeof rx.patientPhoneNumber === "string" && rx.patientPhoneNumber.trim()) {
+    return rx.patientPhoneNumber.trim();
+  }
+  const loose = rx as Prescription & LoosePatientInfo;
+  if (typeof loose.phoneNumber === "string" && loose.phoneNumber.trim()) {
+    return loose.phoneNumber.trim();
+  }
+  return "—";
+}
+
+function parseWeight(value: unknown): number | null {
+  if (typeof value === "number" && !Number.isNaN(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const numText = value.replace(/[^\d.]/g, "");
+    const n = Number(numText);
+    if (!Number.isNaN(n)) return n;
+  }
+  return null;
+}
+
+/** Weight for PDF: nested patient.weight, root patientWeight, or loose weight. */
+export function getPatientWeightForPdf(rx: Prescription): string {
+  if (typeof rx.patient === "object" && rx.patient !== null) {
+    const nested = rx.patient as Record<string, unknown>;
+    const w = parseWeight(nested.weight ?? nested.Weight);
+    if (w != null) return `${w} kg`;
+  }
+  const rootWeight = parseWeight(rx.patientWeight);
+  if (rootWeight != null) return `${rootWeight} kg`;
+  const loose = rx as Prescription & LoosePatientInfo;
+  const lw = parseWeight(loose.weight ?? loose.patientWeight);
+  if (lw != null) return `${lw} kg`;
   return "—";
 }
 

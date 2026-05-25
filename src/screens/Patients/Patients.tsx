@@ -32,6 +32,7 @@ export const Patients = (): JSX.Element => {
       age: patient.age,
       gender: patient.gender as "Male" | "Female" | "Other",
       reason: patient.reason,
+      weight: patient.weight,
     };
     await handleAddPatient(payload);
   };

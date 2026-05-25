@@ -549,6 +549,7 @@ export const AppointmentListSection = ({
                               Mark as done
                             </DropdownMenuItem>
                             <DropdownMenuItem
+                              className="text-red-600 focus:text-red-600"
                               onClick={() => onCancelAppointment(appointment)}
                             >
                               Cancel appointment

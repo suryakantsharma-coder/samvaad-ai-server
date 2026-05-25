@@ -119,6 +119,14 @@ export const PrescriptionViewModal = ({
                     {getDiagnosis(prescription)}
                   </dd>
                 </div>
+                {prescription.extraNotes?.trim() ? (
+                  <div className="sm:col-span-2">
+                    <dt className="font-title-4m text-x-70">Extra notes</dt>
+                    <dd className="font-title-4r mt-0.5 whitespace-pre-wrap break-words">
+                      {prescription.extraNotes}
+                    </dd>
+                  </div>
+                ) : null}
               </dl>
 
               <PrescriptionMedicinesSection medicines={prescription.medicines} />

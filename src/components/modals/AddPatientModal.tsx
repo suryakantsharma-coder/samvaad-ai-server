@@ -26,6 +26,7 @@ interface AddPatientModalProps {
 export interface PatientData {
   name: string;
   age: number;
+  weight: number;
   phone: string;
   gender: string;
   reason: string;
@@ -41,6 +42,7 @@ export const AddPatientModal = ({
   const [formData, setFormData] = useState<PatientData>({
     name: "",
     age: 0,
+    weight: 0,
     phone: "",
     gender: "Male",
     reason: "",
@@ -55,6 +57,7 @@ export const AddPatientModal = ({
       setFormData({
         name: "",
         age: 0,
+        weight: 0,
         phone: "",
         gender: "Male",
         reason: "",
@@ -70,6 +73,7 @@ export const AddPatientModal = ({
     setFormData({
       name: "",
       age: 0,
+      weight: 0,
       phone: "",
       gender: "Male",
       reason: "",
@@ -149,6 +153,54 @@ export const AddPatientModal = ({
                       setFormData({
                         ...formData,
                         age: Math.max(0, formData.age - 1),
+                      })
+                    }
+                    className="h-3 flex items-center justify-center"
+                  >
+                    <ChevronDownIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="font-title-4m font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                Weight (kg)<span className="text-[#ff0004]">*</span>
+              </label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={formData.weight || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      weight: parseFloat(e.target.value) || 0,
+                    })
+                  }
+                  placeholder="0.0"
+                  className="h-[38px] px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] [font-style:var(--title-4r-font-style)]"
+                />
+                <div className="absolute right-5 top-1/2 -translate-y-1/2 flex flex-col gap-0">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        weight: Number((formData.weight + 0.1).toFixed(1)),
+                      })
+                    }
+                    className="h-3 flex items-center justify-center"
+                  >
+                    <ChevronDownIcon className="w-4 h-4 rotate-180" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        weight: Number(Math.max(0, formData.weight - 0.1).toFixed(1)),
                       })
                     }
                     className="h-3 flex items-center justify-center"

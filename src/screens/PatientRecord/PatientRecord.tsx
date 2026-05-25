@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   Calendar,
+  FilePenLine,
   Eye,
   FileText,
   RefreshCw,
@@ -12,7 +13,7 @@ import { Button } from "../../components/ui/button";
 import { getPatientHistory } from "../../data/history";
 import type {
   Appointments,
-  Prescription,
+  Prescription as HistoryPrescription,
   Medicine,
 } from "../../types/appointment.type";
 import type { PatientHistoryResponse } from "../../types/appointment.type";
@@ -20,6 +21,12 @@ import type { Patients } from "../../types/patient.type";
 import { formatTime12h } from "../../lib/dateTimeDisplay";
 import { NewPrescriptionModal } from "../../components/modals";
 import type { NewPrescriptionPayload } from "../../components/modals/NewPrescriptionModal";
+import type {
+  Prescription as ModalPrescription,
+  UpdatePrescriptionPayload,
+} from "../../types/prescription.type";
+import { updatePrescription } from "../../data/prescription";
+import { showError, showSuccess } from "../../lib/toast";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 
 function formatAppointmentDate(d: string) {
@@ -68,13 +75,74 @@ export const PatientRecord = (): JSX.Element => {
     patientFromState ?? null,
   );
   const [appointments, setAppointments] = useState<Appointments[]>([]);
-  const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [prescriptions, setPrescriptions] = useState<HistoryPrescription[]>([]);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<
     string | null
   >(null);
   const [loading, setLoading] = useState(true);
   const [showNewPrescriptionModal, setShowNewPrescriptionModal] =
     useState(false);
+  const [editingPrescription, setEditingPrescription] =
+    useState<ModalPrescription | null>(null);
+
+  const mapHistoryPrescriptionToModal = (
+    p: HistoryPrescription,
+  ): ModalPrescription => {
+    const appointment = p.appointment;
+    const mappedAppointment =
+      typeof appointment === "string"
+        ? appointment
+        : {
+            _id: appointment?._id,
+            appointmentId: appointment?.appointmentId,
+            doctor:
+              typeof appointment?.doctor === "string"
+                ? { _id: appointment.doctor, fullName: "—" }
+                : {
+                    _id: appointment?.doctor?._id,
+                    fullName: appointment?.doctor?.fullName ?? "—",
+                    doctorId: appointment?.doctor?.doctorId,
+                    phoneNumber: appointment?.doctor?.phoneNumber,
+                    email: appointment?.doctor?.email,
+                  },
+            reason: appointment?.reason,
+            status: appointment?.status,
+            type: appointment?.type,
+            appointmentDateTime: appointment?.appointmentDateTime,
+          };
+    return {
+      _id: p._id,
+      patient: p.patient,
+      appointment: mappedAppointment,
+      patientName: p.patientName,
+      appointmentDate: p.appointmentDate,
+      medicines:
+        p.medicines?.map((m) => ({
+          name: m.name,
+          dosage: {
+            value: m.dosage?.value ?? 0,
+            unit: (m.dosage?.unit ?? "mg") as
+              | "mg"
+              | "ml"
+              | "g"
+              | "tablet"
+              | "capsule",
+          },
+          duration: {
+            value: m.duration?.value ?? 0,
+            unit: (m.duration?.unit ?? "Days") as "Days" | "Weeks" | "Months",
+          },
+          intake: (m.intake ?? "After") as "Before" | "After",
+          time: m.time,
+          notes: m.notes,
+        })) ?? [],
+      status: "Draft",
+      ...(p.followUp ? { followUp: p.followUp } : {}),
+      ...(p.extraNotes ? { extraNotes: p.extraNotes } : {}),
+      ...(p.hospital ? { hospital: p.hospital as ModalPrescription["hospital"] } : {}),
+      ...(p.notes ? { notes: p.notes } : {}),
+    };
+  };
 
   const fetchData = useCallback(async () => {
     if (!patientId) return;
@@ -135,6 +203,27 @@ export const PatientRecord = (): JSX.Element => {
 
   const handleSavePrescription = async (_payload: NewPrescriptionPayload) => {
     setShowNewPrescriptionModal(false);
+  };
+
+  const handleEditPrescription = (p: HistoryPrescription) => {
+    setEditingPrescription(mapHistoryPrescriptionToModal(p));
+  };
+
+  const handleUpdatePrescriptionSubmit = async (
+    prescriptionId: string,
+    payload: UpdatePrescriptionPayload,
+  ) => {
+    try {
+      await updatePrescription(prescriptionId, payload);
+      showSuccess("Success!", "Prescription updated successfully.");
+      setEditingPrescription(null);
+      await fetchData();
+    } catch (e) {
+      showError(
+        "Error",
+        e instanceof Error ? e.message : "Failed to update prescription",
+      );
+    }
   };
 
   const selectedPrescription = selectedAppointmentId
@@ -324,32 +413,55 @@ export const PatientRecord = (): JSX.Element => {
                     </span>
                   </h2>
                 </div>
-                {selectedPrescription?.appointmentDate && (
-                  <span className="font-title-5l text-[#57575f] text-sm">
-                    {formatPrescriptionDate(
-                      selectedPrescription.appointmentDate,
-                    )}
-                  </span>
-                )}
+                <div className="flex items-center gap-3">
+                  {selectedPrescription?.appointmentDate && (
+                    <span className="font-title-5l text-[#57575f] text-sm">
+                      {formatPrescriptionDate(
+                        selectedPrescription.appointmentDate,
+                      )}
+                    </span>
+                  )}
+                  {selectedPrescription ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-8 px-2.5 text-primary-2 hover:text-primary-2 hover:bg-primary-2/10 font-title-4r"
+                      leadingIcon={<FilePenLine className="h-4 w-4" />}
+                      onClick={() => handleEditPrescription(selectedPrescription)}
+                    >
+                      Edit
+                    </Button>
+                  ) : null}
+                </div>
               </div>
               <div className="p-5 flex flex-col gap-4">
                 {selectedPrescription?.medicines?.length ? (
-                  selectedPrescription.medicines.map((med, i) => (
-                    <div
-                      key={i}
-                      className="rounded-[10px] border border-[#dedee1] bg-white p-4 flex flex-col gap-2"
-                    >
-                      <p className="font-title-4m text-black">{med.name}</p>
-                      <p className="font-title-5l text-[#57575f] text-sm">
-                        {medicineLine(med)}
-                      </p>
-                      {med.notes && (
+                  <>
+                    {selectedPrescription.medicines.map((med, i) => (
+                      <div
+                        key={i}
+                        className="rounded-[10px] border border-[#dedee1] bg-white p-4 flex flex-col gap-2"
+                      >
+                        <p className="font-title-4m text-black">{med.name}</p>
                         <p className="font-title-5l text-[#57575f] text-sm">
-                          Note: {med.notes}
+                          {medicineLine(med)}
                         </p>
-                      )}
-                    </div>
-                  ))
+                        {med.notes && (
+                          <p className="font-title-5l text-[#57575f] text-sm">
+                            Note: {med.notes}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                    {selectedPrescription.extraNotes?.trim() ? (
+                      <div className="rounded-[10px] bg-[#f5f7ff] p-4 flex flex-col gap-1.5">
+                        <p className="font-title-4m text-[#2b4cb3]">Extra Notes</p>
+                        <p className="font-title-5l text-[#57575f] text-sm whitespace-pre-wrap break-words">
+                          {selectedPrescription.extraNotes}
+                        </p>
+                      </div>
+                    ) : null}
+                  </>
                 ) : selectedAppointmentId ? (
                   <p className="font-title-5l text-[#57575f] text-sm py-4">
                     No prescription for this visit.
@@ -386,10 +498,16 @@ export const PatientRecord = (): JSX.Element => {
       </main>
 
       <NewPrescriptionModal
-        open={showNewPrescriptionModal}
-        onOpenChange={setShowNewPrescriptionModal}
+        open={showNewPrescriptionModal || editingPrescription !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowNewPrescriptionModal(false);
+            setEditingPrescription(null);
+          }
+        }}
         onSave={handleSavePrescription}
-        initialPrescription={null}
+        onUpdate={handleUpdatePrescriptionSubmit}
+        initialPrescription={editingPrescription}
         initialPatient={p}
       />
     </div>

@@ -25,6 +25,7 @@ import { searchMedicines } from "../../data/medicines";
 import type { MedicineCatalogRow } from "../../types/medicineCatalog.type";
 import { getAppointments } from "../../data/appointment";
 import { Appointments } from "../../types/appointment.type";
+import { showError } from "../../lib/toast";
 import type {
   Prescription,
   PrescriptionMedicine,
@@ -34,8 +35,10 @@ import { searchPatients, type PatientSearchDoctorScope } from "../../data/patien
 import { useAuth } from "../../contexts/AuthProvider";
 import { getDoctorPatientsListQuery } from "../../lib/userRole";
 import type { UpdatePrescriptionPayload } from "../../types/prescription.type";
+import { openPrescriptionReportPdfInNewTab } from "../../lib/prescriptionPdf";
 import {
   modalFooterCancelClassName,
+  modalFooterOutlineClassName,
   modalFooterPrimaryClassName,
   modalFooterRowClassName,
   modalHeaderCloseButtonClassName,
@@ -510,6 +513,7 @@ export interface NewPrescriptionPayload {
   appointmentDate: string;
   followUpDays: number;
   medicines: Omit<MedicineEntry, "id" | "expanded" | "medicineNameSelected">[];
+  extraNotes?: string;
 }
 
 function prescriptionMedicineToEntry(
@@ -580,9 +584,96 @@ export const NewPrescriptionModal = ({
   >([]);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [previewingPdf, setPreviewingPdf] = useState(false);
   const [appointmentDate, setAppointmentDate] = useState("2025-11-04");
   const [followUpDays, setFollowUpDays] = useState(7);
   const [medicines, setMedicines] = useState<MedicineEntry[]>([]);
+  const [extraNotes, setExtraNotes] = useState("");
+
+  const validateCreateForm = (): boolean => {
+    if (!selectedPatient) {
+      showError("Validation", "Please select a patient.");
+      return false;
+    }
+    if (!selectedAppointment) {
+      showError("Validation", "Please select an appointment.");
+      return false;
+    }
+    if (!appointmentDate) {
+      showError("Validation", "Please select an appointment date.");
+      return false;
+    }
+    if (followUpDays <= 0) {
+      showError("Validation", "Follow-up days must be greater than 0.");
+      return false;
+    }
+    if (medicines.length === 0) {
+      showError("Validation", "Please add at least one medicine.");
+      return false;
+    }
+    const invalidMedicineIndex = medicines.findIndex(
+      (m) => !m.name.trim() || m.duration <= 0,
+    );
+    if (invalidMedicineIndex !== -1) {
+      showError(
+        "Validation",
+        `Please complete required details for medicine ${invalidMedicineIndex + 1}.`,
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const mapMedicinesToPrescription = (): PrescriptionMedicine[] => {
+    return medicines.map((m) => ({
+      name: m.name,
+      dosage: {
+        value: m.dosage,
+        unit: m.dosageUnit as "mg" | "ml" | "g" | "tablet" | "capsule",
+      },
+      duration: {
+        value: m.duration,
+        unit: (m.durationUnit === "Week"
+          ? "Weeks"
+          : m.durationUnit === "Month"
+            ? "Months"
+            : "Days") as "Days" | "Weeks" | "Months",
+      },
+      intake: m.intake as "Before" | "After",
+      time: { breakfast: m.breakfast, lunch: m.lunch, dinner: m.dinner },
+      notes: m.notes || undefined,
+    }));
+  };
+
+  const buildPreviewPrescription = (): Prescription | null => {
+    if (!validateCreateForm()) return;
+    const patient = selectedPatient;
+    const appointment = selectedAppointment;
+    if (!patient || !appointment) return null;
+    return {
+      _id: `preview-${Date.now()}`,
+      patient,
+      appointment,
+      patientName: patient.fullName,
+      appointmentDate: new Date(appointmentDate).toISOString(),
+      followUp: { value: followUpDays, unit: "Days" },
+      medicines: mapMedicinesToPrescription(),
+      extraNotes: extraNotes.trim() || undefined,
+      status: "Draft",
+    };
+  };
+
+  const handleViewPdf = async () => {
+    if (submitting || previewingPdf) return;
+    const preview = buildPreviewPrescription();
+    if (!preview) return;
+    setPreviewingPdf(true);
+    try {
+      await openPrescriptionReportPdfInNewTab(preview);
+    } finally {
+      setPreviewingPdf(false);
+    }
+  };
 
   const toggleMedicineExpanded = (id: string) => {
     setMedicines((prev) =>
@@ -660,6 +751,7 @@ export const NewPrescriptionModal = ({
           prescriptionMedicineToEntry(m, i),
         ),
       );
+      setExtraNotes(initialPrescription.extraNotes ?? "");
       setPatientSearchText("");
     } else {
       if (initialPatient) {
@@ -670,6 +762,7 @@ export const NewPrescriptionModal = ({
         setAppointmentDate("2025-11-04");
         setFollowUpDays(7);
         setMedicines([]);
+        setExtraNotes("");
       } else {
         setSelectedPatient(null);
         setPatientSearchText("");
@@ -678,6 +771,7 @@ export const NewPrescriptionModal = ({
         setAppointmentDate("2025-11-04");
         setFollowUpDays(7);
         setMedicines([]);
+        setExtraNotes("");
       }
     }
   }, [open, initialPrescription?._id, initialPatient?._id]);
@@ -727,24 +821,8 @@ export const NewPrescriptionModal = ({
           selectedPatient?.fullName ?? initialPrescription.patientName,
         appointmentDate: new Date(appointmentDate).toISOString(),
         followUp: { value: followUpDays, unit: "Days" },
-        medicines: medicines.map((m) => ({
-          name: m.name,
-          dosage: {
-            value: m.dosage,
-            unit: m.dosageUnit as "mg" | "ml" | "g" | "tablet" | "capsule",
-          },
-          duration: {
-            value: m.duration,
-            unit: (m.durationUnit === "Week"
-              ? "Weeks"
-              : m.durationUnit === "Month"
-                ? "Months"
-                : "Days") as "Days" | "Weeks" | "Months",
-          },
-          intake: m.intake as "Before" | "After",
-          time: { breakfast: m.breakfast, lunch: m.lunch, dinner: m.dinner },
-          notes: m.notes || undefined,
-        })),
+        medicines: mapMedicinesToPrescription(),
+        extraNotes: extraNotes.trim() || undefined,
         status: initialPrescription.status,
       };
       setSubmitting(true);
@@ -758,16 +836,20 @@ export const NewPrescriptionModal = ({
       }
       return;
     }
-    if (!selectedPatient || !selectedAppointment) return;
+    if (!validateCreateForm()) return;
+    const patient = selectedPatient;
+    const appointment = selectedAppointment;
+    if (!patient || !appointment) return;
     const payload: NewPrescriptionPayload = {
-      patientId: selectedPatient._id,
-      patientName: selectedPatient.fullName,
-      appointmentId: selectedAppointment._id,
+      patientId: patient._id,
+      patientName: patient.fullName,
+      appointmentId: appointment._id,
       appointmentDate,
       followUpDays,
       medicines: medicines.map(
         ({ id, expanded, medicineNameSelected, ...rest }) => rest,
       ),
+      extraNotes: extraNotes.trim() || undefined,
     };
     setSubmitting(true);
     try {
@@ -781,7 +863,7 @@ export const NewPrescriptionModal = ({
 
   const canSend = isEditMode
     ? Boolean(initialPrescription)
-    : Boolean(selectedPatient && selectedAppointment);
+    : true;
 
   const handleClose = () => {
     if (submitting) return;
@@ -1122,6 +1204,19 @@ export const NewPrescriptionModal = ({
             </div>
           </div>
 
+          <div className="flex flex-col gap-2">
+            <label className="font-title-4m text-black text-[length:var(--title-4m-font-size)]">
+              Extra Notes
+            </label>
+            <textarea
+              value={extraNotes}
+              onChange={(e) => setExtraNotes(e.target.value)}
+              placeholder="Add extra notes for this prescription"
+              rows={4}
+              className="w-full px-4 py-2 bg-white border border-[#dedee1] rounded-[10px] font-title-4r text-sm resize-y min-h-[96px] focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
+
           {/* Footer */}
           <div
             className={`${modalFooterRowClassName} pt-2 border-t border-[#dedee1]`}
@@ -1136,10 +1231,22 @@ export const NewPrescriptionModal = ({
             >
               Cancel
             </Button>
+            {!isEditMode ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handleViewPdf()}
+                loading={previewingPdf}
+                disabled={submitting}
+                className={modalFooterOutlineClassName}
+              >
+                View Prescription
+              </Button>
+            ) : null}
             <Button
               type="button"
               onClick={() => void handleSend()}
-              disabled={!canSend}
+              disabled={submitting || previewingPdf || !canSend}
               loading={submitting}
               leadingIcon={<CircleCheck className="h-4 w-4" />}
               className={`${modalFooterPrimaryClassName} disabled:opacity-50 disabled:pointer-events-none`}
