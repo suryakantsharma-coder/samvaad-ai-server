@@ -26,6 +26,7 @@ import type {
   UpdatePrescriptionPayload,
 } from "../../types/prescription.type";
 import { updatePrescription } from "../../data/prescription";
+import { searchObservationsByPatient } from "../../data/observation";
 import { showError, showSuccess } from "../../lib/toast";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 
@@ -65,6 +66,48 @@ function medicineLine(med: Medicine): string {
   );
 }
 
+type ObservationEntry = {
+  _id?: string;
+  text: string;
+  time: string;
+};
+
+function normalizeObservationEntries(payload: unknown): ObservationEntry[] {
+  const data = (payload as { data?: unknown })?.data ?? payload;
+  const asObj = data as {
+    observation?: { observations?: unknown; entries?: unknown };
+    observations?: unknown;
+    entries?: unknown;
+    items?: Array<{ observations?: unknown; entries?: unknown }>;
+  };
+  const candidate =
+    asObj?.observation?.observations ??
+    asObj?.observation?.entries ??
+    asObj?.observations ??
+    asObj?.entries ??
+    asObj?.items?.[0]?.observations ??
+    asObj?.items?.[0]?.entries;
+
+  if (!Array.isArray(candidate)) return [];
+
+  return candidate
+    .map((item) => {
+      const row = item as { _id?: string; text?: string; time?: string };
+      return {
+        _id: row?._id,
+        text: String(row?.text ?? "").trim(),
+        time: String(row?.time ?? "").trim(),
+      };
+    })
+    .filter((item) => item.text.length > 0);
+}
+
+function formatObservationDateTime(isoLike: string): string {
+  const date = new Date(isoLike);
+  if (Number.isNaN(date.getTime())) return "—";
+  return `${formatAppointmentDate(isoLike)} | ${formatTime12h(isoLike)}`;
+}
+
 export const PatientRecord = (): JSX.Element => {
   const { patientId } = useParams<{ patientId: string }>();
   const navigate = useNavigate();
@@ -84,6 +127,11 @@ export const PatientRecord = (): JSX.Element => {
     useState(false);
   const [editingPrescription, setEditingPrescription] =
     useState<ModalPrescription | null>(null);
+  const [observationEntries, setObservationEntries] = useState<ObservationEntry[]>(
+    [],
+  );
+  const [observationLoading, setObservationLoading] = useState(false);
+  const [observationError, setObservationError] = useState<string | null>(null);
 
   const mapHistoryPrescriptionToModal = (
     p: HistoryPrescription,
@@ -190,9 +238,27 @@ export const PatientRecord = (): JSX.Element => {
     }
   }, [patientId, patientFromState]);
 
+  const fetchObservations = useCallback(async () => {
+    if (!patientId) return;
+    setObservationLoading(true);
+    setObservationError(null);
+    try {
+      const response = await searchObservationsByPatient(patientId);
+      setObservationEntries(normalizeObservationEntries(response));
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to load observations";
+      setObservationError(message);
+      setObservationEntries([]);
+    } finally {
+      setObservationLoading(false);
+    }
+  }, [patientId]);
+
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    fetchObservations();
+  }, [fetchData, fetchObservations]);
 
   const handleViewPrescription = (aptId: string) => {
     setSelectedAppointmentId(aptId);
@@ -271,12 +337,12 @@ export const PatientRecord = (): JSX.Element => {
   const p = patient ?? patientFromState!;
 
   return (
-    <div className="w-full flex flex-col">
-      <main className="flex-1 w-full max-w-[1400px] mx-auto px-4 md:px-6 py-6 flex flex-col gap-[24px]">
+    <div className="w-full h-full flex flex-1 flex-col min-h-0 overflow-hidden">
+      <main className="flex-1 w-full min-h-0 overflow-hidden px-4 md:px-[30px] pt-6 pb-4 flex flex-col gap-[24px]">
         {/* Two-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr,1fr] gap-4 flex-1">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr,1fr] gap-4 flex-1 min-h-0">
           {/* Left column: Patient info + Appointment history */}
-          <div className="flex flex-col gap-0 bg-white rounded-[10px] border border-[#dedee1]">
+          <div className="flex flex-col gap-0 bg-white rounded-[10px] border border-[#dedee1] min-h-0 overflow-hidden">
             {/* Patient header */}
             <div className="flex justify-between gap-3 border-b border-[#dedee1]  p-4">
               <div className="flex flex-col gap-0">
@@ -334,7 +400,7 @@ export const PatientRecord = (): JSX.Element => {
             </div>
 
             {/* Appointment history */}
-            <div className="flex flex-col gap-4 p-4">
+            <div className="flex flex-col gap-4 p-4 min-h-0 overflow-y-auto">
               <h2 className="font-title-3m text-black text-[length:var(--title-3m-font-size)] tracking-[var(--title-3m-letter-spacing)]">
                 Appointment History
               </h2>
@@ -399,7 +465,10 @@ export const PatientRecord = (): JSX.Element => {
           </div>
 
           {/* Right column: Prescription detail */}
-          <div id="prescription-detail-column" className="flex flex-col gap-6">
+          <div
+            id="prescription-detail-column"
+            className="flex flex-col gap-6 min-h-0 overflow-y-auto"
+          >
             <div className="rounded-[10px] border border-[#dedee1] bg-white overflow-hidden flex flex-col">
               <div className="flex items-center justify-between px-5 py-4  border-[#dedee1]">
                 <div className="flex items-center gap-2">
@@ -474,11 +543,54 @@ export const PatientRecord = (): JSX.Element => {
                 )}
               </div>
             </div>
+
+            <div className="rounded-[10px] border border-[#dedee1] bg-white overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-[#dedee1]">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-x-70" />
+                  <h2 className="font-title-3m text-black text-[length:var(--title-3m-font-size)]">
+                    Observations
+                    <span className="font-title-5l text-[#57575f] text-sm">
+                      {` (${observationEntries.length})`}
+                    </span>
+                  </h2>
+                </div>
+              </div>
+              <div className="p-5 flex flex-col gap-3">
+                {observationLoading ? (
+                  <p className="font-title-5l text-[#57575f] text-sm py-1">
+                    Loading observations...
+                  </p>
+                ) : observationError ? (
+                  <p className="font-title-5l text-[#ff0004] text-sm py-1">
+                    Failed to load observations.
+                  </p>
+                ) : observationEntries.length > 0 ? (
+                  observationEntries.map((entry, index) => (
+                    <div
+                      key={entry._id ?? `${entry.time}-${index}`}
+                      className="rounded-[10px] border border-[#dedee1] bg-white p-4 flex flex-col gap-2"
+                    >
+                      <p className="font-title-4m text-black whitespace-pre-wrap break-words">
+                        {entry.text}
+                      </p>
+                      <p className="font-title-5l text-[#57575f] text-sm">
+                        {formatObservationDateTime(entry.time)}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="font-title-5l text-[#57575f] text-sm py-1">
+                    No observations found for this patient.
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Footer actions */}
-        <div className="flex justify-end gap-3 pt-4 border-t border-[#dedee1]">
+        <div className="mt-auto flex justify-end gap-3 pt-4 border-t border-[#dedee1]">
           <Button
             variant="ghost"
             className="inline-flex items-center gap-2 px-4 py-2 h-11 rounded-[6px] bg-white border border-[#dedee1] text-x-70 font-title-4r hover:bg-grey-light"

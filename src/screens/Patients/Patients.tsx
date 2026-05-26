@@ -3,6 +3,7 @@ import {
   AddPatientModal,
   DeletePatientModal,
   EditPatientModal,
+  ObservationModal,
 } from "../../components/modals";
 import { PatientData } from "../../components/modals/AddPatientModal";
 import { PatientHeaderSection } from "./sections/PatientHeaderSection";
@@ -20,6 +21,7 @@ export const Patients = (): JSX.Element => {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [observationModalOpen, setObservationModalOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<
     (PatientData & { _id?: string }) | null
   >(null);
@@ -58,6 +60,11 @@ export const Patients = (): JSX.Element => {
     setDeleteModalOpen(true);
   };
 
+  const openObservationModal = (patient: PatientData & { _id?: string }) => {
+    setSelectedPatient(patient);
+    setObservationModalOpen(true);
+  };
+
   return (
     <div className="w-full flex flex-col gap-[25px] p-4 md:p-6">
       <PatientHeaderSection
@@ -72,6 +79,7 @@ export const Patients = (): JSX.Element => {
       <PatientListSection
         onEditPatient={openEditModal}
         onDeletePatient={openDeleteModal}
+        onOpenObservation={openObservationModal}
         listStartDate={listStartDate}
         listEndDate={listEndDate}
       />
@@ -95,6 +103,16 @@ export const Patients = (): JSX.Element => {
         onDelete={handleDeletePatient}
         patientName={selectedPatient?.name || ""}
         patient={selectedPatient}
+      />
+
+      <ObservationModal
+        open={observationModalOpen}
+        onOpenChange={(open) => {
+          setObservationModalOpen(open);
+          if (!open) setSelectedPatient(null);
+        }}
+        patientId={selectedPatient?._id ?? ""}
+        patientName={selectedPatient?.name ?? ""}
       />
     </div>
   );

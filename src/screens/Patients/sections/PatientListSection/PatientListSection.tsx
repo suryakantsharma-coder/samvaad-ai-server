@@ -209,6 +209,7 @@ const patientsData = [
 interface PatientListSectionProps {
   onEditPatient: (patient: PatientData & { _id?: string }) => void;
   onDeletePatient: (patient: PatientData & { _id?: string }) => void;
+  onOpenObservation: (patient: PatientData & { _id?: string }) => void;
   /** YYYY-MM-DD; forwarded to GET /api/patients as `startDate` / `endDate` when set. */
   listStartDate?: string;
   listEndDate?: string;
@@ -217,6 +218,7 @@ interface PatientListSectionProps {
 export const PatientListSection = ({
   onEditPatient,
   onDeletePatient,
+  onOpenObservation,
   listStartDate = "",
   listEndDate = "",
 }: PatientListSectionProps): JSX.Element => {
@@ -598,6 +600,22 @@ export const PatientListSection = ({
                           }
                         >
                           Patient History
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            onOpenObservation({
+                              name: patient.fullName,
+                              age: patient.age,
+                              weight: patient.weight ?? 0,
+                              phone: patient.phoneNumber,
+                              gender: patient.gender,
+                              reason: patient.reason || "",
+                              countryCode: "+91",
+                              _id: patient?._id || "",
+                            })
+                          }
+                        >
+                          Observation
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-red-600 focus:text-red-600"

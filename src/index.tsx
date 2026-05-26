@@ -156,7 +156,7 @@ function AuthenticatedApp(): JSX.Element {
 
 createRoot(document.getElementById("app") as HTMLElement).render(
   <StrictMode>
-    <div className="mb-[20px]">
+    <div>
       <BrowserRouter>
         <ToastContainer position="top-right" limit={3} />
         <Routes>
