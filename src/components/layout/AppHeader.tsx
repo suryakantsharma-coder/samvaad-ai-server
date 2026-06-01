@@ -225,7 +225,7 @@ function AppHeaderNavTabs(): JSX.Element {
   }
 
   return (
-    <nav className="inline-flex flex-wrap items-center justify-center gap-[16px] md:gap-4 p-1 bg-white rounded-[50px] h-[42px]">
+    <nav className="inline-flex max-w-full flex-nowrap md:flex-wrap items-center justify-start md:justify-center gap-2 md:gap-[16px] p-1 bg-white rounded-[50px] h-[42px] overflow-x-auto">
       {navigationItems.map((item) => {
         const isActive = location.pathname === item.path;
         return (
@@ -235,7 +235,7 @@ function AppHeaderNavTabs(): JSX.Element {
             onClick={() => navigate(item.path)}
             className={`inline-flex items-center justify-center gap-[5px] px-${
               isActive ? "2.5" : "[15px]"
-            } py-[7px] rounded-[50px] h-auto ${
+            } py-[7px] rounded-[50px] h-auto shrink-0 ${
               isActive
                 ? "bg-primary-2 hover:bg-primary-2"
                 : "hover:bg-transparent"
@@ -344,16 +344,20 @@ const AppHeaderUserMenu = memo(function AppHeaderUserMenu(): JSX.Element {
  */
 export const AppHeader = memo(function AppHeader(): JSX.Element {
   return (
-    <header className="flex flex-col md:flex-row items-center justify-between w-full min-h-[78px] px-4 md:px-[30px] py-4 gap-4 relative">
+    <header className="flex flex-row md:flex-col lg:flex-row items-center justify-between w-full min-h-[78px] px-4 md:px-[30px] py-4 gap-3 md:gap-4 relative">
       <img
         className="w-[140px] h-[52px]"
         alt="Febf d c"
         src="/Logo-light-bg.svg"
       />
 
-      <AppHeaderNavTabs />
+      <div className="hidden md:block w-full lg:w-auto">
+        <AppHeaderNavTabs />
+      </div>
 
-      <AppHeaderUserMenu />
+      <div className="w-auto md:w-full lg:w-auto flex justify-end md:justify-center lg:justify-end">
+        <AppHeaderUserMenu />
+      </div>
     </header>
   );
 });

@@ -136,29 +136,29 @@ function DashboardInner(): JSX.Element {
         <DashboardShimmer />
       ) : (
         <>
-          <div className="flex flex-1 min-h-0 gap-[15px] px-[30px] pt-[15px] items-stretch">
-            <div className="flex flex-col gap-[15px] flex-1 min-w-0 min-h-0 overflow-y-auto pb-[15px]">
-              <div className="flex gap-[15px]">
+          <div className="flex flex-1 min-h-0 flex-col xl:flex-row gap-4 md:gap-[15px] px-4 md:px-[30px] pt-3 md:pt-[15px] items-stretch">
+            <div className="flex flex-col gap-4 md:gap-[15px] flex-1 min-w-0 min-h-0 xl:overflow-y-auto pb-4 md:pb-[15px]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-4 md:gap-[15px]">
                 {kpiCards.map((card) => {
                   const Icon = card.Icon;
                   return (
                     <Card
                       key={card.id}
-                      className="flex-1 h-[148px] bg-white rounded-[10px] overflow-hidden shadow-[0px_2px_6px_#a2a6b040] border-0 relative"
+                      className="bg-white rounded-[10px] overflow-hidden shadow-[0px_2px_6px_#a2a6b040] border-0 min-h-[148px]"
                     >
-                      <CardContent className="p-0 relative w-full h-full">
-                        <div className="absolute top-5 left-5 flex items-center gap-2.5">
+                      <CardContent className="p-5 flex h-full min-h-[148px] flex-col justify-between">
+                        <div className="flex items-center gap-2.5">
                           <div className="inline-flex items-center gap-2.5 p-[5px] bg-grey-light rounded-[100px]">
                             <Icon
                               className="w-[22px] h-[22px] text-x-70"
                               strokeWidth={1.8}
                             />
                           </div>
-                          <span className="font-title-3r font-[number:var(--title-3r-font-weight)] text-black text-[length:var(--title-3r-font-size)] tracking-[var(--title-3r-letter-spacing)] leading-[var(--title-3r-line-height)] whitespace-nowrap [font-style:var(--title-3r-font-style)]">
+                          <span className="font-title-3r font-[number:var(--title-3r-font-weight)] text-black text-[length:var(--title-3r-font-size)] tracking-[var(--title-3r-letter-spacing)] leading-[var(--title-3r-line-height)] [font-style:var(--title-3r-font-style)]">
                             {card.label}
                           </span>
                         </div>
-                        <div className="w-[100%] absolute top-[72px] left-5 right-[6.75rem] flex min-w-0 flex-col items-stretch gap-[5px]">
+                        <div className="w-full flex min-w-0 flex-col items-stretch gap-[5px]">
                           <span className="font-title-1 font-[number:var(--title-1-font-weight)] text-black text-[length:var(--title-1-font-size)] tracking-[var(--title-1-letter-spacing)] leading-[var(--title-1-line-height)] [font-style:var(--title-1-font-style)]">
                             {card.value}
                           </span>
@@ -180,17 +180,14 @@ function DashboardInner(): JSX.Element {
                             </span>
                           </div>
                         </div>
-                        {/* <div className="absolute top-[78px] right-5">
-                          {card.chart}
-                        </div> */}
                       </CardContent>
                     </Card>
                   );
                 })}
               </div>
 
-              <div className="flex gap-[15px]">
-                <div className="w-[320px] flex-shrink-0">
+              <div className="flex flex-col lg:flex-row gap-4 md:gap-[15px]">
+                <div className="w-full lg:w-[320px] flex-shrink-0">
                   <DoctorScheduleSection />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -201,12 +198,12 @@ function DashboardInner(): JSX.Element {
               <PatientTrendsSection />
             </div>
 
-            <div className="w-[min(100%,420px)] sm:w-[410px] shrink-0 flex flex-col min-h-0 overflow-hidden pb-[15px] self-stretch">
+            <div className="w-full xl:w-[410px] shrink-0 flex flex-col min-h-0 overflow-hidden pb-4 md:pb-[15px] self-stretch">
               <AppointmentListSection />
             </div>
           </div>
 
-          <section className="w-full shrink-0 px-[30px] pb-[30px]">
+          <section className="w-full shrink-0 px-4 md:px-[30px] pb-5 md:pb-[30px]">
             <Card className="w-full rounded-[10px] overflow-hidden shadow-[0px_2px_6px_#a2a6b040] border-0 bg-white">
               <CardContent className="p-0">
                 <PatientOverviewSection />

@@ -9,9 +9,9 @@ export const AppointmentStatsSection = (): JSX.Element => {
   const navigate = useNavigate();
 
   return (
-    <Card className="flex h-[375px] w-full flex-col overflow-hidden rounded-[10px] border-0 bg-white shadow-[0px_2px_6px_#a2a6b040]">
+    <Card className="flex h-[375px] md:h-[375px] w-full flex-col overflow-hidden rounded-[10px] border-0 bg-white shadow-[0px_2px_6px_#a2a6b040]">
       <CardContent className="flex min-h-0 flex-1 flex-col p-0">
-        <div className="mb-2.5 flex h-8 shrink-0 items-center justify-between px-5 pb-0 pt-5">
+        <div className="mb-2.5 flex h-8 shrink-0 items-center justify-between px-4 md:px-5 pb-0 pt-5">
           <div className="flex items-center gap-2.5">
             <div className="inline-flex items-center gap-2.5 p-[5px] bg-grey-light rounded-[100px]">
               <Stethoscope
@@ -40,7 +40,7 @@ export const AppointmentStatsSection = (): JSX.Element => {
           {doctors.map((doctor) => (
             <div
               key={doctor.id}
-              className="flex flex-col gap-2.5 px-5 py-0 w-full"
+              className="flex flex-col gap-2.5 px-4 md:px-5 py-0 w-full"
             >
               <div className="flex flex-col gap-2.5 px-[15px] py-3 w-full border-b border-solid border-[#dedee1]">
                 <div className="flex items-center justify-between w-full">

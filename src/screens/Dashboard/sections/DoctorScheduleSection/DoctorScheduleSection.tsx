@@ -91,7 +91,7 @@ export const DoctorScheduleSection = (): JSX.Element => {
   return (
     <Card className="w-full max-w-[496px] flex flex-col items-center bg-white rounded-[10px] overflow-hidden shadow-[0px_2px_6px_#a2a6b040] border-0">
       <CardContent className="w-full flex flex-col items-center p-0 pb-5">
-        <div className="h-8 w-full mt-5 px-5 py-0 flex items-center justify-between">
+        <div className="h-8 w-full mt-5 px-4 md:px-5 py-0 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="inline-flex items-center gap-2.5 p-[5px] bg-grey-light rounded-[100px]">
               <ChartPie
@@ -104,11 +104,11 @@ export const DoctorScheduleSection = (): JSX.Element => {
             </span>
           </div>
         </div>
-        <div className="mt-[8px]">
+        <div className="mt-[8px] w-full flex justify-center">
           <DonutChart total={donut.total} segments={donut.segments} />
         </div>
-        <div className="flex flex-col items-center gap-2.5 mt-[15px] w-[333px]">
-          <div className="inline-flex items-center gap-5">
+        <div className="flex flex-col items-center gap-2.5 mt-[15px] w-full max-w-[333px] px-4">
+          <div className="flex w-full flex-wrap items-center justify-between gap-3">
             {donut.legend.slice(0, 2).map((item, index) => (
               <div
                 key={index}
@@ -128,7 +128,7 @@ export const DoctorScheduleSection = (): JSX.Element => {
               </div>
             ))}
           </div>
-          <div className="flex items-center gap-5 self-stretch w-full">
+          <div className="flex items-center justify-between gap-3 self-stretch w-full flex-wrap">
             {donut.legend.slice(2, 4).map((item, index) => (
               <div
                 key={index}

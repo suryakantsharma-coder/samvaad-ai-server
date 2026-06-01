@@ -47,7 +47,7 @@ export const PatientTrendsSection = (): JSX.Element => {
 
   return (
     <Card className="w-full bg-white rounded-[10px] overflow-hidden shadow-[0px_2px_6px_#a2a6b040] border-0">
-      <CardContent className="p-5">
+      <CardContent className="p-4 md:p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5">
             <div className="inline-flex items-center gap-2.5 p-[5px] bg-grey-light rounded-[100px]">
@@ -62,7 +62,7 @@ export const PatientTrendsSection = (): JSX.Element => {
           </div>
         </div>
 
-        <div className="flex items-center gap-[30px] mb-6 flex-wrap">
+        <div className="flex items-center gap-4 md:gap-[30px] mb-6 flex-wrap">
           <div className="inline-flex items-center gap-2.5">
             <span className="whitespace-nowrap font-title-1 font-[number:var(--title-1-font-weight)] text-black text-[length:var(--title-1-font-size)] tracking-[var(--title-1-letter-spacing)] leading-[var(--title-1-line-height)] [font-style:var(--title-1-font-style)]">
               {patientTrends.total.toLocaleString()}
@@ -94,7 +94,7 @@ export const PatientTrendsSection = (): JSX.Element => {
           ))}
         </div>
 
-        <div className="flex items-end gap-0 w-full">
+        <div className="flex items-end gap-0 w-full overflow-x-auto">
           <div className="flex flex-col items-end justify-between h-[240px] pr-3 pb-6 flex-shrink-0">
             {yAxisLabels.map((label) => (
               <span
@@ -106,7 +106,7 @@ export const PatientTrendsSection = (): JSX.Element => {
             ))}
           </div>
 
-          <div className="flex-1 relative min-w-0">
+          <div className="flex-1 relative min-w-[520px] md:min-w-0">
             <div
               className="absolute top-0 left-0 right-0 h-px bg-[#dedee1]"
               style={{ top: "0%" }}

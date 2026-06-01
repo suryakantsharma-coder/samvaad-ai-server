@@ -390,7 +390,7 @@ export const AppointmentListSection = ({
                   <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
                     Appointment Date and Time
                   </TableHead>
-                  <TableHead className="font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)]">
+                  <TableHead className="text-right font-title-4m leading-[19px] px-[20px] py-[10px] font-[number:var(--title-4m-font-weight)] text-black text-[length:var(--title-4m-font-size)] tracking-[var(--title-4m-letter-spacing)] leading-[var(--title-4m-line-height)] [font-style:var(--title-4m-font-style)] md:text-left">
                     Action
                   </TableHead>
                 </TableRow>
@@ -494,7 +494,7 @@ export const AppointmentListSection = ({
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6 px-[40px] py-[10px] hover:bg-transparent active:bg-transparent data-[state=open]:bg-transparent"
+                              className="ml-auto h-6 w-6 px-[40px] py-[10px] hover:bg-transparent active:bg-transparent data-[state=open]:bg-transparent"
                             >
                               <ThreeDotsVerticalIcon className="h-6 w-6" />
                             </Button>

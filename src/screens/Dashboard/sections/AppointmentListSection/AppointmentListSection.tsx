@@ -17,9 +17,9 @@ export const AppointmentListSection = (): JSX.Element => {
   const rangeLabel = formatRangeDisplay(dateRange.start, dateRange.end);
 
   return (
-    <Card className="w-full h-[965px] min-h-0 max-h-full flex flex-col bg-white rounded-[10px] overflow-hidden shadow-[0px_2px_6px_#a2a6b040] border-0">
+    <Card className="w-full h-auto xl:h-[965px] min-h-0 max-h-full flex flex-col bg-white rounded-[10px] overflow-hidden shadow-[0px_2px_6px_#a2a6b040] border-0">
       <CardContent className="p-0 flex h-full min-h-0 flex-1 flex-col overflow-hidden gap-0">
-        <div className="flex flex-col gap-2 mt-5 px-5 flex-shrink-0 pb-4">
+        <div className="flex flex-col gap-2 mt-5 px-4 md:px-5 flex-shrink-0 pb-4">
           <div className="flex items-center gap-2.5">
             <div className="inline-flex items-center gap-2.5 p-[5px] bg-grey-light rounded-[100px]">
               <CalendarDays
@@ -38,7 +38,40 @@ export const AppointmentListSection = (): JSX.Element => {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 w-full overflow-x-auto overflow-y-auto px-5 pb-5">
+        <div className="flex flex-col gap-3 px-4 pb-5 md:hidden">
+          {rows.map((row) => (
+            <div
+              key={row.id}
+              className="rounded-xl border border-[#dedee1] bg-white p-3 shadow-[0px_1px_3px_#a2a6b025]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-title-4m text-black truncate">{row.patient}</p>
+                  <p className="font-title-5l text-x-70">{row.age}</p>
+                </div>
+                <span
+                  className={`inline-flex items-center justify-center px-2.5 py-[5px] rounded-[100px] ${row.statusBg}`}
+                >
+                  <span className={`font-title-4r ${row.statusText}`}>
+                    {row.status}
+                  </span>
+                </span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
+                <p className="font-title-5l text-x-70">Time</p>
+                <p className="font-title-4r text-black text-right">{row.time}</p>
+                <p className="font-title-5l text-x-70">Doctor</p>
+                <p className="font-title-4r text-black text-right truncate">{row.doctor}</p>
+                <p className="font-title-5l text-x-70">Type</p>
+                <p className="font-title-4r text-black text-right">{row.type}</p>
+                <p className="font-title-5l text-x-70">Date</p>
+                <p className="font-title-4r text-black text-right">{row.date}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="hidden md:block min-h-0 flex-1 w-full overflow-x-auto overflow-y-auto px-5 pb-5">
           <Table>
             <TableHeader>
               <TableRow className="bg-grey-dark hover:bg-grey-dark border-0">

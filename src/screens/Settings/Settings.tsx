@@ -1405,7 +1405,7 @@ export const Settings = (): JSX.Element => {
         type="single"
         value={activeTab}
         onValueChange={(v) => v && setActiveTab(v)}
-        className="inline-flex flex-wrap items-center gap-2 p-[3px] bg-white rounded-[100px] border border-[#dedee1] w-fit"
+        className="inline-flex w-full sm:w-fit flex-wrap items-center gap-2 p-0 sm:p-[3px] bg-transparent sm:bg-white rounded-none sm:rounded-[100px] border-0 sm:border sm:border-[#dedee1]"
       >
         {settingsTabs.map((tab) => {
           const Icon = tab.icon;
@@ -1413,7 +1413,7 @@ export const Settings = (): JSX.Element => {
             <ToggleGroupItem
               key={tab.id}
               value={tab.id}
-              className="inline-flex items-center justify-center gap-2 px-5 py-[10px] rounded-[100px] font-title-4r text-[length:var(--title-4r-font-size)] data-[state=on]:bg-primary-2 data-[state=on]:text-white bg-transparent text-x-70"
+              className="inline-flex items-center justify-center gap-2 px-4 sm:px-5 py-[10px] rounded-[100px] border border-[#dedee1] bg-white text-black font-title-4r text-[length:var(--title-4r-font-size)] data-[state=on]:bg-primary-2 data-[state=on]:border-primary-2 data-[state=on]:text-white sm:border-0 sm:bg-transparent sm:text-x-70 sm:data-[state=on]:bg-primary-2 sm:data-[state=on]:text-white"
             >
               <Icon className="w-4 h-4" />
               {tab.label}

@@ -17,8 +17,8 @@ export const DashboardDateRangeBar = (): JSX.Element => {
   } = useDashboardData();
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-3 px-[30px] pb-3 pt-1">
-      <div className="inline-flex items-center gap-2.5 px-[15px] py-1.5 bg-white rounded-[100px] shadow-[0px_1px_3px_#a2a6b025]">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 md:px-[30px] pb-3 pt-1">
+      <div className="inline-flex w-full sm:w-auto items-center gap-2.5 px-[15px] py-1.5 bg-white rounded-[100px] shadow-[0px_1px_3px_#a2a6b025]">
         <CalendarDays className="w-5 h-5 text-x-70 shrink-0" strokeWidth={1.8} />
         <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-black text-[length:var(--title-4r-font-size)] tracking-[var(--title-4r-letter-spacing)] leading-[var(--title-4r-line-height)] whitespace-nowrap [font-style:var(--title-4r-font-style)]">
           {formatRangeDisplay(dateRange.start, dateRange.end)}
@@ -30,7 +30,7 @@ export const DashboardDateRangeBar = (): JSX.Element => {
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex w-full sm:w-auto flex-wrap items-center gap-2">
         <label className="inline-flex items-center gap-2 text-sm text-x-70">
           <span className="font-title-4r font-[number:var(--title-4r-font-weight)] text-[length:var(--title-4r-font-size)]">
             From
@@ -55,11 +55,11 @@ export const DashboardDateRangeBar = (): JSX.Element => {
         </label>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex w-full sm:w-auto flex-wrap items-center gap-2">
         <Button
           type="button"
           variant="outline"
-          className="h-auto rounded-[100px] px-3 py-1.5 text-xs border-[#dedee1]"
+          className="h-auto rounded-[100px] px-3 py-1.5 text-xs border-[#dedee1] flex-1 sm:flex-initial"
           onClick={() => applyPresetDays(7)}
         >
           Last 7 days
@@ -67,7 +67,7 @@ export const DashboardDateRangeBar = (): JSX.Element => {
         <Button
           type="button"
           variant="outline"
-          className="h-auto rounded-[100px] px-3 py-1.5 text-xs border-[#dedee1]"
+          className="h-auto rounded-[100px] px-3 py-1.5 text-xs border-[#dedee1] flex-1 sm:flex-initial"
           onClick={() => applyPresetDays(30)}
         >
           Last 30 days
@@ -75,7 +75,7 @@ export const DashboardDateRangeBar = (): JSX.Element => {
         <Button
           type="button"
           variant="outline"
-          className="h-auto rounded-[100px] px-3 py-1.5 text-xs border-[#dedee1]"
+          className="h-auto rounded-[100px] px-3 py-1.5 text-xs border-[#dedee1] flex-1 sm:flex-initial"
           onClick={applyThisMonth}
         >
           This month

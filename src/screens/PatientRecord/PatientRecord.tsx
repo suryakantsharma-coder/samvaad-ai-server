@@ -127,9 +127,9 @@ export const PatientRecord = (): JSX.Element => {
     useState(false);
   const [editingPrescription, setEditingPrescription] =
     useState<ModalPrescription | null>(null);
-  const [observationEntries, setObservationEntries] = useState<ObservationEntry[]>(
-    [],
-  );
+  const [observationEntries, setObservationEntries] = useState<
+    ObservationEntry[]
+  >([]);
   const [observationLoading, setObservationLoading] = useState(false);
   const [observationError, setObservationError] = useState<string | null>(null);
 
@@ -187,7 +187,9 @@ export const PatientRecord = (): JSX.Element => {
       status: "Draft",
       ...(p.followUp ? { followUp: p.followUp } : {}),
       ...(p.extraNotes ? { extraNotes: p.extraNotes } : {}),
-      ...(p.hospital ? { hospital: p.hospital as ModalPrescription["hospital"] } : {}),
+      ...(p.hospital
+        ? { hospital: p.hospital as ModalPrescription["hospital"] }
+        : {}),
       ...(p.notes ? { notes: p.notes } : {}),
     };
   };
@@ -496,7 +498,9 @@ export const PatientRecord = (): JSX.Element => {
                       variant="ghost"
                       className="h-8 px-2.5 text-primary-2 hover:text-primary-2 hover:bg-primary-2/10 font-title-4r"
                       leadingIcon={<FilePenLine className="h-4 w-4" />}
-                      onClick={() => handleEditPrescription(selectedPrescription)}
+                      onClick={() =>
+                        handleEditPrescription(selectedPrescription)
+                      }
                     >
                       Edit
                     </Button>
@@ -524,7 +528,9 @@ export const PatientRecord = (): JSX.Element => {
                     ))}
                     {selectedPrescription.extraNotes?.trim() ? (
                       <div className="rounded-[10px] bg-[#f5f7ff] p-4 flex flex-col gap-1.5">
-                        <p className="font-title-4m text-[#2b4cb3]">Extra Notes</p>
+                        <p className="font-title-4m text-[#2b4cb3]">
+                          Extra Notes
+                        </p>
                         <p className="font-title-5l text-[#57575f] text-sm whitespace-pre-wrap break-words">
                           {selectedPrescription.extraNotes}
                         </p>

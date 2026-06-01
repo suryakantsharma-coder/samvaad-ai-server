@@ -1,7 +1,8 @@
 import { dialogCloseButtonClassName } from "../ui/dialog-close-styles";
 
 /** Footer row: right-aligned actions, spacing matches New Appointment modal */
-export const modalFooterRowClassName = "flex justify-end gap-3 pt-4";
+export const modalFooterRowClassName =
+  "flex flex-wrap items-center justify-end gap-2 pt-4 sm:flex-nowrap sm:gap-3 [&>button]:shrink-0";
 
 /** Secondary / dismiss action (Cancel, Close) — plain X icon beside label */
 export const modalFooterCancelClassName =

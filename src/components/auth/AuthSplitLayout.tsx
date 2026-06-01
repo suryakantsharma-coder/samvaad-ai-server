@@ -73,7 +73,7 @@ export function AuthSplitLayout({
 
           {/* Right half: hero (no card UI — typography only) */}
           <section
-            className="relative flex min-h-[260px] w-full shrink-0 flex-col justify-center overflow-hidden md:h-full md:w-1/2 md:min-w-0 md:max-w-[50%] md:min-h-0"
+            className="relative hidden md:flex min-h-[260px] w-full shrink-0 flex-col justify-center overflow-hidden md:h-full md:w-1/2 md:min-w-0 md:max-w-[50%] md:min-h-0"
             aria-label="Welcome"
           >
             <div

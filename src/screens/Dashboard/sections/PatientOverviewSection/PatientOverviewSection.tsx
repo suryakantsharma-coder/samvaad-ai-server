@@ -18,7 +18,7 @@ export const PatientOverviewSection = (): JSX.Element => {
 
   return (
     <div className="w-full flex flex-col gap-5 bg-white overflow-hidden">
-      <div className="flex items-center justify-between px-5 pt-5">
+      <div className="flex items-center justify-between px-4 md:px-5 pt-5">
         <div className="flex items-center gap-2.5">
           <div className="inline-flex items-center gap-2.5 p-[5px] bg-grey-light rounded-[100px]">
             <Users className="w-[22px] h-[22px] text-x-70" strokeWidth={1.8} />
@@ -40,7 +40,43 @@ export const PatientOverviewSection = (): JSX.Element => {
           />
         </div>
       </div>
-      <div className="w-full overflow-x-auto">
+      <div className="grid grid-cols-1 gap-3 px-4 pb-5 md:hidden">
+        {patientData.map((patient) => (
+          <div
+            key={patient.id}
+            className="rounded-xl border border-[#dedee1] bg-white p-3 shadow-[0px_1px_3px_#a2a6b025]"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-title-4m text-black truncate">{patient.name}</p>
+                <p className="font-title-5l text-x-70">{patient.age}</p>
+              </div>
+              <span
+                className={`inline-flex items-center justify-center px-2.5 py-[5px] rounded-[100px] ${patient.statusBg}`}
+              >
+                <span className={`font-title-4r ${patient.statusText}`}>
+                  {patient.status}
+                </span>
+              </span>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
+              <p className="font-title-5l text-x-70">Phone</p>
+              <p className="font-title-4r text-black text-right">{patient.phone}</p>
+              <p className="font-title-5l text-x-70">Gender</p>
+              <p className="font-title-4r text-black text-right">{patient.gender}</p>
+              <p className="font-title-5l text-x-70">Reason</p>
+              <p className="font-title-4r text-black text-right truncate">{patient.reason}</p>
+              <p className="font-title-5l text-x-70">Doctor</p>
+              <p className="font-title-4r text-black text-right truncate">{patient.doctor}</p>
+              <p className="font-title-5l text-x-70">Appointment</p>
+              <p className="font-title-4r text-black text-right">
+                {patient.appointmentDate} {patient.time}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden md:block w-full overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-grey-dark hover:bg-grey-dark border-0">
