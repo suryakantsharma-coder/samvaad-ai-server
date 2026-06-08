@@ -17,7 +17,7 @@ export const AppointmentListSection = (): JSX.Element => {
   const rangeLabel = formatRangeDisplay(dateRange.start, dateRange.end);
 
   return (
-    <Card className="w-full h-auto xl:h-[965px] min-h-0 max-h-full flex flex-col bg-white rounded-[10px] overflow-hidden shadow-[0px_2px_6px_#a2a6b040] border-0">
+    <Card className="w-full h-auto xl:h-full min-h-0 max-h-full flex flex-col bg-white rounded-[10px] overflow-hidden shadow-[0px_2px_6px_#a2a6b040] border-0">
       <CardContent className="p-0 flex h-full min-h-0 flex-1 flex-col overflow-hidden gap-0">
         <div className="flex flex-col gap-2 mt-5 px-4 md:px-5 flex-shrink-0 pb-4">
           <div className="flex items-center gap-2.5">
