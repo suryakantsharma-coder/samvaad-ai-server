@@ -1,6 +1,6 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AppHeader } from "./AppHeader";
-import { Stethoscope } from "lucide-react";
+import { BarChart3, Stethoscope } from "lucide-react";
 import { useAuth } from "../../contexts/AuthProvider";
 import {
   isHospitalAdminRole,
@@ -13,7 +13,7 @@ type MobileNavItem = {
   path: string;
   icon: string;
   label: string;
-  iconMode?: "asset" | "doctors";
+  iconMode?: "asset" | "doctors" | "usage";
 };
 
 function mobileNavigationItemsForRole(role: string | undefined | null): MobileNavItem[] {
@@ -22,6 +22,7 @@ function mobileNavigationItemsForRole(role: string | undefined | null): MobileNa
       { id: "hospitals", label: "Hospitals", icon: "/building.svg", path: "/hospitals" },
       { id: "medicines", label: "Medicine", icon: "/pill.svg", path: "/medicines" },
       { id: "payouts", label: "Payouts", icon: "/payment.svg", path: "/payout" },
+      { id: "usage", label: "Usage", icon: "/call.svg", path: "/usage/super-admin", iconMode: "usage" },
     ];
   }
 
@@ -55,6 +56,7 @@ function mobileNavigationItemsForRole(role: string | undefined | null): MobileNa
       { id: "appointments", label: "Appointments", icon: "/calender.svg", path: "/appointments" },
       { id: "prescriptions", label: "Prescriptions", icon: "/pill.svg", path: "/prescriptions" },
       { id: "payments", label: "Payments", icon: "/payment.svg", path: "/payment" },
+      { id: "usage", label: "Usage", icon: "/call.svg", path: "/usage", iconMode: "usage" },
     ];
   }
 
@@ -94,6 +96,8 @@ function MobileBottomNav(): JSX.Element | null {
             >
               {item.iconMode === "doctors" ? (
                 <Stethoscope className="h-5 w-5" strokeWidth={2} />
+              ) : item.iconMode === "usage" ? (
+                <BarChart3 className="h-5 w-5" strokeWidth={2} />
               ) : (
                 <img
                   className="h-5 w-5"

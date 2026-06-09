@@ -11,7 +11,7 @@ import { Settings } from "./screens/Settings";
 import { Login } from "./screens/Login";
 import { Signup } from "./screens/Signup";
 import { AuthProvider, useAuth } from "./contexts/AuthProvider";
-import { getHomePathForRole, isHospitalAdminRole } from "./lib/userRole";
+import { getHomePathForRole, isHospitalAdminRole, isSuperAdminRole } from "./lib/userRole";
 import { DoctorProvider } from "./contexts/DoctorProvider";
 import { PatientProvider } from "./contexts/PatientProvider";
 import { AppointmentProvider } from "./contexts/AppointmentProvider";
@@ -23,6 +23,8 @@ import { Payment } from "./screens/Payment";
 import { Payout } from "./screens/Payout";
 import { MainLayout } from "./components/layout";
 import { Dashboard } from "./screens/Dashboard";
+import { Usage } from "./screens/Usage";
+import { SuperAdminUsage } from "./screens/SuperAdminUsage";
 import { HospitalProvider } from "./contexts/HospitalProvider";
 import { PrescriptionProvider } from "./contexts/PrescriptionProvider";
 import { PublicPrescription } from "./screens/PublicPrescription";
@@ -112,6 +114,36 @@ function HospitalAdminDashboardRoute(): JSX.Element {
   return <Dashboard />;
 }
 
+/** Usage API and UI are hospital-admin only; others are sent to their home. */
+function HospitalAdminUsageRoute(): JSX.Element {
+  const { user, authHydrating } = useAuth();
+  if (authHydrating) {
+    return <div className="flex-1 min-h-[40vh]" aria-busy="true" />;
+  }
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  if (!isHospitalAdminRole(user.role)) {
+    return <Navigate to={getHomePathForRole(user.role)} replace />;
+  }
+  return <Usage />;
+}
+
+/** Usage API and UI are super-admin only; others are sent to their home. */
+function SuperAdminUsageRoute(): JSX.Element {
+  const { user, authHydrating } = useAuth();
+  if (authHydrating) {
+    return <div className="flex-1 min-h-[40vh]" aria-busy="true" />;
+  }
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  if (!isSuperAdminRole(user.role)) {
+    return <Navigate to={getHomePathForRole(user.role)} replace />;
+  }
+  return <SuperAdminUsage />;
+}
+
 /** Logged-in app: providers, toasts, and main routes (AuthProvider redirects if no token). */
 function AuthenticatedApp(): JSX.Element {
   return (
@@ -139,6 +171,8 @@ function AuthenticatedApp(): JSX.Element {
                       path="/dashboard"
                       element={<HospitalAdminDashboardRoute />}
                     />
+                    <Route path="/usage" element={<HospitalAdminUsageRoute />} />
+                    <Route path="/usage/super-admin" element={<SuperAdminUsageRoute />} />
                     <Route path="/patients" element={<Patients />} />
                     <Route path="/doctors" element={<Doctors />} />
                     <Route path="/appointments" element={<Appointments />} />

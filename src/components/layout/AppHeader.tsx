@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import {
+  BarChart3,
   BellIcon,
   ChevronDownIcon,
   LogOutIcon,
@@ -27,7 +28,7 @@ type NavItem = {
   icon: string;
   path: string;
   /** Dashboard uses an inline doctor (stethoscope) SVG instead of `icon`. */
-  iconMode?: "asset" | "doctor" | "doctors";
+  iconMode?: "asset" | "doctor" | "doctors" | "usage";
 };
 
 const DEFAULT_NAV_ITEMS: NavItem[] = [
@@ -81,6 +82,13 @@ function navigationItemsForUser(user: User | null): NavItem[] {
         label: "Payouts",
         icon: "/payment.svg",
         path: "/payout",
+      },
+      {
+        id: "usage",
+        label: "Usage",
+        icon: "/call.svg",
+        path: "/usage/super-admin",
+        iconMode: "usage",
       },
     ];
   }
@@ -161,6 +169,13 @@ function navigationItemsForUser(user: User | null): NavItem[] {
         label: "Payments",
         icon: "/payment.svg",
         path: "/payment",
+      },
+      {
+        id: "usage",
+        label: "Usage",
+        icon: "/call.svg",
+        path: "/usage",
+        iconMode: "usage",
       },
     ];
   }
@@ -245,6 +260,12 @@ function AppHeaderNavTabs(): JSX.Element {
               <Stethoscope
                 className={`h-5 w-5 shrink-0 ${isActive ? "text-white" : "text-black"}`}
                 strokeWidth={1.75}
+                aria-hidden
+              />
+            ) : item.iconMode === "usage" ? (
+              <BarChart3
+                className={`h-5 w-5 shrink-0 ${isActive ? "text-white" : "text-black"}`}
+                strokeWidth={1.9}
                 aria-hidden
               />
             ) : (
