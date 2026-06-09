@@ -9,4 +9,9 @@ interface ImportMetaEnv {
   readonly VITE_WHATSAPP_ONBOARDING_URL?: string;
   /** Two-step verification PIN for POST .../register (default 123456). */
   readonly VITE_WHATSAPP_REGISTER_PIN?: string;
+  readonly VITE_WA_TEMPLATE_APPOINTMENT_CONFIRMATION?: string;
+  readonly VITE_WA_TEMPLATE_POST_OPD_PRESCRIPTION?: string;
+  readonly VITE_WA_TEMPLATE_MEDICINE_REMINDER?: string;
+  readonly VITE_WA_TEMPLATE_DOSAGE_COMPLETION?: string;
+  readonly VITE_WA_TEMPLATE_DOSAGE_FOLLOWUP_NOT_YET?: string;
 }

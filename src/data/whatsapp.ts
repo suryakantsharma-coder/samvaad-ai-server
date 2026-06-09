@@ -68,6 +68,18 @@ export interface WhatsappOnboardingStatusPayload {
   verifyRegistration: boolean;
 }
 
+export interface WhatsappTemplateAssignmentPayload {
+  hospitalId: string;
+  phone_number_id: string;
+  templates: {
+    appointmentConfirmation: string;
+    postOpdPrescription: string;
+    medicineReminder: string;
+    dosageCompletion: string;
+    dosageFollowupNotYet: string;
+  };
+}
+
 export function parseWhatsappOnboardingStatus(
   raw: unknown,
   hospitalIdFallback: string,
@@ -132,6 +144,29 @@ export async function putWhatsappOnboardingStatus(
       registrationPhone: payload.registrationPhone,
       subscribeApp: payload.subscribeApp,
       verifyRegistration: payload.verifyRegistration,
+    },
+  });
+}
+
+/**
+ * POST /api/whatsapp-template-assignment
+ * Assigns template names for a hospital + WhatsApp phone number id.
+ */
+export async function postWhatsappTemplateAssignment(
+  payload: WhatsappTemplateAssignmentPayload,
+): Promise<unknown> {
+  return authFetch("/api/whatsapp-template-assignment", {
+    method: "POST",
+    body: {
+      hospitalId: payload.hospitalId.trim(),
+      phone_number_id: payload.phone_number_id.trim(),
+      templates: {
+        appointmentConfirmation: payload.templates.appointmentConfirmation.trim(),
+        postOpdPrescription: payload.templates.postOpdPrescription.trim(),
+        medicineReminder: payload.templates.medicineReminder.trim(),
+        dosageCompletion: payload.templates.dosageCompletion.trim(),
+        dosageFollowupNotYet: payload.templates.dosageFollowupNotYet.trim(),
+      },
     },
   });
 }

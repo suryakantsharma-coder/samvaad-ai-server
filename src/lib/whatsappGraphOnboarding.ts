@@ -1,4 +1,5 @@
 import {
+  postWhatsappTemplateAssignment,
   putWhatsappOnboardingStatus,
   type WhatsappOnboardingStatusPayload,
 } from "../data/whatsapp";
@@ -9,7 +10,8 @@ export const WHATSAPP_GRAPH_API_VERSION = "v21.0";
 export type WhatsappOnboardingStepId =
   | "register"
   | "subscribed_apps"
-  | "phone_status";
+  | "phone_status"
+  | "template_assignment";
 
 export interface WhatsappOnboardingStepState {
   id: WhatsappOnboardingStepId;
@@ -35,6 +37,11 @@ export function defaultOnboardingSteps(): WhatsappOnboardingStepState[] {
     {
       id: "phone_status",
       label: "Phone status (GET /PHONE_NUMBER_ID?fields=…)",
+      status: "idle",
+    },
+    {
+      id: "template_assignment",
+      label: "Template assignment (POST /api/whatsapp-template-assignment)",
       status: "idle",
     },
   ];
@@ -110,7 +117,6 @@ function isStepHttpSuccess(res: Response): boolean {
 }
 
 async function syncOnboardingToServer(
-  hospitalId: string,
   flags: WhatsappOnboardingStatusPayload,
 ): Promise<void> {
   try {
@@ -176,7 +182,7 @@ export async function runWhatsappGraphOnboarding(params: {
       if (index === 0) serverFlags.registrationPhone = false;
       if (index === 1) serverFlags.subscribeApp = false;
       if (index === 2) serverFlags.verifyRegistration = false;
-      await syncOnboardingToServer(hospital, serverFlags);
+      await syncOnboardingToServer(serverFlags);
       onStepError(steps[index].label, msg);
       onStepUpdate([...steps]);
       return;
@@ -203,13 +209,93 @@ export async function runWhatsappGraphOnboarding(params: {
     if (index === 1) serverFlags.subscribeApp = ok;
     if (index === 2) serverFlags.verifyRegistration = ok;
 
-    await syncOnboardingToServer(hospital, serverFlags);
+    await syncOnboardingToServer(serverFlags);
 
     if (!ok) {
       onStepError(
         steps[index].label,
         steps[index].errorMessage ?? `HTTP ${httpStatus}`,
       );
+    }
+    onStepUpdate([...steps]);
+  };
+
+  const runTemplateAssignment = async (): Promise<void> => {
+    const stepIndex = 3;
+    steps[stepIndex] = { ...steps[stepIndex], status: "running" };
+    onStepUpdate([...steps]);
+
+    const templateEnv = {
+      appointmentConfirmation: (
+        import.meta.env.VITE_WA_TEMPLATE_APPOINTMENT_CONFIRMATION ?? ""
+      ).trim(),
+      postOpdPrescription: (
+        import.meta.env.VITE_WA_TEMPLATE_POST_OPD_PRESCRIPTION ?? ""
+      ).trim(),
+      medicineReminder: (
+        import.meta.env.VITE_WA_TEMPLATE_MEDICINE_REMINDER ?? ""
+      ).trim(),
+      dosageCompletion: (
+        import.meta.env.VITE_WA_TEMPLATE_DOSAGE_COMPLETION ?? ""
+      ).trim(),
+      dosageFollowupNotYet: (
+        import.meta.env.VITE_WA_TEMPLATE_DOSAGE_FOLLOWUP_NOT_YET ?? ""
+      ).trim(),
+    };
+
+    const missing: string[] = [];
+    if (!hospital) missing.push("hospitalId");
+    if (!phoneNumberId?.trim()) missing.push("phone_number_id");
+    if (!templateEnv.appointmentConfirmation) {
+      missing.push("VITE_WA_TEMPLATE_APPOINTMENT_CONFIRMATION");
+    }
+    if (!templateEnv.postOpdPrescription) {
+      missing.push("VITE_WA_TEMPLATE_POST_OPD_PRESCRIPTION");
+    }
+    if (!templateEnv.medicineReminder) {
+      missing.push("VITE_WA_TEMPLATE_MEDICINE_REMINDER");
+    }
+    if (!templateEnv.dosageCompletion) {
+      missing.push("VITE_WA_TEMPLATE_DOSAGE_COMPLETION");
+    }
+    if (!templateEnv.dosageFollowupNotYet) {
+      missing.push("VITE_WA_TEMPLATE_DOSAGE_FOLLOWUP_NOT_YET");
+    }
+
+    if (missing.length > 0) {
+      const msg = `Missing required fields for template assignment: ${missing.join(", ")}`;
+      steps[stepIndex] = {
+        ...steps[stepIndex],
+        status: "failed",
+        errorMessage: msg,
+        completedAt: new Date().toISOString(),
+      };
+      onStepError(steps[stepIndex].label, msg);
+      onStepUpdate([...steps]);
+      return;
+    }
+
+    try {
+      await postWhatsappTemplateAssignment({
+        hospitalId: hospital,
+        phone_number_id: phoneNumberId.trim(),
+        templates: templateEnv,
+      });
+      steps[stepIndex] = {
+        ...steps[stepIndex],
+        status: "success",
+        httpStatus: 200,
+        completedAt: new Date().toISOString(),
+      };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Template assignment failed";
+      steps[stepIndex] = {
+        ...steps[stepIndex],
+        status: "failed",
+        errorMessage: msg,
+        completedAt: new Date().toISOString(),
+      };
+      onStepError(steps[stepIndex].label, msg);
     }
     onStepUpdate([...steps]);
   };
@@ -250,6 +336,8 @@ export async function runWhatsappGraphOnboarding(params: {
       },
     ),
   );
+
+  await runTemplateAssignment();
 
   return steps.every((s) => s.status === "success");
 }
